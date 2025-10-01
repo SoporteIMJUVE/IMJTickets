@@ -40,7 +40,11 @@
                                 @endguest
 
                                 @auth
-                                    <button wire:click="ticketProgress({{ $ticket->id }})" class="btn btn-{{ $ticket->estado_sty }} w-full h-full">
+                                    <button wire:key="{{ $ticket->id }}"
+                                            wire:click="ticketProgress({{ $ticket->id }})"
+                                            wire:confirm.prompt='¿Estás seguro de que deseas cambiar el estado del ticket {{ $ticket->id }}?
+                                                                 \nIngresa la palabra "{{ $ticket->estado_sigtxt }}" para confirmar|{{ $ticket->estado_sigtxt }}'
+                                            class="btn btn-{{ $ticket->estado_sty }} w-full h-full">
                                         {{ $ticket->estado_txt }}
                                     </button>
                                 @endauth

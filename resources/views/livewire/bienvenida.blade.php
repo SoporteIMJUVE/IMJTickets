@@ -24,10 +24,5 @@
 
         </div>
 
-        <!-- Version -->
-        <div class="absolute bottom-2 left-2 text-gray-400 text-sm">
-            v0.7.0
-        </div>
-
     </div>
 </x-layouts.app>

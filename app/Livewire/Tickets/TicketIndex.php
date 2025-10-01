@@ -13,9 +13,9 @@ class TicketIndex extends Component
 
     public $numEstados;
 
-    public function ticketProgress($Id)
+    public function ticketProgress($id)
     {
-        $ticket = Ticket::find($Id);
+        $ticket = Ticket::find($id);
         if ($ticket && $ticket->estado < 3) { // asumimos que 3 = Cerrado
             $ticket->increment('estado'); // incrementa 1 automáticamente en la BD
             $ticket->refresh(); // refresca los datos del modelo

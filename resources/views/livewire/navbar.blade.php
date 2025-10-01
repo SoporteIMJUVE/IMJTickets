@@ -2,10 +2,15 @@
 
     {{-- Parte superior de la barra (botones) --}}
     <div class="flex w-full bg-white shadow-md px-20 py-3 z-10">
+
+        {{-- Versión --}}
+        <span class="absolute left-7 top-1/2 -translate-y-1/2 text-xs text-gray-300">
+            v0.8.0
+        </span>
         
         <div class="flex-1">
             <a class="btn btn-ghost p-0 h-auto w-auto"
-                href="/"
+                href="{{ route('bienvenida') }}"
                 wire:navigate.hover>
                 <img src="{{ asset('images/IMJLogo.jpeg') }}" alt="IMJTickets" class="h-10">
             </a>

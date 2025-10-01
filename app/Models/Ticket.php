@@ -21,6 +21,19 @@ class Ticket extends Model
         return self::ESTADOS[$this->estado] ?? 'Desconocido';
     }
 
+    public function getEstadoSigtxtAttribute()
+{
+    $i = $this->estado;
+    $estados = self::ESTADOS;
+
+    // verificar si ya es el último estado
+    if ($i >= count($estados) - 1) {
+        return null;
+    }
+
+    return $estados[$i + 1];
+}
+
     const ESTILOS = [
         0 => 'success',
         1 => 'warning',
