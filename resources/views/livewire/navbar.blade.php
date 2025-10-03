@@ -5,7 +5,7 @@
 
         {{-- Versión --}}
         <span class="absolute left-7 top-1/2 -translate-y-1/2 text-xs text-gray-300">
-            v0.8.0
+            v0.8.1
         </span>
         
         <div class="flex-1">
