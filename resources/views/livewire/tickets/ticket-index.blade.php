@@ -3,7 +3,7 @@
     {{-- Tabla de tickets --}}
     <div class="overflow-x-auto rounded-box w-full shadow-xl">
         <table id="tickets-table" class="table table-fixed text-xs">
-
+            
             <!-- head -->
             <thead class="bg-[#681a32] text-white">
                 <tr>
@@ -51,8 +51,8 @@
                             @endif
                         </td>
                         <td class="border-r border-gray-300 text-center">{{ $ticket->created_at }}</td>
-                        <td class="border-r border-gray-300 text-center">{{ $ticket->updated_at }}</td>
-                        <td class="text-center">{{ $ticket->updated_at }}</td>
+                        <td class="border-r border-gray-300 text-center">{{ $ticket->atendido_at }}</td>
+                        <td class="text-center">@if($ticket->estado == $numEstados-1){{ $ticket->updated_at }}@endif</td>
                     </tr>
                 @endforeach
                 
@@ -72,6 +72,15 @@
         </div>
 
     </div>
+
+    {{-- Elementos ocultos para mantener los estilos de DaisyUI --}}
+    {{-- (DaisyUI aplica estilos solo si detecta estos elementos en el DOM) --}}
+    <div class="badge badge-outline badge-error" style="display: none;"></div>
+    <div class="badge badge-outline badge-warning" style="display: none;"></div>
+    <div class="badge badge-outline badge-success" style="display: none;"></div>
+    <button class="btn btn-error" style="display: none;"></button>
+    <button class="btn btn-warning" style="display: none;"></button>
+    <button class="btn btn-success" style="display: none;"></button>
 
     {{--
     <!-- jQuery (necesario para colResizable) -->

@@ -18,6 +18,13 @@ class TicketIndex extends Component
         $ticket = Ticket::find($id);
         if ($ticket && $ticket->estado < 3) { // asumimos que 3 = Cerrado
             $ticket->increment('estado'); // incrementa 1 automáticamente en la BD
+
+            // Si el estado cambia a "Atendiendo"
+            if ($ticket->estado == 1) {
+                $ticket->atendido_at = now();
+                $ticket->save();
+            }
+
             $ticket->refresh(); // refresca los datos del modelo
         }
 
