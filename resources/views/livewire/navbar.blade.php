@@ -16,6 +16,25 @@
             </a>
         </div>
 
+        {{-- Botones centrales --}}
+        @if(request()->routeIs('tickets.user') || request()->routeIs('tickets.index'))
+
+            {{-- Contenedor absoluto centrado para los botones de Admin y Usuario --}}
+            <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+
+                <button wire:click="logout" class="btn btn-imjuve">
+                    Usuario
+                </button>
+
+                @if (request()->routeIs('tickets.index'))
+                    <button wire:click="logout" class="btn btn-imjuve">
+                        Admin
+                    </button>
+                @endif
+                
+            </div>
+        @endif
+
         <div class="flex-none gap-2">
 
             @guest
