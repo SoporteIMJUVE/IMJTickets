@@ -1,4 +1,4 @@
-<x-form submit="createTicket" title="¿Cual es tu problema?" button="Enviar ticket">
+<x-form submit="createTicket" title="¿Cuál es tu problema?" button="Enviar ticket">
 
     {{-- Descripción --}}
     <fieldset class="fieldset relative">
