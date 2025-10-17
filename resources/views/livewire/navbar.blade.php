@@ -8,6 +8,7 @@
             v0.9.0
         </span>
         
+        {{-- Logo --}}
         <div class="flex-1">
             <a class="btn btn-ghost p-0 h-auto w-auto"
                 href="{{ route('bienvenida') }}"
@@ -28,7 +29,7 @@
 
                 @if (request()->routeIs('tickets.index'))
                     <button wire:click="logout" class="btn btn-imjuve">
-                        Admin
+                        Reporte
                     </button>
                 @endif
                 

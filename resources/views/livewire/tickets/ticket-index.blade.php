@@ -8,13 +8,32 @@
             <thead class="bg-[#681a32] text-white">
                 <tr>
                     <th colspan="id" class="text-center w-13">ID</th>
-                    <th colspan="id" class="text-center w-30">Reporto</th>
+                    <th colspan="nombre" class="text-center w-30">Nombre</th>
                     <th colspan="correo" class="text-center w-40">Correo</th>
                     <th colspan="descripcion" class="text-center">Descripción</th>
-                    <th colspan="tipo" class="text-center w-25">Tipo</th>
-                    <th colspan="area" class="text-center w-25">Área</th>
-                    <th colspan="estado" class="text-center w-35">Estado</th>
-                    <th colspan="creatdo" class="text-center w-35">Creado</th>
+                    <th colspan="tipo" class="text-center w-25 h-10 p-1">
+                        <x-form.dropdown-checkbox 
+                            title="Tipo" 
+                            field="tipo" 
+                            :filters="$tipos"
+                        />
+                    </th>
+                    <th colspan="area" class="text-center w-25 h-10 p-1">
+                        <x-form.dropdown-checkbox 
+                            title="Área" 
+                            field="area" 
+                            :filters="$areas"
+                        />
+                    </th>
+                    <th colspan="estado" class="text-center w-35 h-10 p-1">
+                        <x-form.dropdown-checkbox 
+                            title="Estado" 
+                            field="estado" 
+                            :filters="$estados"
+                            filterType="id"
+                        />
+                    </th>
+                    <th colspan="creado" class="text-center w-35">Creado</th>
                     <th colspan="atendido" class="text-center w-35">Atendido</th>
                     <th colspan="cerrado" class="text-center w-35">Cerrado</th>
                 </tr>

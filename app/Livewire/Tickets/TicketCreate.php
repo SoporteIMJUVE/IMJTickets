@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Tickets;
 use App\Livewire\Forms\TicketForm;
-use App\Models\Area;
 use App\Models\Type;
+use App\Models\Area;
 
 use Livewire\Component;
 
@@ -29,8 +29,8 @@ class TicketCreate extends Component
     public function render()
     {
         return view('livewire.tickets.ticket-create', [
-            'areas' => Area::all(),
             'tipos' => Type::all(),
+            'areas' => Area::all(),
         ]);
 
     }
