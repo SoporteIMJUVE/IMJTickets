@@ -5,7 +5,7 @@
 
         {{-- Versión --}}
         <span class="absolute left-5 translate-y-3 text-xs text-gray-300">
-            v0.9.2
+            v0.10.0
         </span>
         
         {{-- Logo --}}
@@ -23,13 +23,15 @@
             {{-- Contenedor absoluto centrado para los botones de Admin y Usuario --}}
             <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
 
-                <button wire:click="logout" class="btn btn-imjuve">
-                    Usuario
+                {{--
+                <button class="btn btn-imjuve">
+                    Buscar
                 </button>
+                --}}
 
                 @if (request()->routeIs('tickets.index'))
-                    <button wire:click="logout" class="btn btn-imjuve">
-                        Reporte
+                    <button class="btn btn-imjuve">
+                        Exportar
                     </button>
                 @endif
                 

@@ -16,6 +16,8 @@ class TicketIndex extends Component
     public $user;
     public $numEstados;
     public array $activeFilters = [];
+    public array $period = [];
+    public array $order = ['created_at', 'desc'];
 
     public function ticketProgress($id)
     {
@@ -59,12 +61,17 @@ class TicketIndex extends Component
 
         $this->resetPage();
     }
+
+    public function setOrder($field, $direction)
+    {
+        $this->order = [(string) $field, (string) $direction];
+        $this->resetPage();
+    }
     
     public function mount()
     {
         // Redireccion si accedemos a '/tickets' por URL (sin llenar el formulario de usuario)
-        if(request()->routeIs('tickets.user') && !request("user"))
-    {
+        if(request()->routeIs('tickets.user') && !request("user")){
             return redirect()->to(route("bienvenida"));
         }
 
@@ -79,19 +86,43 @@ class TicketIndex extends Component
     public function render()
     {
         // Crear consulta base
-        $this->query = Ticket::query()->latest();
+        $this->query = Ticket::query();
 
         // Filtramos por usuario si no se está autenticado
         if (!Auth::check()) {
             $this->query->where('correo', $this->user);
         }
 
-        // Aplicar filtros activos
+        // Aplicar filtros activos si los hay
         if (!empty($this->activeFilters)) {
             foreach ($this->activeFilters as $field => $filters) {
                 $this->query->whereNotIn($field, array_keys($filters));
             }
         }
+
+        // Aplicar filtro de periodo si los hay
+        if (!empty($this->period)) {
+            foreach ($this->period as $field => $range) {
+                if(!empty($range) && isset($range['from']) && $range['from'] != null && isset($range['to']) && $range['to'] != null) {
+
+                    if($field === 'updated_at') {
+                        $this->query->where('estado', 2); // Solo filtrar tickets atendidos
+                    }
+
+                    $this->query->whereBetween($field, [$range['from'], $range['to']]);
+                }
+            }
+        }
+
+        // Aplicar ordenamiento
+        if($this->order[0] === 'created_at'){
+            $this->query->orderBy($this->order[0], $this->order[1]); // Ordenamiento simple por fecha de creacion
+        } else {
+            $this->query
+                ->orderByRaw('(CASE WHEN estado IS ' . ($this->order[0] === 'atendido_at' ? 'NOT 0' : 2) . ' THEN 0 ELSE 1 END) ASC')
+                ->orderBy($this->order[0], $this->order[1])
+                ->orderBy('created_at', $this->order[1]);
+        }        
 
         return view('livewire.tickets.ticket-index', [
             'tickets' => $this->query->paginate(10),
