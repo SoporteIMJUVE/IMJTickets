@@ -1,7 +1,7 @@
-<div class="flex justify-center items-center min-h-screen bg-gray-100 pt-20 px-20 pb-3">
+<div class="flex items-center min-h-screen bg-gray-100 pt-20 px-20 pb-3">
 
     {{-- Tabla de tickets --}}
-    <div class="overflow-x-auto rounded-box w-full shadow-xl">
+    <div class="min-w-[1200px] overflow-x-auto rounded-box w-full shadow-xl">
         <table id="tickets-table" class="table table-fixed text-xs">
             
             <!-- head -->
@@ -10,10 +10,10 @@
                     <th colspan="id" class="text-center w-13">ID</th>
                     <th colspan="nombre" class="text-center w-30">Nombre</th>
                     <th colspan="correo" class="text-center w-40">Correo</th>
-                    <th colspan="descripcion" class="text-center">Descripción</th>
+                    <th colspan="descripcion" class="text-center min-w-70">Descripción</th>
                     <th colspan="tipo" class="text-center w-25 h-10 p-1">
                         <x-form.dropdown-checkbox 
-                            title="Tipo" 
+                            title="Tipo"
                             field="tipo" 
                             :filters="$tipos"
                         />
@@ -48,8 +48,8 @@
                         <td class="border-r border-gray-300 text-center truncate">{{ $ticket->nombre }}</td>
                         <td class="border-r border-gray-300 truncate">{{ $ticket->correo }}</td>
                         <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->descripcion }}</td>
-                        <td class="border-r border-gray-300 text-center truncate">{{ $ticket->tipo }}</td>
-                        <td class="border-r border-gray-300 text-center truncate">{{ $ticket->area }}</td>
+                        <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->tipo }}</td>
+                        <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->area }}</td>
                         <td class="h-14 flex justify-center border-r border-gray-300">
                             @if( $ticket->estado == $numEstados-1 )
                                 <div class="badge badge-outline badge-{{ $ticket->estado_sty }} w-full h-full">{{ $ticket->estado_txt }}</div>

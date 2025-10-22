@@ -1,11 +1,11 @@
-<div class="navbar fixed top-0 left-0 w-full flex-col items-center justify-center p-0 z-50">
+<div class="navbar fixed top-0 left-0 w-full flex-col items-center justify-center p-0 z-71">
 
     {{-- Parte superior de la barra (botones) --}}
-    <div class="flex w-full bg-white shadow-md px-20 py-3 z-10">
+    <div class="flex w-full bg-white shadow-md px-20 py-3 z-70">
 
         {{-- Versión --}}
         <span class="absolute left-5 translate-y-3 text-xs text-gray-300">
-            v0.9.0
+            v0.9.1
         </span>
         
         {{-- Logo --}}
@@ -84,7 +84,7 @@
             [$m1, $m2] = explode('|', session('createTicket'));
         @endphp --}}
 
-        <div class="w-full bg-transparent px-20 z-9">
+        <div class="w-full bg-transparent px-20 z-69">
             <div role="alert" class="alert alert-success shadow-md -mt-3 pt-5 z-70 cursor-pointer"
                 x-data="{ show: true }" x-show="show" @click="show = false"
                 x-transition:leave="transition transform duration-500" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-10">
