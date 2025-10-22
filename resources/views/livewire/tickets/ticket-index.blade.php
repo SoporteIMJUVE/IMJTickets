@@ -33,9 +33,25 @@
                             filterType="id"
                         />
                     </th>
-                    <th colspan="creado" class="text-center w-35">Creado</th>
-                    <th colspan="atendido" class="text-center w-35">Atendido</th>
-                    <th colspan="cerrado" class="text-center w-35">Cerrado</th>
+                    <th colspan="creado" class="text-center w-35 h-10 p-1">
+                        <x-form.dropdown-date 
+                            title="Creado"
+                            checked="checked"
+                            field="created_at" 
+                        />
+                    </th>
+                    <th colspan="creado" class="text-center w-35 h-10 p-1">
+                        <x-form.dropdown-date 
+                            title="Atendido" 
+                            field="atendido_at" 
+                        />
+                    </th>
+                    <th colspan="cerrado" class="text-center w-35 h-10 p-1">
+                        <x-form.dropdown-date 
+                            title="Cerrado" 
+                            field="updated_at" 
+                        />
+                    </th>
                 </tr>
             </thead>
 
