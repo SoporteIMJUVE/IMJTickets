@@ -3,7 +3,7 @@
     {{-- Descripción --}}
     <fieldset class="fieldset relative">
         <legend class="fieldset-legend text-legend">Descripción</legend>
-        <textarea wire:model="form.descripcion" class="textarea w-full placeholder-sky-50 @error('form.descripcion') border-red-500 border-3 @enderror"
+        <textarea wire:model="form.descripcion" class="textarea w-full @error('form.descripcion') border-red-500 border-3 @enderror"
                     placeholder="Describenos tu problema brevemente"></textarea>
         @error('form.descripcion') 
             <p class="absolute -bottom-4 right-0 font-bold text-red-500 ">{{ $message }}</p>
