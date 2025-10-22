@@ -5,7 +5,7 @@
 
         {{-- Versión --}}
         <span class="absolute left-5 translate-y-3 text-xs text-gray-300">
-            v0.9.1
+            v0.9.2
         </span>
         
         {{-- Logo --}}
