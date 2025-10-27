@@ -8,6 +8,18 @@ use Livewire\Component;
 
 class Navbar extends Component
 {
+    public $showCentralNav = false;
+    
+    public function emitExcel()
+    {
+        $this->dispatch('emitExcel');
+    }
+
+    public function exportPdf()
+    {
+        // Lógica para exportar datos a PDF
+    }
+
     public function logout(Request $request)
     {
         Auth::logout();
@@ -17,6 +29,12 @@ class Navbar extends Component
 
         // Redireccion full reload
         return redirect()->to(route("bienvenida"));
+    }
+
+    public function mount()
+    {
+        // evaluar ruta una sola vez al montar el componente
+        $this->showCentralNav = request()->routeIs('tickets.user') || request()->routeIs('tickets.index');
     }
 
     public function render()
