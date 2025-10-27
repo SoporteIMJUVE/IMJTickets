@@ -18,7 +18,7 @@
         </div>
 
         {{-- Botones centrales --}}
-        @if(request()->routeIs('tickets.user') || request()->routeIs('tickets.index'))
+        @if($this->showCentralNav)
 
             {{-- Contenedor absoluto centrado para los botones de Admin y Usuario --}}
             <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -29,12 +29,12 @@
                 </button>
                 --}}
 
-                @if (request()->routeIs('tickets.index'))
-                    <button class="btn btn-imjuve">
+                @auth
+                    <button class="btn btn-imjuve" wire:click="emitExcel">
                         Exportar
                     </button>
-                @endif
-                
+                @endauth
+
             </div>
         @endif
 
