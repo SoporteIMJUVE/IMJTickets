@@ -5,7 +5,7 @@
 
         {{-- Versión --}}
         <span class="absolute left-5 translate-y-3 text-xs text-gray-300">
-            v0.11.0
+            v0.11.1
         </span>
         
         {{-- Logo --}}
@@ -28,13 +28,9 @@
                     Buscar
                 </button>
                 --}}
-
-                @auth
-                    <button class="btn btn-imjuve" wire:click="emitExcel">
-                        Exportar
-                    </button>
-                @endauth
-
+                {{-- Botón para exportar tickets --}}
+                <dropdown-export />
+                <x-form.dropdown-export />
             </div>
         @endif
 

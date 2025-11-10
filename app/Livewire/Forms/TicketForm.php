@@ -15,7 +15,7 @@ class TicketForm extends EmailForm
     public function rules()
     {
         return array_merge(parent::rules(), [
-            'descripcion' => ['required', 'max:500'],
+            'descripcion' => ['required', 'min:10', 'max:500'],
             'tipo'        => ['required', Rule::notIn(['error'])],
             'area'        => ['required', Rule::notIn(['error'])],
             'nombre'      => ['required', 'max:30'],
