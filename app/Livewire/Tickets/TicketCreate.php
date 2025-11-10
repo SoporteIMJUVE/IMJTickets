@@ -17,7 +17,7 @@ class TicketCreate extends Component
         $ticket = $this->form->createDBTicket();
 
         //Mandamos el mensaje de la alerta de exito
-        session()->flash('createTicket', "Tu ticket se ha enviado exitosamente! - ID del ticket: {$ticket->id}");
+        session()->flash('createTicket', "¡Tu ticket se ha enviado exitosamente! - ID del ticket: {$ticket->id}");
 
         // Redireccion full reload
         return redirect()->to(route("bienvenida"));

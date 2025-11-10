@@ -28,13 +28,9 @@
                     Buscar
                 </button>
                 --}}
-
-                @auth
-                    <button class="btn btn-imjuve" wire:click="emitExcel">
-                        Exportar
-                    </button>
-                @endauth
-
+                {{-- Botón para exportar tickets --}}
+                <dropdown-export />
+                <x-form.dropdown-export />
             </div>
         @endif
 
