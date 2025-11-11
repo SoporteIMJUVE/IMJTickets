@@ -8,12 +8,14 @@ use App\Models\Area;
 use App\Models\Type;
 
 use Maatwebsite\Excel\Facades\Excel;
+use Barryvdh\DomPDF\Facade\Pdf;
 use App\Exports\TicketsExcel;
 use Livewire\Attributes\On;
 
 use Livewire\WithPagination;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class TicketIndex extends Component
 {
@@ -121,17 +123,21 @@ class TicketIndex extends Component
     #[On('emitExcel')]
     public function exportExcel()
     {
-        return Excel::download(new TicketsExcel($this->buildQuery()->get()), 'IMJTickets '.now().'.xlsx');
+        return Excel::download(new TicketsExcel($this->buildQuery()->get()), 'IMJTickets '.now()->format('Y-m-d H:i').'.xlsx');
+    }
+
+    #[On('emitPdf')]
+    public function exportPdf()
+    {
+        return redirect()->to(route('tickets.pdf'));
     }
     
     public function mount()
     {
-        // Redireccion si accedemos a '/tickets' por URL (sin llenar el formulario de usuario)
         if(request()->routeIs('tickets.user') && !request("user")){
             return redirect()->to(route("bienvenida"));
         }
 
-        // Si ingresamos como usuario
         if (request()->routeIs('tickets.user')) {
             $this->user = request("user");
         }

@@ -15,9 +15,9 @@ class Navbar extends Component
         $this->dispatch('emitExcel');
     }
 
-    public function exportPdf()
+    public function emitPdf()
     {
-        // Lógica para exportar datos a PDF
+        $this->dispatch('emitPdf');
     }
 
     public function logout(Request $request)
