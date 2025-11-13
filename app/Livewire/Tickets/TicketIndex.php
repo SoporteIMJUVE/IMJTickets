@@ -129,8 +129,32 @@ class TicketIndex extends Component
     #[On('emitPdf')]
     public function exportPdf()
     {
-        return redirect()->to(route('tickets.pdf'));
+        $pdf = Pdf::loadView('exports.TicketsPDF', [
+            'tickets' => $this->buildQuery()->get()
+        ])->setPaper('a4', 'landscape');
+
+        $directory = 'temp';
+        $tempPath = $directory . '/' . 'IMJTickets '.now()->format('d-m-Y H:i').'.pdf'; // Ruta relativa
+
+        $files = Storage::disk('local')->files($directory);
+        $timeLimit = now()->subMinutes(5)->getTimestamp(); //Encuentra un archivo con más de 5 minutos de antigüedad, lo elimina
+
+        foreach ($files as $file) {
+            if (Storage::disk('local')->lastModified($file) < $timeLimit) {
+                Storage::disk('local')->delete($file);
+            }
+        }
+        if (!Storage::disk('local')->exists($directory)) {
+            Storage::disk('local')->makeDirectory($directory);
+        }
+    
+        Storage::disk('local')->put($tempPath, $pdf->output());
+
+        $fullPath = Storage::disk('local')->path($tempPath); // Ruta completa del archivo
+
+        return response()->download($fullPath, 'IMJTickets '.now()->format('d-m-Y H:i').'.pdf');
     }
+
     
     public function mount()
     {

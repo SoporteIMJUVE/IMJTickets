@@ -16,5 +16,4 @@ Route::get('/tickets/create', TicketCreate::class)->name('tickets.create');
 
 Route::middleware('auth')->group(function () {
     Route::get('/tickets/index', TicketIndex::class)->name('tickets.index');
-    Route::get('/tickets/pdf', [TicketController::class, 'exportPdf'])->name('tickets.pdf');
 });

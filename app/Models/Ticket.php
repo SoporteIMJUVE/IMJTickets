@@ -52,4 +52,8 @@ class Ticket extends Model
         "descripcion",
         "estado"
     ];
+
+    protected $casts = [
+        'atendido_at' => 'datetime',
+    ];
 }
