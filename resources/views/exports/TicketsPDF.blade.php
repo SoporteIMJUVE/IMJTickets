@@ -82,14 +82,14 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th style="width: 3%;">ID</th>
+                <th style="width: 4%;">ID</th>
                 <th style="width: 10%;">Nombre</th>
                 <th style="width: 14%;">Correo</th>
                 <th style="width: 17%;">Descripción</th>
                 <th style="width: 10%;">Tipo</th>
                 <th style="width: 17%;">Área</th>
                 <th style="width: 7%;">Estado</th>
-                <th style="width: 8%;">Creado</th>
+                <th style="width: 7%;">Creado</th>
                 <th style="width: 7%;">Atendido</th>
                 <th style="width: 7%;">Cerrado</th>
             </tr>

@@ -133,21 +133,19 @@ class TicketIndex extends Component
             'tickets' => $this->buildQuery()->get()
         ])->setPaper('a4', 'landscape');
 
-        $directory = 'temp';
-        $tempPath = $directory . '/' . 'IMJTickets '.now()->format('d-m-Y H:i').'.pdf'; // Ruta relativa
-
-        $files = Storage::disk('local')->files($directory);
-        $timeLimit = now()->subMinutes(5)->getTimestamp(); //Encuentra un archivo con más de 5 minutos de antigüedad, lo elimina
+        $files = Storage::disk('local')->files('temp');
+        $timeLimit = now()->subMinutes(1)->getTimestamp(); //Encuentra un archivo con más de 1 minuto de antigüedad, lo elimina
 
         foreach ($files as $file) {
             if (Storage::disk('local')->lastModified($file) < $timeLimit) {
                 Storage::disk('local')->delete($file);
             }
         }
-        if (!Storage::disk('local')->exists($directory)) {
-            Storage::disk('local')->makeDirectory($directory);
+        if (!Storage::disk('local')->exists('temp')) {
+            Storage::disk('local')->makeDirectory('temp');
         }
-    
+
+        $tempPath = 'temp/IMJTickets '.now()->format('d-m-Y H:i').'.pdf'; // Ruta relativa
         Storage::disk('local')->put($tempPath, $pdf->output());
 
         $fullPath = Storage::disk('local')->path($tempPath); // Ruta completa del archivo
