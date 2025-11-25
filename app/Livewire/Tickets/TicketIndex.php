@@ -145,7 +145,7 @@ class TicketIndex extends Component
             Storage::disk('local')->makeDirectory('temp');
         }
 
-        $tempPath = 'temp/IMJTickets '.now()->format('d-m-Y H:i').'.pdf'; // Ruta relativa
+        $tempPath = 'temp/IMJTickets.pdf'; // Ruta relativa
         Storage::disk('local')->put($tempPath, $pdf->output());
 
         $fullPath = Storage::disk('local')->path($tempPath); // Ruta completa del archivo
