@@ -9,6 +9,14 @@ use Livewire\Component;
 class Navbar extends Component
 {
     public $showCentralNav = false;
+
+    public $wordSearch = '';
+
+    # Funcion predefinida de Livewire que se ejecuta cuando se actualiza la propiedad wordSearch
+    public function updatedWordSearch()
+    {
+        $this->dispatch('emitSearch', wordSearch: $this->wordSearch);
+    }
     
     public function emitExcel()
     {
