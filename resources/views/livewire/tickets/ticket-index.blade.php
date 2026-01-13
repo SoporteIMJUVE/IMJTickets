@@ -107,6 +107,7 @@
         </div>
 
     </div>
+    
 
     {{-- Elementos ocultos para mantener los estilos de DaisyUI --}}
     {{-- (DaisyUI aplica estilos solo si detecta estos elementos en el DOM) --}}
