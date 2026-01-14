@@ -23,9 +23,11 @@ class TicketIndex extends Component
 
     public $user;
     public $numEstados;
-    public array $activeFilters = [];
+    public $wordSearch = ''; #wordSearch incluye
+    public array $activeFilters = []; #activeFilters excluye
     public array $period = [];
     public array $order = ['created_at', 'desc'];
+
 
     public function ticketProgress($id)
     {
@@ -45,6 +47,49 @@ class TicketIndex extends Component
         // Actualizamos la colección para que la tabla se refresque
         $this->tickets = Ticket::all();
     }
+
+
+    #[On('emitExcel')]
+    public function exportExcel()
+    {
+        return Excel::download(new TicketsExcel($this->buildQuery()->get()), 'IMJTickets '.now()->format('Y-m-d H:i').'.xlsx');
+    }
+
+
+    #[On('emitPdf')]
+    public function exportPdf()
+    {
+        $pdf = Pdf::loadView('exports.TicketsPDF', [
+            'tickets' => $this->buildQuery()->get()
+        ])->setPaper('a4', 'landscape');
+
+        $files = Storage::disk('local')->files('temp');
+        $timeLimit = now()->subMinutes(1)->getTimestamp(); //Encuentra un archivo con más de 1 minuto de antigüedad, lo elimina
+
+        foreach ($files as $file) {
+            if (Storage::disk('local')->lastModified($file) < $timeLimit) {
+                Storage::disk('local')->delete($file);
+            }
+        }
+        if (!Storage::disk('local')->exists('temp')) {
+            Storage::disk('local')->makeDirectory('temp');
+        }
+
+        $tempPath = 'temp/IMJTickets.pdf'; // Ruta relativa
+        Storage::disk('local')->put($tempPath, $pdf->output());
+
+        $fullPath = Storage::disk('local')->path($tempPath); // Ruta completa del archivo
+
+        return response()->download($fullPath, 'IMJTickets '.now()->format('d-m-Y H:i').'.pdf');
+    }
+
+
+    #[On('emitSearch')]
+    public function wordSearch($wordSearch)
+    {
+        $this->wordSearch = $wordSearch;
+    }
+
 
     public function setFilter($field, $filter)
     {
@@ -70,11 +115,13 @@ class TicketIndex extends Component
         $this->resetPage();
     }
 
+
     public function setOrder($field, $direction)
     {
         $this->order = [(string) $field, (string) $direction];
         $this->resetPage();
     }
+
 
     public function buildQuery()
     {
@@ -84,6 +131,19 @@ class TicketIndex extends Component
         // Filtramos por usuario si no se está autenticado
         if (!Auth::check()) {
             $query->where('correo', $this->user);
+        }
+
+        // Aplicar búsqueda por palabra clave si existe
+        if (!empty($this->wordSearch)) {
+            $searchTerm = '%' . $this->wordSearch . '%';
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('id', 'like', $searchTerm)
+                  ->orWhere('nombre', 'like', $searchTerm)
+                  ->orWhere('correo', 'like', $searchTerm)
+                  ->orWhere('descripcion', 'like', $searchTerm)
+                  ->orWhere('area', 'like', $searchTerm)
+                  ->orWhere('tipo', 'like', $searchTerm);
+            });
         }
 
         // Aplicar filtros activos si los hay
@@ -120,40 +180,7 @@ class TicketIndex extends Component
         return $query;
     }
 
-    #[On('emitExcel')]
-    public function exportExcel()
-    {
-        return Excel::download(new TicketsExcel($this->buildQuery()->get()), 'IMJTickets '.now()->format('Y-m-d H:i').'.xlsx');
-    }
 
-    #[On('emitPdf')]
-    public function exportPdf()
-    {
-        $pdf = Pdf::loadView('exports.TicketsPDF', [
-            'tickets' => $this->buildQuery()->get()
-        ])->setPaper('a4', 'landscape');
-
-        $files = Storage::disk('local')->files('temp');
-        $timeLimit = now()->subMinutes(1)->getTimestamp(); //Encuentra un archivo con más de 1 minuto de antigüedad, lo elimina
-
-        foreach ($files as $file) {
-            if (Storage::disk('local')->lastModified($file) < $timeLimit) {
-                Storage::disk('local')->delete($file);
-            }
-        }
-        if (!Storage::disk('local')->exists('temp')) {
-            Storage::disk('local')->makeDirectory('temp');
-        }
-
-        $tempPath = 'temp/IMJTickets.pdf'; // Ruta relativa
-        Storage::disk('local')->put($tempPath, $pdf->output());
-
-        $fullPath = Storage::disk('local')->path($tempPath); // Ruta completa del archivo
-
-        return response()->download($fullPath, 'IMJTickets '.now()->format('d-m-Y H:i').'.pdf');
-    }
-
-    
     public function mount()
     {
         if(request()->routeIs('tickets.user') && !request("user")){
@@ -166,6 +193,7 @@ class TicketIndex extends Component
 
         $this->numEstados = count(Ticket::ESTADOS);
     }
+
 
     public function render()
     {

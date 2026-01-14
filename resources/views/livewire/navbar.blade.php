@@ -20,17 +20,29 @@
         {{-- Botones centrales --}}
         @if($this->showCentralNav)
 
-            {{-- Contenedor absoluto centrado para los botones de Admin y Usuario --}}
-            <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            {{-- Contenedor absoluto centrado--}}
+            <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-3">
 
-                {{--
-                <button class="btn btn-imjuve">
-                    Buscar
-                </button>
-                --}}
+                <label class="input w-100">
+                    <svg class="h-[1em] opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <g
+                        stroke-linejoin="round"
+                        stroke-linecap="round"
+                        stroke-width="2.5"
+                        fill="none"
+                        stroke="currentColor"
+                        >
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.3-4.3"></path>
+                        </g>
+                    </svg>
+                    <input type="search" class="grow" placeholder="Buscar por palabras clave"
+                            wire:model.live="wordSearch"/>
+                </label>
 
-                {{-- Botón para exportar tickets --}}
+                {{-- Botón exportar --}}
                 <x-form.dropdown-export />
+
             </div>
         @endif
 
