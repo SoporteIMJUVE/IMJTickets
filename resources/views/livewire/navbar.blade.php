@@ -108,7 +108,7 @@
     @endif
 
     <div wire:loading.class="opacity-100 visible" wire:target="emitExcel, emitPdf" class="opacity-0 invisible transition-all duration-500 fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white border shadow-xl rounded-lg p-6 flex-col items-center gap-2">
-        <span class="loading loading-bars loading-xl"></span>
+        <span class="loading loading-bars loading-xl text-primary"></span>
         <span class="font-semibold text-gray-700">Generando archivo</span>
     </div>
 
