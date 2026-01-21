@@ -15,10 +15,10 @@ class TicketForm extends EmailForm
     public function rules()
     {
         return array_merge(parent::rules(), [
-            'descripcion' => ['required', 'min:10', 'max:500'],
+            'descripcion' => ['required', 'min:5', 'max:100'],
             'tipo'        => ['required', Rule::notIn(['error'])],
             'area'        => ['required', Rule::notIn(['error'])],
-            'nombre'      => ['required', 'max:30'],
+            'nombre'      => ['required', 'max:30', 'regex:/^\w+\s+\w+/'],
         ]);
     }
 
@@ -26,11 +26,13 @@ class TicketForm extends EmailForm
     {
         return array_merge(parent::messages(), [
             'descripcion.required' => 'Es necesario ingresar una descripción',
-            'descripcion.max'      => 'La descripción no puede exceder los 500 caracteres',
+            'descripcion.min'      => 'La descripción debe tener al menos 5 caracteres',
+            'descripcion.max'      => 'La descripción no puede exceder los 100 caracteres',
             'tipo.not_in'          => 'Es necesario ingresar un tipo de incidente',
             'area.not_in'          => 'Es necesario ingresar un área',
             'nombre.required'      => 'Es necesario ingresar un nombre',
             'nombre.max'           => 'El nombre no puede exceder los 30 caracteres',
+            'nombre.regex'         => 'Debes ingresar al menos un nombre y un apellido',
         ]);
     }
 

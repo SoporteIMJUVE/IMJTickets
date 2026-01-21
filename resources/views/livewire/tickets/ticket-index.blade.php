@@ -76,9 +76,7 @@
 
                                 @auth
                                     <button wire:key="{{ $ticket->id }}"
-                                            wire:click="ticketProgress({{ $ticket->id }})"
-                                            wire:confirm.prompt='¿Estás seguro de que deseas cambiar el estado del ticket {{ $ticket->id }}?
-                                                                 \nIngresa la palabra "{{ $ticket->estado_sigtxt }}" para confirmar|{{ $ticket->estado_sigtxt }}'
+                                            wire:click="openTicketModal({{ $ticket->id }})"
                                             class="btn btn-{{ $ticket->estado_sty }} w-full h-full">
                                         {{ $ticket->estado_txt }}
                                     </button>
@@ -117,6 +115,47 @@
     <button class="btn btn-error" style="display: none;"></button>
     <button class="btn btn-warning" style="display: none;"></button>
     <button class="btn btn-success" style="display: none;"></button>
+
+    {{-- Modal de confirmación --}}
+    @if($showModal && $ticketForConfirmation)
+        <div class="modal modal-open">
+            <div class="modal-box">
+                <h3 class="font-bold text-lg mb-4 text-center">Confirmar cambio de estado</h3>
+                <p class="mb-4 text-center">
+                    ¿Está seguro de que desea cambiar el estado del <strong>ticket {{ $ticketForConfirmation->id }}</strong>?
+                </p>                
+                <input 
+                    type="text" 
+                    placeholder='Ingresa la palabra "{{ $ticketForConfirmation->estado_sigtxt }}" para confirmar'
+                    wire:model="confirmationWord"
+                    wire:keydown.enter="confirmTicketProgress"
+                    class="input input-bordered w-full mb-6" 
+                />
+
+                <div class="modal-action">
+                    <button wire:click="closeModal" class="btn btn-ghost">Cancelar</button>
+                    <button wire:click="confirmTicketProgress" class="btn bg-[#681a32] text-white btn-ghost">Confirmar</button>
+                </div>
+            </div>
+            <div class="modal-backdrop" wire:click="closeModal"></div>
+        </div>
+    @endif
+
+    {{-- Modal de error --}}
+    @if($showErrorModal)
+        <div class="modal modal-open">
+            <div class="modal-box max-w-sm">
+                <h3 class="font-bold text-lg mb-4 text-red-600 text-center">Error</h3>
+                <p class="mb-6 text-center">
+                    {{ $errorMessage }}
+                </p>
+                <div class="modal-action">
+                    <button wire:click="closeErrorModal" class="btn bg-red-400 hover:bg-red-500">Aceptar</button>
+                </div>
+            </div>
+            <div class="modal-backdrop" wire:click="closeErrorModal"></div>
+        </div>
+    @endif
 
     {{--
     <!-- jQuery (necesario para colResizable) -->

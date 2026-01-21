@@ -14,36 +14,49 @@
         /*Encabezado*/
         .header-table {
             width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 15px;
+            border-collapse: collapse; /* Elimina espacios entre celdas */
+            border-bottom: 2px solid #9D2449; /* Color institucional aprox. (Guinda) */
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-family: sans-serif;
         }
-        .header-table td {
-            border: none;
-            vertical-align: top;
+        .logo-cell {
+            width: 20%;
+            vertical-align: middle; /* Centra el logo verticalmente */
         }
         .logo {
-            width: 120px;
+            max-width: 160px; /* Controla el tamaño para que no se pixel */
             height: auto;
         }
-        .header-text {
+        .text-cell {
+            width: 80%;
             text-align: right;
-        }
-        .header-text h2 {
-            margin: 0;
-            padding: 0;
+            vertical-align: middle; /* Centra el texto respecto al logo */
+            color: #333;
+        }       
+        .title-main {
             font-size: 18px;
-        }
-        .header-text h3 {
-            margin: 5px 0;
-            padding: 0;
-            font-size: 14px;
-            font-weight: normal;
-        }
-        .header-text p {
+            font-weight: bold;
+            text-transform: uppercase; /* Más formal */
             margin: 0;
-            padding: 0;
-            font-size: 11px;
-            color: #555;
+            color: #2c2c2c;
+        }
+        .title-sub {
+            font-size: 18px;
+            margin: 2px 0;
+            font-weight: bold;
+        }
+        .report-name {
+            font-size: 16px;
+            font-weight: noprmal;
+            color: #9D2449; /* Destaca el nombre del reporte */
+            margin-top: 5px;
+            margin-bottom: 0;
+        }
+        .meta-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
         }
 
         /*Estilo de la tabla */
@@ -62,22 +75,26 @@
             background: #f2f2f2;
             text-align: center;
         }
+        
     </style>
 </head>
 <body>
 
     <table class="header-table">
-        <tr>
-            <td style="width: 20%;">
-                <img src="{{ public_path('images/IMJLogo.jpeg') }}" alt="Logo" class="logo">
-            </td>
-            <td style="width: 80%;" class="header-text">
-                <h2>Instituto Mexicano de la Juventud</h2>
-                <h3>Reporte de Tickets</h3>
-                <p>Generado el: {{ now()->format('d-m-Y') }}</p>
-            </td>
-        </tr>
-    </table>
+    <tr>
+        <td class="logo-cell">
+            <img src="{{ public_path('images/IMJLogo.jpeg') }}" alt="Logo" class="logo">
+        </td>
+        <td class="text-cell">
+            <h1 class="title-main">Instituto Mexicano de la Juventud</h1>
+            <h2 class="title-sub">Subdirección de Sistemas</h2>
+            <h3 class="report-name">Reporte de Tickets</h3>
+            <p class="meta-info">
+                Generado el: {{ now()->format('d/m/Y') }} &bull; Hora: {{ now()->format('H:i') }}
+            </p>
+        </td>
+    </tr>
+</table>
 
     <table class="data-table">
         <thead>
@@ -111,5 +128,6 @@
             @endforeach
         </tbody>
     </table>
+
 </body>
 </html>
