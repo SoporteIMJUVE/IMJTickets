@@ -33,7 +33,7 @@ class EmailForm extends Form
 
         // Validación adicional si tiene tickets
         if (!Ticket::where('correo', $this->correo)->exists()) {
-            $this->addError('correo', 'Este correo no tiene ningun ticket asosiado');
+            $this->addError('correo', 'Este correo no tiene ningun ticket asociado');
             return false;
         }
         
