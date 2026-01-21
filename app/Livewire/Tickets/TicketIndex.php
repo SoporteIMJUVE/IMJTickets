@@ -28,6 +28,65 @@ class TicketIndex extends Component
     public array $period = [];
     public array $order = ['created_at', 'desc'];
 
+    // Propiedades para el modal de confirmación
+    public $showModal = false;
+    public $ticketForConfirmation = null;
+    public $confirmationWord = '';
+    public $showErrorModal = false;
+    public $errorMessage = '';
+
+
+    public function openTicketModal($id)
+    {
+        $ticket = Ticket::find($id);
+        if ($ticket && $ticket->estado < 3) {
+            $this->ticketForConfirmation = $ticket;
+            $this->confirmationWord = '';
+            $this->showModal = true;
+        }
+    }
+
+
+    public function closeModal()
+    {
+        $this->showModal = false;
+        $this->confirmationWord = '';
+        $this->ticketForConfirmation = null;
+    }
+
+
+    public function closeErrorModal()
+    {
+        $this->showErrorModal = false;
+        $this->errorMessage = '';
+    }
+
+
+    public function confirmTicketProgress()
+    {
+        if (!$this->ticketForConfirmation) {
+            return;
+        }
+
+        // Validar si el campo está vacío
+        if (empty(trim($this->confirmationWord))) {
+            $this->errorMessage = 'Ingresa la palabra para cambiar el estado del ticket.';
+            $this->showErrorModal = true;
+            return;
+        }
+
+        $expectedWord = $this->ticketForConfirmation->estado_sigtxt ?? '';
+        
+        if ($this->confirmationWord !== $expectedWord) {
+            $this->errorMessage = 'La palabra de confirmación no coincide. Intente de nuevo.';
+            $this->showErrorModal = true;
+            return;
+        }
+
+        $this->ticketProgress($this->ticketForConfirmation->id);
+        $this->closeModal();
+    }
+
 
     public function ticketProgress($id)
     {
