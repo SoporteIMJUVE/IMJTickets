@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Tickets;
 use App\Livewire\Forms\TicketForm;
+use App\Models\User;
 use App\Models\Type;
 use App\Models\Area;
 
@@ -18,6 +19,9 @@ class TicketCreate extends Component
 
         //Mandamos el mensaje de la alerta de exito
         session()->flash('createTicket', "¡Tu ticket se ha enviado exitosamente! - ID del ticket: {$ticket->id}");
+
+        //Notficamos a todos los usuarios que hay un nuevo ticket
+        User::query()->update(['new_ticket' => true]);
 
         // Redireccion full reload
         return redirect()->to(route("bienvenida"));
