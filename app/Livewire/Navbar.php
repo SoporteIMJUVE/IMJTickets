@@ -39,6 +39,14 @@ class Navbar extends Component
         return redirect()->to(route("bienvenida"));
     }
 
+    public function checkNew()
+    {
+        if (auth()->user()->new_ticket_sound) {
+            $this->dispatch('newTicketSound');
+            auth()->user()->update(['new_ticket_sound' => false]);
+        }
+    }
+
     public function mount()
     {
         // evaluar ruta una sola vez al montar el componente

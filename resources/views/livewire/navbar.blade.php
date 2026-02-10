@@ -106,33 +106,46 @@
 
     @endif
 
-    {{-- Alerta de nuevo ticket --}}
+    {{-- Alerta de ticket recibido --}}
     @auth
-        <div wire:poll class="w-full bg-transparent px-20 z-69">
-            @if (auth()->user()->new_ticket)
-                    <audio id="alert-sound" src="{{ asset('new-notification-022-370046.mp3') }}" preload="auto"></audio>
-                    <div role="alert" class="alert alert-warning shadow-md -mt-3 pt-5 z-70 cursor-pointer"
-                        x-data="{ show: true }" x-show="show"
-                        @click="window.location.href='{{ route('tickets.index') }}'"
-                        x-effect="show && document.getElementById('alert-sound').play()"
-                        x-transition:enter="transition transform duration-500" x-transition:enter-start="opacity-0 -translate-y-10" x-transition:enter-end="opacity-100 translate-y-0"
-                        x-transition:leave="transition transform duration-500" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-10">
+        <div wire:poll="checkNew" class="w-full bg-transparent px-20 z-69">
+
+            {{-- Sonido de la alerta --}}
+            <audio id="alert-sound" src="{{ asset('sounds/new-notification-022-370046.mp3') }}" preload="auto"></audio>
+            <script>
+                document.addEventListener('livewire:init', () => {
+                    Livewire.on('newTicketSound', () => {
+                        const audio = document.getElementById('alert-sound');
+                        audio.currentTime = 0;
+                        audio.play().catch(() => {
+                            console.warn('Audio bloqueado por el navegador. Se requiere interacción del usuario para reproducir sonidos.');
+                        });
+                    });
+                });
+            </script>
+
+            {{-- Visual de la alerta --}}
+            @if (auth()->user()->new_ticket_alert)
+                <div role="alert" class="alert alert-warning shadow-md -mt-3 pt-5 z-70 cursor-pointer"
+                    x-data="{ show: true }" x-show="show"
+                    @click="window.location.href='{{ route('tickets.index') }}'"
+                    x-transition:enter="transition transform duration-500" x-transition:enter-start="opacity-0 -translate-y-10" x-transition:enter-end="opacity-100 translate-y-0"
+                    x-transition:leave="transition transform duration-500" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-10">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                    </svg>
+                    <span>¡Nuevo ticket recibido!</span>
+                    <button type="button" class="btn btn-ghost btn-sm btn-circle ml-auto" @click.stop="show = false" aria-label="Cerrar alerta">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
                         </svg>
-                        <span>Prueba</span>
-                        <button type="button" class="btn btn-ghost btn-sm btn-circle ml-auto" @click.stop="show = false" aria-label="Cerrar alerta">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
+                    </button>
+                </div>
             @endif
         </div>
     @endauth
 
     {{-- Loading exportación --}}
-
     <div wire:loading.class="opacity-100 visible" wire:target="emitExcel, emitPdf" class="opacity-0 invisible transition-all duration-500 fixed inset-0 backdrop-blur-sm z-40 pointer-events-none"></div>
     <div wire:loading.class="opacity-100 visible" wire:target="emitExcel, emitPdf" class="opacity-0 invisible transition-all duration-500 fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white border shadow-xl rounded-lg p-6 flex flex-col items-center gap-2 pointer-events-auto">
         <span class="loading loading-bars loading-xl text-primary"></span>
