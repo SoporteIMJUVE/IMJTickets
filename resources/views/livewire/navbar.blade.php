@@ -203,7 +203,7 @@
 
     {{-- Alerta de ticket recibido --}}
     @auth
-        <div wire:poll="checkNew" class="w-full bg-transparent px-20 z-69">
+        <div {{-- wire:poll="checkNew" --}} class="w-full bg-transparent px-20 z-69">
 
             {{-- Sonido de la alerta --}}
             <audio id="alert-sound" src="{{ asset('sounds/new-notification-022-370046.mp3') }}" preload="auto"></audio>
