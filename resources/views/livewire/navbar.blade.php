@@ -5,7 +5,7 @@
 
         {{-- Versión --}}
         <span class="absolute left-5 translate-y-3 text-xs text-gray-300">
-            v0.14.0
+            v1.0.0
         </span>
         
         {{-- Logo --}}
@@ -218,15 +218,14 @@
             {{-- Visual de la alerta --}}
             @if (auth()->user()->new_ticket_alert)
                 <div role="alert" class="alert alert-warning shadow-md -mt-3 pt-5 z-70 cursor-pointer"
-                    x-data="{ show: true }" x-show="show"
-                    @click="window.location.href='{{ route('tickets.index') }}'"
-                    x-transition:enter="transition transform duration-500" x-transition:enter-start="opacity-0 -translate-y-10" x-transition:enter-end="opacity-100 translate-y-0"
-                    x-transition:leave="transition transform duration-500" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-10">
+                    wire:click="clearNew(true)"
+                    wire:transition.origin.top.duration.750ms>
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
                     </svg>
                     <span>¡Nuevo ticket recibido!</span>
-                    <button type="button" class="btn btn-ghost btn-sm btn-circle ml-auto" @click.stop="show = false" aria-label="Cerrar alerta">
+                    <button type="button" class="btn btn-ghost btn-sm btn-circle ml-auto"
+                            wire:click.stop="clearNew(false)">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
                         </svg>

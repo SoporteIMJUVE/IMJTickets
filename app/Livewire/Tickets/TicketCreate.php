@@ -21,7 +21,8 @@ class TicketCreate extends Component
         session()->flash('createTicket', "¡Tu ticket se ha enviado exitosamente! - ID del ticket: {$ticket->id}");
 
         //Notficamos a todos los usuarios que hay un nuevo ticket
-        User::query()->update(['new_ticket' => true]);
+        User::query()->update(['new_ticket_alert' => true, 'new_ticket_sound' => true]);
+
 
         // Redireccion full reload
         return redirect()->to(route("bienvenida"));

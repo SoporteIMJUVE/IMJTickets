@@ -47,6 +47,15 @@ class Navbar extends Component
         }
     }
 
+    public function clearNew($redirect = false)
+    {
+        auth()->user()->update(['new_ticket_alert' => false]);
+        
+        if ($redirect) {
+            return redirect()->to(route("tickets.index"));
+        }
+    }
+
     public function mount()
     {
         // evaluar ruta una sola vez al montar el componente
