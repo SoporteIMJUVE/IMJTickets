@@ -5,7 +5,7 @@
 
         {{-- Versión --}}
         <span class="absolute left-5 translate-y-3 text-xs text-gray-300">
-            v1.0.1
+            v1.0.2
         </span>
         
         {{-- Logo --}}
@@ -203,7 +203,7 @@
 
     {{-- Alerta de ticket recibido --}}
     @auth
-        <div wire:poll="checkNew" class="w-full bg-transparent px-20 z-69">
+        <div {{-- wire:poll="checkNew" --}} class="w-full bg-transparent px-20 z-69">
 
             {{-- Sonido de la alerta --}}
             <audio id="alert-sound" src="{{ asset('sounds/new-notification-022-370046.mp3') }}" preload="auto"></audio>
