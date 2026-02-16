@@ -70,6 +70,7 @@
                             @if( $ticket->estado == $numEstados-1 )
                                 <div class="badge badge-outline badge-{{ $ticket->estado_sty }} w-full h-full">{{ $ticket->estado_txt }}</div>
                             @else
+
                                 @guest
                                     <div class="badge badge-outline badge-{{ $ticket->estado_sty }} w-full h-full">{{ $ticket->estado_txt }}</div>
                                 @endguest
@@ -81,6 +82,7 @@
                                         {{ $ticket->estado_txt }}
                                     </button>
                                 @endauth
+
                             @endif
                         </td>
                         <td class="border-r border-gray-300 text-center">{{ $ticket->created_at }}</td>
