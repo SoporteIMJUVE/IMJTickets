@@ -50,7 +50,7 @@ class Navbar extends Component
     public function mount()
     {
         // evaluar ruta una sola vez al montar el componente
-        $this->showCentralNav = request()->routeIs('tickets.user') || request()->routeIs('tickets.index');
+        $this->showCentralNav = request()->routeIs('tickets.user') || request()->routeIs('tickets.index') || request()->routeIs('admin.validar-correos');
     }
 
     public function render()

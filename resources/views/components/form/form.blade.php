@@ -22,7 +22,9 @@
             {{ $slot }}
 
             {{-- Botón --}}
-            <button wire:loading.remove type="submit" class="btn btn-imjuve w-full">{{ $button }}</button>
+            <div class="text-center pt-7">
+                <button wire:loading.remove type="submit" class="btn btn-imjuve w-full">{{ $button }}</button>
+            </div>
         </form>
     </div>
 </div>
