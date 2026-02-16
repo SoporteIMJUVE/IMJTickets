@@ -21,6 +21,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'new_ticket_alert',
+        'new_ticket_sound',
     ];
 
     /**
