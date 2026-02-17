@@ -5,7 +5,7 @@
 
         {{-- Versión --}}
         <span class="absolute left-5 translate-y-3 text-xs text-gray-300">
-            v1.0.2
+            v1.0.3
         </span>
         
         {{-- Logo --}}
@@ -18,7 +18,7 @@
         </div>
 
         {{-- Botones centrales --}}
-        @if($this->showCentralNav)
+        @if($showCentralNav)
 
             {{-- Contenedor absoluto centrado--}}
             <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
@@ -40,11 +40,11 @@
                             wire:model.live="wordSearch"/>
                 </label>
 
-                @if(request()->routeIs('tickets.*'))
+                @if($this->showExport)
                     {{-- Botón exportar --}}
                     <x-form.dropdown-export />
                 
-                @elseif(request()->routeIs('admin.validar-correos'))
+                @elseif($this->showEmailValidation)
                     {{-- Botón Importar Excel --}}
                     <label for="modal-importar" class="btn btn-sm btn-outline btn-success gap-2 h-10 cursor-pointer">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -203,7 +203,7 @@
 
     {{-- Alerta de ticket recibido --}}
     @auth
-        <div {{-- wire:poll="checkNew" --}} class="w-full bg-transparent px-20 z-69">
+        <div wire:poll="checkNew" class="w-full bg-transparent px-20 z-69">
 
             {{-- Sonido de la alerta --}}
             <audio id="alert-sound" src="{{ asset('sounds/new-notification-022-370046.mp3') }}" preload="auto"></audio>
