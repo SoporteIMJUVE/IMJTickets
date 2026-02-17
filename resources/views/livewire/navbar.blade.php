@@ -40,11 +40,11 @@
                             wire:model.live="wordSearch"/>
                 </label>
 
-                @if($this->showExportButtons)
+                @if($this->showExport)
                     {{-- Botón exportar --}}
                     <x-form.dropdown-export />
                 
-                @elseif(request()->routeIs('admin.validar-correos'))
+                @elseif($this->showEmailValidation)
                     {{-- Botón Importar Excel --}}
                     <label for="modal-importar" class="btn btn-sm btn-outline btn-success gap-2 h-10 cursor-pointer">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
