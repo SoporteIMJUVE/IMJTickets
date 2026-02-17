@@ -18,10 +18,10 @@
         </div>
 
         {{-- Botones centrales --}}
-        @if($this->showCentralNav)
+        @if($showCentralNav)
 
             {{-- Contenedor absoluto centrado--}}
-            <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
+            <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-3" wire:ignore.self>
 
                 <label class="input w-100">
                     <svg class="h-[1em] opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -40,7 +40,7 @@
                             wire:model.live="wordSearch"/>
                 </label>
 
-                @if(request()->routeIs('tickets.*'))
+                @if($this->showExportButtons)
                     {{-- Botón exportar --}}
                     <x-form.dropdown-export />
                 
@@ -203,7 +203,7 @@
 
     {{-- Alerta de ticket recibido --}}
     @auth
-        <div {{-- wire:poll="checkNew" --}} class="w-full bg-transparent px-20 z-69">
+        <div wire:poll="checkNew" class="w-full bg-transparent px-20 z-69">
 
             {{-- Sonido de la alerta --}}
             <audio id="alert-sound" src="{{ asset('sounds/new-notification-022-370046.mp3') }}" preload="auto"></audio>

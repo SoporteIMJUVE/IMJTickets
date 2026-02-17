@@ -9,6 +9,7 @@ use Livewire\Component;
 class Navbar extends Component
 {
     public $showCentralNav = false;
+    public $showExportButtons = false;
 
     public $wordSearch = '';
 
@@ -60,6 +61,7 @@ class Navbar extends Component
     {
         // evaluar ruta una sola vez al montar el componente
         $this->showCentralNav = request()->routeIs('tickets.user') || request()->routeIs('tickets.index') || request()->routeIs('admin.validar-correos');
+        $this->showExportButtons = request()->routeIs('tickets.*');
     }
 
     public function render()
