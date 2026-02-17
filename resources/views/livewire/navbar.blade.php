@@ -21,7 +21,7 @@
         @if($showCentralNav)
 
             {{-- Contenedor absoluto centrado--}}
-            <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-3" wire:ignore.self>
+            <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
 
                 <label class="input w-100">
                     <svg class="h-[1em] opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
