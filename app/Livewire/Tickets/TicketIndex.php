@@ -94,9 +94,9 @@ class TicketIndex extends Component
         if ($ticket && $ticket->estado < 3) { // asumimos que 3 = Cerrado
             $ticket->increment('estado'); // incrementa 1 automáticamente en la BD
 
-            // Si el estado cambia a "Atendiendo"
-            if ($ticket->estado == 1) {
-                $ticket->atendido_at = now();
+            // Si el estado cambia a "Cerrado"
+            if ($ticket->estado == 2) {
+                $ticket->cerrado_at = now();
                 $ticket->save();
             }
 
@@ -217,7 +217,7 @@ class TicketIndex extends Component
             foreach ($this->period as $field => $range) {
                 if(!empty($range) && isset($range['from']) && $range['from'] != null && isset($range['to']) && $range['to'] != null) {
 
-                    if($field === 'updated_at') {
+                    if($field === 'cerrado_at') {
                         $query->where('estado', 2); // Solo filtrar tickets atendidos
                     }
 
@@ -231,7 +231,7 @@ class TicketIndex extends Component
             $query->orderBy($this->order[0], $this->order[1]); // Ordenamiento simple por fecha de creacion
         } else {
             $query
-                ->orderByRaw('(CASE WHEN estado IS ' . ($this->order[0] === 'atendido_at' ? 'NOT 0' : 2) . ' THEN 0 ELSE 1 END) ASC')
+                ->orderByRaw('(CASE WHEN estado IS 2 THEN 0 ELSE 1 END) ASC')
                 ->orderBy($this->order[0], $this->order[1])
                 ->orderBy('created_at', $this->order[1]);
         }
