@@ -40,16 +40,10 @@
                             field="created_at" 
                         />
                     </th>
-                    <th colspan="creado" class="text-center w-35 h-10 p-1">
-                        <x-form.dropdown-date 
-                            title="Atendido" 
-                            field="atendido_at" 
-                        />
-                    </th>
                     <th colspan="cerrado" class="text-center w-35 h-10 p-1">
                         <x-form.dropdown-date 
                             title="Cerrado" 
-                            field="updated_at" 
+                            field="cerrado_at" 
                         />
                     </th>
                 </tr>
@@ -86,8 +80,7 @@
                             @endif
                         </td>
                         <td class="border-r border-gray-300 text-center">{{ $ticket->created_at }}</td>
-                        <td class="border-r border-gray-300 text-center">{{ $ticket->atendido_at }}</td>
-                        <td class="text-center">@if($ticket->estado == $numEstados-1){{ $ticket->updated_at }}@endif</td>
+                        <td class="border-r border-gray-300 text-center">{{ $ticket->cerrado_at }}</td>
                     </tr>
                 @endforeach
                 
