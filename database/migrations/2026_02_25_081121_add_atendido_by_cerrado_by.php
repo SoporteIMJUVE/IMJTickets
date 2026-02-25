@@ -12,9 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('tickets', function (Blueprint $table) {
-            $table->dropColumn('atendido_at');
-            $table->timestamp('cerrado_at')->nullable();
-            $table->text('comentarios')->nullable();
+            $table->string('atendido_by')->nullable();
+            $table->string('cerrado_by')->nullable();
         });
     }
 
@@ -24,8 +23,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('tickets', function (Blueprint $table) {
-            $table->timestamp('atendido_at')->nullable();
-            $table->dropColumn(['cerrado_at', 'comentarios']);
+            $table->dropColumn(['atendido_by', 'cerrado_by']);
         });
     }
 };

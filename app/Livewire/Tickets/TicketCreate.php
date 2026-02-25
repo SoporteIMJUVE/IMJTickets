@@ -23,7 +23,6 @@ class TicketCreate extends Component
         //Notficamos a todos los usuarios que hay un nuevo ticket
         User::query()->update(['new_ticket_alert' => true, 'new_ticket_sound' => true]);
 
-
         // Redireccion full reload
         return redirect()->to(route("bienvenida"));
 
