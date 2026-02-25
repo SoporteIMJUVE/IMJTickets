@@ -91,12 +91,20 @@ class TicketIndex extends Component
     public function ticketProgress($id)
     {
         $ticket = Ticket::find($id);
-        if ($ticket && $ticket->estado < 3) { // asumimos que 3 = Cerrado
+        if ($ticket && $ticket->estado < 3) { // asumimos que 2 = Cerrado
             $ticket->increment('estado'); // incrementa 1 automáticamente en la BD
+
+            // Si el estado cambia a "Atendido"
+            if ($ticket->estado == 1) {
+                $ticket->atendido_at = now();
+                $ticket->atendido_by = Auth::user()->email;
+                $ticket->save();
+            }
 
             // Si el estado cambia a "Cerrado"
             if ($ticket->estado == 2) {
                 $ticket->cerrado_at = now();
+                $ticket->cerrado_by = Auth::user()->email;
                 $ticket->save();
             }
 
