@@ -8,15 +8,11 @@
     <link rel="icon" type="image/png" href="{{ asset('images/IMJCabezaT.png') }}">
     <title>IMJTickets</title>
 
-    {{-- Alpine.js --}}
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-
     {{-- Vite para Tailwind CSS y DaisyUI --}}
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     {{-- Livewire --}}
     @livewireStyles
-    @livewireScripts
 
     {{-- SweetAlert --}}
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

@@ -7,7 +7,7 @@ use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow; // Para usar la primera fila como encabezados
 use Maatwebsite\Excel\Concerns\WithUpserts; // Para permitir actualizaciones basadas en una columna única (Update + Insert)
 
-class EmpleadosImport implements ToModel, WithHeadingRow, WithUpserts
+class ImportarEmpleados implements ToModel, WithHeadingRow, WithUpserts
 {
     public function model(array $row)
     {

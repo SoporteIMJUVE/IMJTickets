@@ -5,7 +5,7 @@
 
         {{-- Versión --}}
         <span class="absolute left-5 translate-y-3 text-xs text-gray-300">
-            v0.14.0
+            v1.1.0
         </span>
         
         {{-- Logo --}}
@@ -18,10 +18,10 @@
         </div>
 
         {{-- Botones centrales --}}
-        @if($this->showCentralNav)
+        @if($showCentralNav)
 
             {{-- Contenedor absoluto centrado--}}
-            <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-3">
+            <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
 
                 <label class="input w-100">
                     <svg class="h-[1em] opacity-50" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -40,11 +40,11 @@
                             wire:model.live="wordSearch"/>
                 </label>
 
-                @if(request()->routeIs('tickets.*'))
+                @if($this->showExport)
                     {{-- Botón exportar --}}
                     <x-form.dropdown-export />
                 
-                @elseif(request()->routeIs('admin.validar-correos'))
+                @elseif($this->showEmailValidation)
                     {{-- Botón Importar Excel --}}
                     <label for="modal-importar" class="btn btn-sm btn-outline btn-success gap-2 h-10 cursor-pointer">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -54,20 +54,24 @@
                     </label>
 
                     {{-- Botón Agregar Empleado --}}
-                    <button class="btn btn-imjuve hover:brightness-85 text-white gap-2 border-none h-10">
+                    <label for="modal-agregar-empleado" class="btn btn-imjuve hover:brightness-85 text-white gap-2 border-none h-10 cursor-pointer"
+                           x-on:click="
+                           $wire.crearNombre = ''; 
+                           $wire.crearCorreo = '';
+                           document.querySelectorAll('.text-red-500').forEach(el => el.innerHTML = '');
+                           document.querySelectorAll('.border-red-500').forEach(el => el.classList.remove('border-red-500', 'border-3'));
+                           document.querySelectorAll('#modal-eliminar-errores input').forEach(input => input.value = '');
+                           $dispatch('limpiar-errores-registro');" >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                         </svg>
                         <span class="hidden xl:inline">Agregar empleado</span>
-                    </button>
-                    
+                    </label>
                 @endif
-
             </div>
         @endif
 
         <div class="flex-none gap-2">
-
             @guest
                 <a class="btn btn-imjuve"
                     href="{{ route("login", ['role' => 'admin'] ) }}"
@@ -116,14 +120,14 @@
                                         {{-- Opciones del menú --}}
                                         <a href="{{ route('admin.validar-correos') }}" 
                                            wire:navigate.hover 
-                                           class="block w-full text-left px-4 py-3 hover:bg-blue-600 hover:text-white transition rounded-sm text-gray-800 text-sm cursor-pointer">
+                                           class="block w-full text-left px-4 py-3 hover:bg-emerald-600 hover:text-white transition rounded-sm text-gray-800 text-sm cursor-pointer">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="inline-block w-4 h-4 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                             </svg>
                                             Validar correos
                                         </a>
 
-                                        <button class="w-full text-left px-4 py-3 hover:bg-blue-600 hover:text-white transition rounded-sm text-gray-800 text-sm">
+                                        <button class="w-full text-left px-4 py-3 hover:bg-emerald-600 hover:text-white transition rounded-sm text-gray-800 text-sm">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="inline-block w-4 h-4 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7m0 0c0 2.21-3.582 4-8 4s-8-1.79-8-4m0 0C4 4.79 7.582 3 12 3s8 1.79 8 4" />
                                             </svg>
@@ -132,7 +136,7 @@
 
                                         <div class="border-t border-gray-200 my-1"></div>
                                 
-                                        <button class="w-full text-left px-4 py-3 hover:bg-emerald-600 hover:text-white transition rounded-sm text-gray-800 text-sm">
+                                        <button class="w-full text-left px-4 py-3 hover:bg-blue-600 hover:text-white transition rounded-sm text-gray-800 text-sm">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="inline-block w-4 h-4 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>

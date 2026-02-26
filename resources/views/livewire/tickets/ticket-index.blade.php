@@ -134,7 +134,7 @@
 
                 <div class="modal-action">
                     <button wire:click="closeModal" class="btn btn-ghost">Cancelar</button>
-                    <button wire:click="confirmTicketProgress" class="btn bg-[#681a32] text-white btn-ghost">Confirmar</button>
+                    <button wire:click="confirmTicketProgress" class="btn btn-imjuve hover:brightness-85 text-white btn-ghost">Confirmar</button>
                 </div>
             </div>
             <div class="modal-backdrop" wire:click="closeModal"></div>

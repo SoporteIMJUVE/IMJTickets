@@ -11,6 +11,11 @@ class TicketCreate extends Component
 {
     public TicketForm $form;
 
+    public function mount()
+    {
+        $this->form->validarEmpleado = true;
+    }
+    
     public function createTicket()
     {
         //Validamos y creamos el ticket en la base de datos

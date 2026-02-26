@@ -4,18 +4,25 @@ namespace App\Livewire\Forms;
 
 use Livewire\Form;
 use App\Models\Ticket;
+use App\Models\Empleado;
 
 class EmailForm extends Form
 {
     public $correo;
-
     public $dominio = "@imjuventud.gob.mx";
+    public $validarEmpleado = false;
 
     public function rules()
     {
-        return [
+        $reglas = [
             'correo' => ['required', 'email', 'ends_with:'.$this->dominio],
         ];
+        
+        if ($this->validarEmpleado) {
+            $reglas['correo'][] = 'exists:empleados,correo';
+        }
+
+        return $reglas;
     }
 
     public function messages()
@@ -24,6 +31,7 @@ class EmailForm extends Form
             'correo.required' => 'Es necesario ingresar un correo',
             'correo.email' => 'El correo ingresado no es válido',
             'correo.ends_with' => 'El correo debe ser institucional ('.$this->dominio.')',
+            'correo.exists' => 'El correo no está registrado en el sistema',
         ];
     }
 
