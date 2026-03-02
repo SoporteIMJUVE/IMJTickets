@@ -11,6 +11,7 @@
                     <th colspan="nombre" class="text-center w-30">Nombre</th>
                     <th colspan="correo" class="text-center w-40">Correo</th>
                     <th colspan="descripcion" class="text-center min-w-70">Descripción</th>
+                    <th colspan="comentarios" class="text-center min-w-70">Comentarios</th>
                     <th colspan="tipo" class="text-center w-25 h-10 p-1">
                         <x-form.dropdown-checkbox 
                             title="Tipo"
@@ -57,14 +58,22 @@
                         <td class="border-r border-gray-300 text-center">{{ $ticket->id }}</td>
                         <td class="border-r border-gray-300 text-center truncate">{{ $ticket->nombre }}</td>
                         <td class="border-r border-gray-300 truncate">{{ $ticket->correo }}</td>
-                        <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->descripcion }}</td>
+                        <x-form.interactive-td
+                            content="{{ $ticket->descripcion }}"
+                            wire:key="{{ $ticket->id }}"
+                            wire:click="openTicketModal({{ $ticket->id }})"
+                        />
+                        <x-form.interactive-td
+                            content="{{ $ticket->comentarios }}"
+                            wire:key="{{ $ticket->id }}"
+                            wire:click="ticketProgress({{ $ticket->id }})"
+                        />
                         <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->tipo }}</td>
                         <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->area }}</td>
                         <td class="h-14 flex justify-center border-r border-gray-300">
                             @if( $ticket->estado == $numEstados-1 )
                                 <div class="badge badge-outline badge-{{ $ticket->estado_sty }} w-full h-full">{{ $ticket->estado_txt }}</div>
                             @else
-
                                 @guest
                                     <div class="badge badge-outline badge-{{ $ticket->estado_sty }} w-full h-full">{{ $ticket->estado_txt }}</div>
                                 @endguest
@@ -76,7 +85,6 @@
                                         {{ $ticket->estado_txt }}
                                     </button>
                                 @endauth
-
                             @endif
                         </td>
                         <td class="border-r border-gray-300 text-center">{{ $ticket->created_at }}</td>
@@ -100,16 +108,25 @@
         </div>
 
     </div>
-    
 
-    {{-- Elementos ocultos para mantener los estilos de DaisyUI --}}
-    {{-- (DaisyUI aplica estilos solo si detecta estos elementos en el DOM) --}}
-    <div class="badge badge-outline badge-error" style="display: none;"></div>
-    <div class="badge badge-outline badge-warning" style="display: none;"></div>
-    <div class="badge badge-outline badge-success" style="display: none;"></div>
-    <button class="btn btn-error" style="display: none;"></button>
-    <button class="btn btn-warning" style="display: none;"></button>
-    <button class="btn btn-success" style="display: none;"></button>
+
+    {{--
+    <!-- jQuery (necesario para colResizable) -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <!-- colResizable -->
+    <script src="https://cdn.jsdelivr.net/npm/colresizable/colResizable-1.6.min.js"></script>
+    <script>
+        document.addEventListener('livewire:navigated', function () {
+            $('#tickets-table').colResizable({
+                liveDrag: true,
+                gripInnerHtml: "<div class='grip'></div>",
+                draggingClass: "dragging",
+                resizeMode: 'fit'
+            });
+        });
+    </script>
+    --}}
+
 
     {{-- Modal de confirmación --}}
     @if($showModal && $ticketForConfirmation)
@@ -129,7 +146,7 @@
 
                 <div class="modal-action">
                     <button wire:click="closeModal" class="btn btn-ghost">Cancelar</button>
-                    <button wire:click="confirmTicketProgress" class="btn bg-[#681a32] text-white btn-ghost">Confirmar</button>
+                    <button wire:click="confirmTicketProgress" class="btn btn-imjuve hover:brightness-85 text-white btn-ghost">Confirmar</button>
                 </div>
             </div>
             <div class="modal-backdrop" wire:click="closeModal"></div>
@@ -152,21 +169,14 @@
         </div>
     @endif
 
-    {{--
-    <!-- jQuery (necesario para colResizable) -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <!-- colResizable -->
-    <script src="https://cdn.jsdelivr.net/npm/colresizable/colResizable-1.6.min.js"></script>
-    <script>
-        document.addEventListener('livewire:navigated', function () {
-            $('#tickets-table').colResizable({
-                liveDrag: true,
-                gripInnerHtml: "<div class='grip'></div>",
-                draggingClass: "dragging",
-                resizeMode: 'fit'
-            });
-        });
-    </script>
-    --}}
+
+    {{-- Elementos ocultos para mantener los estilos de DaisyUI --}}
+    {{-- (DaisyUI aplica estilos solo si detecta estos elementos en el DOM) --}}
+    <div class="badge badge-outline badge-error" style="display: none;"></div>
+    <div class="badge badge-outline badge-warning" style="display: none;"></div>
+    <div class="badge badge-outline badge-success" style="display: none;"></div>
+    <button class="btn btn-error" style="display: none;"></button>
+    <button class="btn btn-warning" style="display: none;"></button>
+    <button class="btn btn-success" style="display: none;"></button>
 
 </div>

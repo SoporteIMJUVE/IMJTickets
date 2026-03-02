@@ -208,6 +208,7 @@ class TicketIndex extends Component
                   ->orWhere('nombre', 'like', $searchTerm)
                   ->orWhere('correo', 'like', $searchTerm)
                   ->orWhere('descripcion', 'like', $searchTerm)
+                  ->orWhere('comentarios', 'like', $searchTerm)
                   ->orWhere('area', 'like', $searchTerm)
                   ->orWhere('tipo', 'like', $searchTerm);
             });
