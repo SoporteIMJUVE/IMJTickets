@@ -80,7 +80,7 @@
             @endguest
     
             @auth
-                <!-- contenedor relativo inline-block para logout + ghost -->
+                <!-- Botones de administración -->
                 <div class="relative inline-block">                    
                     <button wire:click="logout" class="btn btn-imjuve hover:brightness-85">
                         Cerrar sesión
@@ -89,9 +89,8 @@
                     <div x-data="{ drawerOpen: false }" 
                          class="absolute left-full pl-3 top-1/2 -translate-y-1/2 ml-2">
                         <button @click="drawerOpen = !drawerOpen" 
-                                class="btn btn-circle btn-ghost text-gray-500 hover:bg-transparent transition cursor-pointer tooltip tooltip-bottom" 
-                                :class="{ 'bg-gray-200 shadow-inner scale-95': drawerOpen }" 
-                                data-tip="Ajustes">
+                                class="btn btn-circle btn-ghost text-gray-500 hover:bg-transparent transition cursor-pointer" 
+                                :class="{ 'bg-gray-200 shadow-inner scale-95': drawerOpen }">
                             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="size-6">
                                 <path d="M4 6.75H20" stroke="currentColor" stroke-width="2.0" stroke-linecap="round"/>
                                 <path d="M4 12.75H20" stroke="currentColor" stroke-width="2.0" stroke-linecap="round"/>
