@@ -1,4 +1,4 @@
-<div class="min-h-screen bg-gray-100 pt-20 px-4 sm:px-6 lg:px-20 pb-3">
+<div class="min-h-screen bg-gray-100 pt-20 px-4 sm:px-6 lg:px-20 pb-3 flex items-center">
 
     {{-- Tabla de tickets --}}
     <div class="w-full overflow-x-auto rounded-box w-full shadow-xl">
@@ -60,8 +60,7 @@
                         <td class="border-r border-gray-300 truncate">{{ $ticket->correo }}</td>
                         <x-form.interactive-td
                             content="{{ $ticket->descripcion }}"
-                            wire:key="{{ $ticket->id }}"
-                            wire:click="openTicketModal({{ $ticket->id }})"
+                            onclick="modalPrueba.showModal()"
                         />
                         <x-form.interactive-td
                             content="{{ $ticket->comentarios }}"
@@ -79,8 +78,7 @@
                                 @endguest
 
                                 @auth
-                                    <button wire:key="{{ $ticket->id }}"
-                                            wire:click="openTicketModal({{ $ticket->id }})"
+                                    <button for="my_modal_7"
                                             class="btn btn-{{ $ticket->estado_sty }} w-full h-full">
                                         {{ $ticket->estado_txt }}
                                     </button>
@@ -127,6 +125,30 @@
     </script>
     --}}
 
+    {{-- Modals --}}
+
+    {{-- Modal de prueba --}}
+    <button class="btn" onclick="modalPrueba.showModal()">modal prueba</button>
+
+    <!-- Put this part before </body> tag -->
+    <dialog id="my_modal_2" class="modal">
+        <div class="modal-box">
+            <h3 class="text-lg font-bold">Hello!</h3>
+            <p class="py-4">Press ESC key or click outside to close</p>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <x-form.modal id="modalPrueba" submit="ticketProgress({{ $ticket->id }})" title="¿Cuál es el siguiente estado del ticket?" subtitle="Explicacion de lo que hace este modal" subbutton="Subbutton" button="Confirmar">
+        <x-form.input 
+            legend="Comentarios adicionales (opcional)" 
+            model="confirmationComment" 
+            type="text" 
+            placeholder="Agrega un comentario que se guardará en el historial del ticket"
+        />
+    </x-form.modal>
 
     {{-- Modal de confirmación --}}
     @if($showModal && $ticketForConfirmation)
@@ -149,7 +171,7 @@
                     <button wire:click="confirmTicketProgress" class="btn btn-imjuve hover:brightness-85 text-white btn-ghost">Confirmar</button>
                 </div>
             </div>
-            <div class="modal-backdrop" wire:click="closeModal"></div>
+            <div class="modal-backdrop w-full h-full" wire:click="closeModal"></div>
         </div>
     @endif
 
