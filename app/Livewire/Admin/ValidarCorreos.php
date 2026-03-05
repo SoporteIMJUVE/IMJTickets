@@ -5,6 +5,8 @@ namespace App\Livewire\Admin;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
+use App\Livewire\Forms\EmailForm;
+use App\Livewire\Forms\NombreForm;
 
 class ValidarCorreos extends Component
 {
@@ -12,14 +14,14 @@ class ValidarCorreos extends Component
     use WithPagination;
 
     public $fileExcel;
-    public $crearNombre;
-    public $crearCorreo;
-    public $editarNombre;
-    public $editarCorreo;
+    public $empleadosIncompletos = [];
+
     public $originalCorreo;
     public $originalNombre;
     public $empleadoAEliminar;
-    
+
+    public $emailForm;
+    public $nombreForm;
 
     public function render()
     {
@@ -36,16 +38,45 @@ class ValidarCorreos extends Component
 
         $ruta = $this->fileExcel->getRealPath();
         $datos = \Maatwebsite\Excel\Facades\Excel::toArray([], $ruta);
-        $titulo = array_map('strtolower', $datos[0][0] ?? []);
+        $filas = $datos[0] ?? [];
+        $encabezados = array_map('strtolower', array_shift($filas) ?? []);
 
-        if (!in_array('nombre', $titulo) || !in_array('correo', $titulo)) {
+        $celdaNombre = array_search('nombre', $encabezados);
+        $celdaCorreo = array_search('correo', $encabezados);
+
+        if ($celdaNombre === false || $celdaCorreo === false) {
             $this->dispatch('mostrar-error-excel');
             $this->reset('fileExcel');
             return;
         }
+
+        $this->empleadosIncompletos = [];
+        foreach ($filas as $fila) {
+            $nombre = trim($fila[$celdaNombre] ?? '');
+            $correo = trim($fila[$celdaCorreo] ?? '');
+            
+            if ($nombre !== '' && $correo === '') {
+                $this->empleadosIncompletos[] = [
+                    'dato' => $nombre,
+                    'error' => 'Correo electrónico'
+                ];
+            }    
+            elseif ($nombre === '' && $correo !== '') {
+                $this->empleadosIncompletos[] = [
+                    'dato' => $correo,
+                    'error' => 'Nombre completo'
+                ];
+            }
+        }
+
+        if (count($this->empleadosIncompletos) > 0) {
+            $this->dispatch('mostrar-nombres-sin-correo');
+            $this->reset('fileExcel');
+            return;
+        }
+
         try {
             \Maatwebsite\Excel\Facades\Excel::import(new \App\Imports\ImportarEmpleados, $this->fileExcel);
-
             $this->reset('fileExcel');
             session()->flash('message', '¡Excel importado y datos actualizados con éxito!');
         } catch (\Exception $e) {
@@ -62,20 +93,12 @@ class ValidarCorreos extends Component
     }
 
     public function agregarEmpleado()
-    {
-        $this->validate([
-            'crearNombre' => ['required', 'max:50', 'regex:/^\S+\s+\S+\s+\S+/'],
-            'crearCorreo' => ['required', 'email', 'ends_with:@imjuventud.gob.mx'],
-        ], [
-            'crearNombre.required'  => 'Es necesario ingresar un nombre',
-            'crearNombre.regex'     => 'Debes ingresar el nombre completo del empleado',
-            'crearCorreo.required'  => 'Es necesario ingresar un correo',
-            'crearCorreo.email'     => 'El correo ingresado no es válido',
-            'correo.ends_with'      => 'El correo debe ser institucional (@imjuventud.gob.mx)',
-        ]);
+    {  
+        $this->emailForm->validate();
+        $this->nombreForm->validate();
 
-        if (\App\Models\Empleado::where('correo', $this->correo)->exists()) {
-            $this->addError('correo', 'Este correo ya está registrado');
+        if (\App\Models\Empleado::where('correo', $this->crearCorreo)->exists()) {
+            $this->addError('crearCorreo', 'Este correo ya está registrado');
             return;
         }
 
@@ -84,19 +107,21 @@ class ValidarCorreos extends Component
             'correo' => $this->crearCorreo,
         ]);
 
-        $this->reset(['crearNombre', 'crearCorreo']);
-        $this->dispatch('mostrar-toast', mensaje: 'Empleado agregado con éxito');
+        $this->emailForm->reset();
+        $this->nombreForm->reset();
+        $this->dispatch('mostrar-toast', mensaje: 'Empleado(a) agregado(a) con éxito');
 
     }
 
     public function editarEmpleado($correo)
     {
         $this->resetErrorBag();
-        $empleado = \App\Models\Empleado::where('correo', $correo)->first();
-        if (!$empleado) {
-            dd("No se encontró al empleado con el correo: " . $correo); 
-        }
+        $this->validate([
+        'editarNombre' => $this->nombreForm->rules()['nombre'],
+        'editarCorreo' => $this->emailForm->rules()['correo'],
+    ], array_merge($this->nombreForm->messages(), $this->emailForm->messages()));
 
+        $empleado = \App\Models\Empleado::where('correo', $correo)->first();
         $this->editarCorreo = $empleado->correo;
         $this->editarNombre = $empleado->nombre;
         $this->originalCorreo = $empleado->correo;
@@ -114,20 +139,15 @@ class ValidarCorreos extends Component
             return;
         }
         
+        $reglas = $this->formularioBase->rules();
         $this->validate([
-            'editarNombre' => ['required', 'max:50', 'regex:/^\S+\s+\S+\s+\S+/'],
-            'editarCorreo' => ['required', 'email', 'ends_with:@imjuventud.gob.mx'],
-        ], [
-            'editarNombre.required' => 'Es necesario ingresar un nombre',
-            'editarNombre.regex'    => 'Debes ingresar el nombre completo del empleado',
-            'editarCorreo.required'  => 'Es necesario ingresar un correo',
-            'editarCorreo.email'     => 'El correo ingresado no es válido',
-            'editarCorreo.ends_with' => 'El correo debe ser institucional (@imjuventud.gob.mx)',
-        ]);
+            'editarNombre' => $reglas['nombre'],
+            'editarCorreo' => $reglas['correo'],
+        ], $this->formularioBase->messages());
 
         if ($this->editarCorreo !== $this->originalCorreo) {
             if (\App\Models\Empleado::where('correo', $this->editarCorreo)->exists()) {
-                $this->addError('editarCorreo', 'Este correo ya pertenece a otro empleado.');
+                $this->addError('editarCorreo', 'Este correo ya está registrado');
                 return;
             }
         }
@@ -140,7 +160,7 @@ class ValidarCorreos extends Component
             ]);
         }
         $this->reset(['editarNombre', 'editarCorreo', 'originalNombre', 'originalCorreo']);
-        $this->dispatch('mostrar-toast', mensaje: 'Empleado actualizado con éxito');
+        $this->dispatch('mostrar-toast', mensaje: 'Empleado(a) actualizado(a) con éxito');
     }
 
     public function prepararEliminacion($correo, $nombre)
@@ -156,7 +176,7 @@ class ValidarCorreos extends Component
 
         if ($empleado) {
             $empleado->delete();
-            $this->dispatch('mostrar-toast', mensaje: 'Empleado eliminado con éxito');
+            $this->dispatch('mostrar-toast', mensaje: 'Empleado(a) eliminado(a) con éxito');
         }
             $this->reset('empleadoAEliminar');
         }

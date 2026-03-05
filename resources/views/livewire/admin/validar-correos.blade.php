@@ -62,7 +62,7 @@
         </div>
     @endif
 
-    {{-- Modal de Instrucciones de Importación --}}
+    {{-- Modal instrucciones de importación --}}
     <input type="checkbox" id="modal-importar" class="modal-toggle" />
     <div class="modal">
         <div class="modal-box relative bg-white p-0 overflow-hidden w-72 sm:w-120">        
@@ -82,7 +82,7 @@
                     <div class="flex-1 items-center gap-2 text-gray-700 font-medium">Nombre</div>
                     <div class="flex-1 items-center gap-2 text-gray-700 font-medium">Correo</div>
                 </div>
-            </div>              
+            </div>
             <div class="p-6 pt-2 flex justify-end gap-3">
                 <label for="modal-importar" class="btn btn-neutral btn-outline">
                     Cancelar
@@ -96,10 +96,9 @@
         </div>
     </div>
 
-    {{-- Modal de error al procesar Excel --}}
+    {{-- Modal error al procesar Excel --}}
     <input type="file" id="input-excel" wire:model="fileExcel" class="hidden" accept=".xlsx,.xls,.csv">
-    <div x-data="{ openError: false }" 
-         x-on:mostrar-error-excel.window="openError = true">
+    <div x-data="{ openError: false }" x-on:mostrar-error-excel.window="openError = true">
         <input type="checkbox" id="modal-error-columnas" class="modal-toggle" x-model="openError" />
         <div class="modal modal-bottom sm:modal-middle overflow-hidden">
             <div class="modal-box relative bg-white p-0 overflow-hidden w-72 sm:w-120">
@@ -110,21 +109,72 @@
                         </svg>
                         Formato de archivo incorrecto
                     </h3>
-                    <p class="text-sm text-gray-500 mt-2">
-                        No se lograron detectar las columnas necesarias en el archivo Excel.
+                    <p class="text-sm text-gray-600 mt-2">
+                        No se lograron detectar las columnas necesarias en el archivo Excel
                     </p>
-                    <p class="text-sm text-gray-500 mt-2">
+                    <p class="text-sm text-gray-600 mt-2">
                         Asegúrate de que la primera fila contenga exactamente los encabezados:
                         <span class="font-bold text-gray-800">Nombre</span> y 
                         <span class="font-bold text-gray-800">Correo</span>.
                     </p>
-                    <p class="text-sm text-gray-500 mt-2">
-                        Revisa el formato del archivo e inténtalo nuevamente.
+                    <p class="text-sm text-gray-600 mt-2">
+                        Revisa el formato del archivo e inténtalo nuevamente
                     </p>
                 </div>
                 <div class="p-6 pt-2">
-                    <button @click="openError = false" 
-                            class="btn w-full border-none text-white hover:brightness-90 transition-all bg-yellow-600 hover:bg-yellow-700 shadow-sm">
+                    <button @click="openError = false" class="btn w-40 border-none text-white hover:brightness-90 transition-all bg-yellow-600 hover:bg-yellow-700 shadow-sm">
+                        Aceptar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal de empleados sin correo --}}
+    <input type="checkbox" id="modal-incompletos" class="modal-toggle" x-model="openIncompletos" />
+    <div x-data="{ openIncompletos: false }" x-on:mostrar-nombres-sin-correo.window="openIncompletos = true">
+        <div class="modal modal-bottom sm:modal-middle overflow-hidden">
+            <div class="modal-box relative bg-white p-0 overflow-hidden w-full sm:max-w-xl border-t-4">
+                <div class="p-6 text-center">
+                    <h3 class="text-xl font-bold flex items-center justify-center gap-2 text-yellow-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        Datos incompletos en el archivo
+                    </h3>
+                    <p class="text-sm text-gray-600 mt-4">
+                        La información de los siguientes empleados está incompleta:
+                    </p>
+                    <div class="mt-5 max-h-60 overflow-y-auto rounded-xl border border-gray-100 shadow-inner">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-50 text-gray-600 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-2 font-medium">Dato encontrado</th>
+                                <th class="px-4 py-2 font-medium">Dato faltante</th>
+                            </tr> 
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach($empleadosIncompletos as $item)
+                                <tr class="hover:bg-red-50/30 transition-colors">
+                                    <td class="px-4 py-3 font-semibold text-black">
+                                        {{ $item['dato'] }}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="text-red-600 font-bold text-xs tracking-wider">
+                                            {{ $item['error'] }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                    <p class="text-sm text-gray-600 mt-2">
+                        Revisa que todos los empleados tengan un correo y un nombre asociados o elimínalo del archivo y vuelve a cargar el Excel
+                    </p>
+                </div>
+                <div class="p-6 pt-2">
+                    <button @click="openIncompletos = false" class="btn w-40 border-none text-white hover:brightness-90 transition-all bg-yellow-600 hover:bg-yellow-700 shadow-sm">
                         Aceptar
                     </button>
                 </div>
@@ -138,25 +188,21 @@
         <span class="font-semibold text-gray-700">Cargando archivo</span>
     </div>
 
-    {{-- Modal de Agregar nuevo empleado --}}
+    {{-- Modal agregar nuevo empleado --}}
     <input type="checkbox" id="modal-agregar-empleado" class="modal-toggle" />
     <div class="modal">
         <div class="modal-box bg-white">
             <h3 class="font-bold text-lg text-[#641332]">Agregar nuevo empleado</h3>
             <div id="modal-eliminar-errores" class="py-2 flex flex-col gap-4">
                 <div class="relative mb-2">
-                    <input type="text" wire:model="crearNombre" 
-                           class="input input-bordered w-full @error('crearNombre') border-red-500 border-3 @enderror" 
-                           placeholder="Nombre completo" />
-                    @error('crearNombre')
+                    <input type="text" wire:model="nombreForm.nombre" class="input input-bordered w-full @error('nombreForm.nombre') border-red-500 border-3 @enderror" placeholder="Nombre completo" />
+                    @error('nombreForm.nombre')
                         <p class="absolute -bottom-4 right-0 font-bold text-red-500 text-xs">{{ $message }}</p>
                     @enderror
                 </div>
                 <div class="relative mb-2">
-                    <input type="email" wire:model="crearCorreo"
-                           class="input input-bordered w-full @error('crearCorreo') border-red-500 border-3 @enderror" 
-                           placeholder="Correo institucional" />
-                    @error('crearCorreo')
+                    <input type="email" wire:model="emailForm.correo" class="input input-bordered w-full @error('emailForm.correo') border-red-500 border-3 @enderror" placeholder="Correo institucional" />
+                    @error('emailForm.correo')
                         <p class="absolute -bottom-4 right-0 font-bold text-red-500 text-xs">{{ $message }}</p>
                     @enderror
                 </div>           
@@ -176,39 +222,29 @@
         <span class="font-semibold text-gray-700">Validando datos</span>
     </div>
 
-    <div x-show="showToast" 
-     x-transition.opacity.duration.400ms 
-     class="toast toast-center toast-middle z-[1100]">
-    
-    <div class="alert alert-success shadow-2xl">
-        {{-- Aquí se inserta el mensaje dinámico --}}
-        <span class="font-bold text-lg text-white" x-text="toastMessage"></span>
-    </div>
-</div>
-
-    {{-- Modal de Editar empleado --}}
+    {{-- Modal edición de empleado --}}
     <input type="checkbox" id="modal-editar-empleado" class="modal-toggle" />
     <div class="modal" x-data="{}" x-on:abrir-modal-edicion.window="document.getElementById('modal-editar-empleado').checked = true">
         <div class="modal-box bg-white">
             <h3 class="font-bold text-lg text-[#641332]">Editar datos de empleado</h3>
             <div class="py-2 flex flex-col gap-4">
                 <div class="relative mb-2">
-                    <input type="text" wire:model="editarNombre" 
-                           class="input input-bordered w-full @error('editarNombre') border-red-500 border-3 @enderror"/>
-                    @error('editarNombre')
+                    <input type="text" wire:model="nombreForm.nombre" 
+                           class="input input-bordered w-full @error('nombreForm.nombre') border-red-500 border-3 @enderror"/>
+                    @error('nombreForm.nombre')
                         <span class="absolute -bottom-4 right-0 font-bold text-red-500 text-xs">{{ $message }}</span>
                     @enderror
                 </div>
                 <div class="relative mb-2">
-                    <input type="text" wire:model="editarCorreo" 
-                           class="input input-bordered w-full @error('editarCorreo') border-red-500 border-3 @enderror"/>
-                    @error('editarCorreo')
+                    <input type="text" wire:model="emailForm.correo" class="input input-bordered w-full @error('emailForm.correo') border-red-500 border-3 @enderror"/>
+                    @error('emailForm.correo')
                         <span class="absolute -bottom-4 right-0 font-bold text-red-500 text-xs">{{ $message }}</span>
                     @enderror
                 </div>
             </div>
             <div class="modal-action">
                 <label for="modal-editar-empleado" wire:loading.remove class="btn btn-neutral btn-outline">Cancelar</label>
+                <button for 
                 <button wire:click="actualizarEmpleado" wire:loading.remove class="btn btn-imjuve hover:brightness-85 text-white btn-ghost">
                     Actualizar
                 </button>
@@ -222,13 +258,7 @@
         <span class="font-semibold text-gray-700">Validando datos</span>
     </div>
 
-    <div x-show="showToast" x-transition.opacity.duration.400ms class="toast toast-center toast-middle z-[1100]">
-        <div class="alert alert-success shadow-2xl">
-            <span class="font-bold text-lg text-white" x-text="toastMessage"></span>
-        </div>
-    </div>
-
-    {{-- Modal de Confirmación de Eliminación --}}
+    {{-- Modal confirmación de eliminación --}}
     <input type="checkbox" id="modal-eliminar-empleado" class="modal-toggle" />
     <div class="modal">
         <div class="modal-box relative bg-white p-0 overflow-hidden w-72 sm:w-120">        
@@ -238,7 +268,7 @@
                 </h3>
                 <p class="text-sm text-gray-800 mt-2">
                     ¿Está seguro de que desea eliminar al empleado(a)
-                        <span class="font-bold text-gray-800">{{ $empleadoAEliminar['nombre'] ?? '' }}</span>?
+                    <span class="font-bold text-gray-800">{{ $empleadoAEliminar['nombre'] ?? '' }}</span>?
                 </p>
                 <p class="text-sm text-gray-800 mt-2">
                     Esta acción no se puede deshacer
@@ -252,6 +282,13 @@
                     Eliminar
                 </button>
             </div>              
+        </div>
+    </div>
+
+    {{-- Toat de confirmación: agregar, editar o eliminar empleado --}}
+    <div x-show="showToast" x-transition.opacity.duration.100ms class="toast toast-center toast-middle z-[1100]">
+        <div class="alert alert-success shadow-2xl">
+            <span class="font-bold text-lg text-white" x-text="toastMessage"></span>
         </div>
     </div>
 </div>   

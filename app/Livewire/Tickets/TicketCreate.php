@@ -18,8 +18,11 @@ class TicketCreate extends Component
     
     public function createTicket()
     {
+        
+        //extraemos el nombre de los empleados dentro de l BD
+        $empleado = \App\Models\Empleado::where('correo', $this->form->correo)->first();
         //Validamos y creamos el ticket en la base de datos
-        $ticket = $this->form->createDBTicket();
+        $ticket = $this->form->createDBTicket($empleado->nombre);
 
         //Mandamos el mensaje de la alerta de exito
         session()->flash('createTicket', "¡Tu ticket se ha enviado exitosamente! - ID del ticket: {$ticket->id}");

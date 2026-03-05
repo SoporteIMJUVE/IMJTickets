@@ -61,7 +61,7 @@
                 @foreach ($tickets as $ticket)
                     <tr class="h-14 max-h-14 border-b border-gray-300">
                         <td class="border-r border-gray-300 text-center">{{ $ticket->id }}</td>
-                        <td class="border-r border-gray-300 text-center truncate">{{ $ticket->nombre }}</td>
+                        <td class="border-r border-gray-300 text-center overflow-x-auto">{{ $ticket->nombre }}</td>
                         <td class="border-r border-gray-300 truncate">{{ $ticket->correo }}</td>
                         <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->descripcion }}</td>
                         <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->tipo }}</td>
@@ -137,7 +137,6 @@
                     <button wire:click="confirmTicketProgress" class="btn btn-imjuve hover:brightness-85 text-white btn-ghost">Confirmar</button>
                 </div>
             </div>
-            <div class="modal-backdrop" wire:click="closeModal"></div>
         </div>
     @endif
 
@@ -153,7 +152,6 @@
                     <button wire:click="closeErrorModal" class="btn bg-red-400 hover:bg-red-500">Aceptar</button>
                 </div>
             </div>
-            <div class="modal-backdrop" wire:click="closeErrorModal"></div>
         </div>
     @endif
 
