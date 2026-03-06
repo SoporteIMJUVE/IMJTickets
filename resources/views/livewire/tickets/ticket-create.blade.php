@@ -1,14 +1,11 @@
 <x-form submit="createTicket" title="¿Cuál es tu problema?" button="Enviar ticket">
 
     {{-- Descripción --}}
-    <fieldset class="fieldset relative">
-        <legend class="fieldset-legend text-legend">Descripción</legend>
-        <textarea wire:model="form.descripcion" class="textarea w-full @error('form.descripcion') border-red-500 border-3 @enderror"
-                    placeholder="Describenos tu problema brevemente"></textarea>
-        @error('form.descripcion') 
-            <p class="absolute -bottom-4 right-0 font-bold text-red-500 ">{{ $message }}</p>
-        @enderror
-    </fieldset>
+    <x-form.textarea 
+        legend="Descripción" 
+        model="form.descripcion"
+        placeholder="Describenos tu problema brevemente"
+    />
 
     {{-- Tipo de incidente --}}
     <x-form.select 

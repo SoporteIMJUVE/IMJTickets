@@ -20,6 +20,15 @@
 
     {{-- SweetAlert --}}
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    {{-- Estilo para mantener el espacio de la scrollbar
+        (para evitar el cambio de pantalla con el modal) --}}
+    <style>
+        html {
+            overflow-y: scroll;
+        }
+    </style>
+    
 </head>
 
 <body>

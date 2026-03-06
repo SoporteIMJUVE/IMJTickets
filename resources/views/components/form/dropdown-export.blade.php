@@ -1,7 +1,7 @@
 @auth
     <div class="dropdown">
 
-        <button tabindex="0" role="button" class="btn btn-imjuve hover:brightness-85">
+        <button tabindex="0" role="button" class="btn btn-imjuve">
             <span>Exportar</span>
         </button>
 

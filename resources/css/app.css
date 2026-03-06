@@ -15,6 +15,11 @@
 .btn-imjuve {
     background-color: #681a32;
     color: white;
+    transition: all 0.2s ease;
+}
+
+.btn-imjuve:hover {
+    background-color: #7d1f39;
 }
 
 .text-imjuve {
