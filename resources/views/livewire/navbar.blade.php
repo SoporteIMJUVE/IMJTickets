@@ -82,7 +82,7 @@
             @auth
                 <!-- Botones de administración -->
                 <div class="relative inline-block">                    
-                    <button wire:click="logout" class="btn btn-imjuve hover:brightness-85">
+                    <button wire:click="logout" class="btn btn-imjuve">
                         Cerrar sesión
                     </button>
 

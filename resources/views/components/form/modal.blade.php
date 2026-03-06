@@ -1,6 +1,6 @@
 @props([
     'id',
-    'submit',
+    'submit' => null,
     'title' => null,
     'subtitle' => null,
     'button',
@@ -9,24 +9,23 @@
 
 <dialog id="{{ $id }}" class="modal">
     <div class="modal-box max-w-lg bg-transparent shadow-none border-0 p-0 w-full flex justify-center">
-            <x-form noBack="noBack"
-                    submit="{{ $submit }}"
-                    title="{{ $title }}"
-                    subtitle="{{ $subtitle }}" 
-                    subbutton="{{ $subbutton }}"
-                    button="{{ $button }}"
-                    modalID="{{ $id }}">
+        <x-form noBack="noBack"
+                submit="{{ $submit }}"
+                title="{{ $title }}"
+                subtitle="{{ $subtitle }}" 
+                subbutton="{{ $subbutton }}"
+                button="{{ $button }}"
+                modalId="{{ $id }}">
 
-                {{-- Contenido del modal --}}
-                {{ $slot }}
+            {{-- Contenido del modal --}}
+            {{ $slot }}
 
-            </x-form>
+        </x-form>
     </div>
 
     {{-- Modal backdrop (capa de fondo que cierra el modal al hacer click) --}}
-    <form method="dialog" class="modal-backdrop">
+    <form method="dialog" class="modal-backdrop w-full h-full">
         <button>close</button>
     </form>
-        
-</dialog>
 
+</dialog>

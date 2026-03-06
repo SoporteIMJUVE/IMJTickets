@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Tickets;
 
+use App\Livewire\Forms\CommentForm;
+
 use Livewire\Component;
 use App\Models\Ticket;
 use App\Models\Area;
@@ -35,6 +37,28 @@ class TicketIndex extends Component
     public $showErrorModal = false;
     public $errorMessage = '';
 
+    // Propiedad para los modals
+    public $selectedTicket = null;
+
+    public CommentForm $cForm;
+
+    public function findTicket($id)
+    {
+        $this->selectedTicket = Ticket::find($id);
+    }
+
+    public function editComments($id)
+    {
+        $this->cForm->edit($id);
+        $ticket = Ticket::find($id);
+        $ticket->refresh(); // refresca los datos del modelo
+    }
+
+    public function closeDescriptionModal()
+    {
+        $this->showDescriptionModal = false;
+        $this->selectedTicketModal = null;
+    }
 
     public function openTicketModal($id)
     {
@@ -45,7 +69,6 @@ class TicketIndex extends Component
             $this->showModal = true;
         }
     }
-
 
     public function closeModal()
     {

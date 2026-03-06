@@ -60,12 +60,13 @@
                         <td class="border-r border-gray-300 truncate">{{ $ticket->correo }}</td>
                         <x-form.interactive-td
                             content="{{ $ticket->descripcion }}"
-                            onclick="modalPrueba.showModal()"
+                            wire:key="{{ $ticket->id }}"
+                            x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById('modalDescripcion')?.showModal())"
                         />
                         <x-form.interactive-td
                             content="{{ $ticket->comentarios }}"
                             wire:key="{{ $ticket->id }}"
-                            wire:click="ticketProgress({{ $ticket->id }})"
+                            x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById('modalComentarios')?.showModal())"
                         />
                         <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->tipo }}</td>
                         <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->area }}</td>
@@ -127,27 +128,40 @@
 
     {{-- Modals --}}
 
-    {{-- Modal de prueba --}}
-    <button class="btn" onclick="modalPrueba.showModal()">modal prueba</button>
-
-    <!-- Put this part before </body> tag -->
-    <dialog id="my_modal_2" class="modal">
-        <div class="modal-box">
-            <h3 class="text-lg font-bold">Hello!</h3>
-            <p class="py-4">Press ESC key or click outside to close</p>
-        </div>
-        <form method="dialog" class="modal-backdrop">
-            <button>close</button>
-        </form>
-    </dialog>
-
-    <x-form.modal id="modalPrueba" submit="ticketProgress({{ $ticket->id }})" title="¿Cuál es el siguiente estado del ticket?" subtitle="Explicacion de lo que hace este modal" subbutton="Subbutton" button="Confirmar">
-        <x-form.input 
-            legend="Comentarios adicionales (opcional)" 
-            model="confirmationComment" 
-            type="text" 
-            placeholder="Agrega un comentario que se guardará en el historial del ticket"
+    {{-- Modal de descripcion --}}
+    <x-form.modal id="modalDescripcion" button="Cerrar">
+        <x-form.textarea 
+            legend="Descripción del ticket"
+            legendAccent="{{ $selectedTicket?->id ?? '' }}"
+            content="{{ $selectedTicket?->descripcion ?? '' }}"
+            readonly
         />
+    </x-form.modal>
+
+    {{-- Modal de comentarios --}}
+    <x-form.modal id="modalComentarios"
+                    submit="editComments({{ $selectedTicket?->id }})"
+                    subbutton="Cerrar"
+                    button="Editar comentarios">
+        {{--<x-form.textarea 
+            legend="Comentarios del ticket"
+            legendAccent="{{ $selectedTicket?->id ?? '' }}"
+            wire:model="cForm.comentarios"
+            content="{{ $selectedTicket?->comentarios ?? '' }}"
+        />--}}
+        <fieldset class="fieldset relative">
+            <legend class="fieldset-legend text-legend">Comentarios del ticket
+                <span class="text-imjuve">{{ $selectedTicket?->id ?? '' }}</span>
+            </legend>
+            <textarea  wire:model=cForm.comentarios
+                        class="textarea w-full @error('cForm.comentarios') border-red-500 border-3 @enderror">{{ $selectedTicket?->comentarios ?? '' }}
+            </textarea>
+
+            @error('cForm.comentarios') 
+                <p class="absolute -bottom-4 right-0 font-bold text-red-500 ">{{ $message }}</p>
+            @enderror
+            
+        </fieldset>
     </x-form.modal>
 
     {{-- Modal de confirmación --}}
@@ -202,3 +216,5 @@
     <button class="btn btn-success" style="display: none;"></button>
 
 </div>
+
+

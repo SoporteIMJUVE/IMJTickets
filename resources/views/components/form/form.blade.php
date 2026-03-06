@@ -2,13 +2,13 @@
 
     'noBack'=>null,
 
-    'submit',
+    'submit' => null,
     'title' => null,
     'subtitle' => null,
     'subbutton' => null,
     'button',
 
-    'modalID' => null,
+    'modalId' => null,
 ])
 
 @if($noBack === null)
@@ -37,17 +37,29 @@
             {{ $slot }}
 
             @if($subbutton)
-                {{-- Si se manda boton secundario (opcional), se usa despliegue de dos botones (pensado para modals) --}}
+                {{-- Si se manda boton secundario (opcional) se usa despliegue de dos botones (pensado para modals),
+                    el subbutton siempre cierra el modal, el button principal ejecuta el submit --}}
                 <div class="modal-action pt-7">
-                    <label for="{{ $modalID }}" wire:target="agregarEmpleado" wire:loading.remove class="btn btn-neutral btn-outline">{{ $subbutton }}</label>
-                    <button wire:click="agregarEmpleado" wire:loading.remove class="btn btn-imjuve hover:brightness-85 text-white btn-ghost">{{ $button }}</button>
+                    <button class="btn btn-neutral btn-outline"
+                            onclick="document.getElementById('{{ $modalId }}').close()">
+                        {{ $subbutton }}
+                    </button>
+                    <button class="btn btn-imjuve"
+                            type="submit" wire:loading.remove >
+                        {{ $button }}
+                    </button>
                 </div>
             @else
                 {{-- Si no hay botón secundario se usa despliegue de boton unico --}}
                 <div class="text-center pt-7">
                     <button wire:loading.remove class="btn btn-imjuve w-full"
-                        {{-- Si se manda un modalID se asume que el boton unico cerrrara ese modal --}}
-                        @if($modalID) for="{{ $modalID }}" @else type="submit" @endif>
+                        {{-- Si se manda un modalId se asume que el boton unico cerrrara ese modal --}}
+                        @if($modalId)
+                            onclick="document.getElementById('{{ $modalId }}').close()"
+                        @else
+                            type="submit"
+                        @endif
+                    >
                         {{ $button }}
                     </button>
                 </div>
