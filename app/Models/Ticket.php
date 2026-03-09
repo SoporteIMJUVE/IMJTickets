@@ -50,6 +50,7 @@ class Ticket extends Model
         "area",
         "tipo",
         "descripcion",
+        "comentarios",
         "estado"
     ];
 

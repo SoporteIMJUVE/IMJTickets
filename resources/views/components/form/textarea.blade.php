@@ -11,7 +11,7 @@
     </legend>
     <textarea {{ $attributes }}
                 wire:model="{{ $model }}"
-                class="textarea w-full @error($model) border-red-500 border-3 @enderror">{{ $content }}
+                class="textarea w-full @error($model) border-red-500 border-3 @enderror">
     </textarea>
 
     @error($model) 

@@ -1,5 +1,6 @@
 @props([
     'id',
+    'key',
     'submit' => null,
     'title' => null,
     'subtitle' => null,
@@ -7,9 +8,9 @@
     'subbutton' => null
 ])
 
-<dialog id="{{ $id }}" class="modal">
+<dialog id="{{ $id }}" wire:key="{{ $id }}{{ $key }}" class="modal">
     <div class="modal-box max-w-lg bg-transparent shadow-none border-0 p-0 w-full flex justify-center">
-        <x-form noBack="noBack"
+        <x-form noBack="true"
                 submit="{{ $submit }}"
                 title="{{ $title }}"
                 subtitle="{{ $subtitle }}" 

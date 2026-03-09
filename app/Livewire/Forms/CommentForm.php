@@ -16,11 +16,10 @@ class CommentForm extends Form
 
         if ($ticket) {
             $ticket->update(['comentarios' => $this->comentarios]);
-        }
-        else {
-            session()->flash('error', "No se encontró el ticket con ID: {$id}");
+            $ticket->refresh(); // Recargar para obtener la versión actualizada
+            return $ticket;
         }
 
-        return $ticket;
+        return null;
     }
 }

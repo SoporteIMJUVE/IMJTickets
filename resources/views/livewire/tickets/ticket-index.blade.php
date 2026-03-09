@@ -63,10 +63,25 @@
                             wire:key="{{ $ticket->id }}"
                             x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById('modalDescripcion')?.showModal())"
                         />
+                        {{-- @auth
+                            <x-form.interactive-td
+                                content="{{ $ticket->comentarios }}"
+                                wire:key="{{ $ticket->id }}"
+                                x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById( 'modalCA' )?.showModal())"
+                            />
+                        @endauth
+                        @guest
+                            <x-form.interactive-td
+                                content="{{ $ticket->comentarios }}"
+                                wire:key="{{ $ticket->id }}"
+                                x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById( 'modalCE' )?.showModal())"
+                            />
+                        @endguest --}}
                         <x-form.interactive-td
                             content="{{ $ticket->comentarios }}"
                             wire:key="{{ $ticket->id }}"
-                            x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById('modalComentarios')?.showModal())"
+                            x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById('{{ auth()->check() ? 'modalCA' : 'modalCE' }}')?.showModal())"
+                            :noGlow="empty($ticket->comentarios) && !auth()->check()"
                         />
                         <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->tipo }}</td>
                         <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->area }}</td>
@@ -129,39 +144,37 @@
     {{-- Modals --}}
 
     {{-- Modal de descripcion --}}
-    <x-form.modal id="modalDescripcion" button="Cerrar">
+    <x-form.modal id="modalDescripcion" key="{{ $selectedTicket?->id ?? 'new' }}" button="Cerrar">
         <x-form.textarea 
             legend="Descripción del ticket"
             legendAccent="{{ $selectedTicket?->id ?? '' }}"
-            content="{{ $selectedTicket?->descripcion ?? '' }}"
+            key="modelD{{ $selectedTicket?->id ?? 'new' }}"
+            model="tForm.descripcion"
+            {{-- content="{{ $selectedTicket?->descripcion ?? '' }}" --}}
             readonly
         />
     </x-form.modal>
 
-    {{-- Modal de comentarios --}}
-    <x-form.modal id="modalComentarios"
+    {{-- Modal de comentario empleado --}}
+    <x-form.modal id="modalCE" key="{{ $selectedTicket?->id ?? 'new' }}" button="Cerrar">
+        <x-form.textarea 
+            legend="Comentarios del ticket"
+            legendAccent="{{ $selectedTicket?->id ?? '' }}"
+            model="cForm.comentarios"
+            readonly
+        />
+    </x-form.modal>
+
+    {{-- Modal de comentarios admin --}}
+    <x-form.modal id="modalCA" key="{{ $selectedTicket?->id ?? 'new' }}"
                     submit="editComments({{ $selectedTicket?->id }})"
                     subbutton="Cerrar"
                     button="Editar comentarios">
-        {{--<x-form.textarea 
+        <x-form.textarea 
             legend="Comentarios del ticket"
             legendAccent="{{ $selectedTicket?->id ?? '' }}"
-            wire:model="cForm.comentarios"
-            content="{{ $selectedTicket?->comentarios ?? '' }}"
-        />--}}
-        <fieldset class="fieldset relative">
-            <legend class="fieldset-legend text-legend">Comentarios del ticket
-                <span class="text-imjuve">{{ $selectedTicket?->id ?? '' }}</span>
-            </legend>
-            <textarea  wire:model=cForm.comentarios
-                        class="textarea w-full @error('cForm.comentarios') border-red-500 border-3 @enderror">{{ $selectedTicket?->comentarios ?? '' }}
-            </textarea>
-
-            @error('cForm.comentarios') 
-                <p class="absolute -bottom-4 right-0 font-bold text-red-500 ">{{ $message }}</p>
-            @enderror
-            
-        </fieldset>
+            model="cForm.comentarios"
+        />
     </x-form.modal>
 
     {{-- Modal de confirmación --}}
