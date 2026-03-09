@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Tickets;
 
+use App\Livewire\Forms\TicketForm;
 use App\Livewire\Forms\CommentForm;
 
 use Livewire\Component;
@@ -40,18 +41,38 @@ class TicketIndex extends Component
     // Propiedad para los modals
     public $selectedTicket = null;
 
+    public TicketForm $tForm;
     public CommentForm $cForm;
 
     public function findTicket($id)
     {
-        $this->selectedTicket = Ticket::find($id);
+        $ticket = Ticket::find($id);
+
+        if ($ticket) {
+            $this->selectedTicket = $ticket;
+            $this->tForm->descripcion = $ticket->descripcion;
+            $this->cForm->comentarios = $ticket->comentarios;
+        }
     }
 
     public function editComments($id)
     {
-        $this->cForm->edit($id);
-        $ticket = Ticket::find($id);
-        $ticket->refresh(); // refresca los datos del modelo
+        try {
+            $ticket = $this->cForm->edit($id);
+            
+            if ($ticket) {
+                // Actualizar el ticket seleccionado con los nuevos datos
+                $this->selectedTicket = $ticket;
+                
+                // Mostrar mensaje de éxito
+                session()->flash('success', 'Comentarios actualizados correctamente');
+                
+                // Cerrar el modal
+                $this->dispatch('close-modal', modalId: 'modalComentarios');
+            }
+        } catch (\Exception $e) {
+            session()->flash('error', 'Error al guardar los comentarios: ' . $e->getMessage());
+        }
     }
 
     public function closeDescriptionModal()

@@ -1,6 +1,6 @@
 @props([
 
-    'noBack'=>null,
+    'noBack'=>false,
 
     'submit' => null,
     'title' => null,
@@ -11,10 +11,10 @@
     'modalId' => null,
 ])
 
-@if($noBack === null)
+@unless($noBack)
     {{-- Contenedor principal del formulario (background) --}}
     <div class="flex justify-center items-center min-h-screen bg-gray-100 pt-17.5 pb-1">
-@endif
+@endunless
 
     {{-- Tarjeta del formulario --}}
     <div class="card w-full max-w-lg bg-white shadow-xl p-7">
@@ -38,14 +38,15 @@
 
             @if($subbutton)
                 {{-- Si se manda boton secundario (opcional) se usa despliegue de dos botones (pensado para modals),
-                    el subbutton siempre cierra el modal, el button principal ejecuta el submit --}}
+                    el subbutton siempre cierra el modal, el button principal ejecuta el submit y luego cierra el modal (probar si no se rompe el form si no hay modal asocado) --}}
                 <div class="modal-action pt-7">
                     <button class="btn btn-neutral btn-outline"
                             onclick="document.getElementById('{{ $modalId }}').close()">
                         {{ $subbutton }}
                     </button>
                     <button class="btn btn-imjuve"
-                            type="submit" wire:loading.remove >
+                            type="submit" wire:loading.remove
+                            onclick="document.getElementById('{{ $modalId }}').close()">
                         {{ $button }}
                     </button>
                 </div>

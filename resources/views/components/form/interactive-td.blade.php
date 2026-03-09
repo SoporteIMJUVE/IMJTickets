@@ -1,18 +1,27 @@
 @props([
+    'noGlow' => false,
     'content'
 ])
 
 <td {{ $attributes }}
-    class="border-r border-gray-300 transition-all hover:bg-blue-50 hover:text-blue-700 hover:shadow-sm cursor-pointer group relative">
+    class="border-r border-gray-300
+    @unless($noGlow) transition-all hover:bg-blue-50 hover:text-blue-700 hover:shadow-sm cursor-pointer group relative @endunless">
 
     @if(empty($content))
-        {{-- Celdas vacías --}}
-        <div class="flex items-center justify-center h-full">
-            <svg class="w-0 h-0 opacity-0 group-hover:w-5 group-hover:h-5 group-hover:opacity-100 transition-all duration-200" 
-                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-        </div>
+        {{-- Celdas vacías --}}        
+        @auth
+            <div class="flex items-center justify-center h-full">
+                <svg class="w-0 h-0 opacity-0 group-hover:w-5 group-hover:h-5 group-hover:opacity-100 transition-all duration-200" 
+                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+            </div>
+        @endauth
+        @guest
+            <div class="flex items-center justify-center h-full">
+                <span class="text-gray-400">Sin comentarios</span>
+            </div>
+        @endguest
     @else
         {{-- Celdas con contenido --}}
         <span class="inline-flex items-center gap-0 group-hover:gap-2 overflow-hidden w-full">
