@@ -40,7 +40,7 @@
                 {{-- Si se manda boton secundario (opcional) se usa despliegue de dos botones (pensado para modals),
                     el subbutton siempre cierra el modal, el button principal ejecuta el submit y luego cierra el modal (probar si no se rompe el form si no hay modal asocado) --}}
                 <div class="modal-action pt-7">
-                    <button class="btn btn-neutral btn-outline"
+                    <button class="btn btn-soft"
                             onclick="document.getElementById('{{ $modalId }}').close()">
                         {{ $subbutton }}
                     </button>
@@ -54,7 +54,7 @@
                 {{-- Si no hay botón secundario se usa despliegue de boton unico --}}
                 <div class="text-center pt-7">
                     <button wire:loading.remove class="btn btn-imjuve w-full"
-                        {{-- Si se manda un modalId se asume que el boton unico cerrrara ese modal --}}
+                        {{-- Si se manda un modalId se asume que el boton unico cerrara ese modal --}}
                         @if($modalId)
                             onclick="document.getElementById('{{ $modalId }}').close()"
                         @else

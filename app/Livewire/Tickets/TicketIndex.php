@@ -31,78 +31,26 @@ class TicketIndex extends Component
     public array $period = [];
     public array $order = ['created_at', 'desc'];
 
-    // Propiedades para el modal de confirmación
-    public $showModal = false;
-    public $ticketForConfirmation = null;
-    public $confirmationWord = '';
-    public $showErrorModal = false;
-    public $errorMessage = '';
-
-    // Propiedad para los modals
+    // Propiedades para los modals
     public $selectedTicket = null;
-
     public TicketForm $tForm;
     public CommentForm $cForm;
 
+    
     public function findTicket($id)
     {
         $ticket = Ticket::find($id);
 
-        if ($ticket) {
-            $this->selectedTicket = $ticket;
-            $this->tForm->descripcion = $ticket->descripcion;
-            $this->cForm->comentarios = $ticket->comentarios;
-        }
+        $this->selectedTicket = $ticket;
+        $this->tForm->descripcion = $ticket->descripcion;
+        $this->cForm->comentarios = $ticket->comentarios;
+        $this->tForm->estado = $ticket->estado;
     }
+
 
     public function editComments($id)
     {
-        try {
-            $ticket = $this->cForm->edit($id);
-            
-            if ($ticket) {
-                // Actualizar el ticket seleccionado con los nuevos datos
-                $this->selectedTicket = $ticket;
-                
-                // Mostrar mensaje de éxito
-                session()->flash('success', 'Comentarios actualizados correctamente');
-                
-                // Cerrar el modal
-                $this->dispatch('close-modal', modalId: 'modalComentarios');
-            }
-        } catch (\Exception $e) {
-            session()->flash('error', 'Error al guardar los comentarios: ' . $e->getMessage());
-        }
-    }
-
-    public function closeDescriptionModal()
-    {
-        $this->showDescriptionModal = false;
-        $this->selectedTicketModal = null;
-    }
-
-    public function openTicketModal($id)
-    {
-        $ticket = Ticket::find($id);
-        if ($ticket && $ticket->estado < 3) {
-            $this->ticketForConfirmation = $ticket;
-            $this->confirmationWord = '';
-            $this->showModal = true;
-        }
-    }
-
-    public function closeModal()
-    {
-        $this->showModal = false;
-        $this->confirmationWord = '';
-        $this->ticketForConfirmation = null;
-    }
-
-
-    public function closeErrorModal()
-    {
-        $this->showErrorModal = false;
-        $this->errorMessage = '';
+        $this->cForm->edit($id);
     }
 
 
