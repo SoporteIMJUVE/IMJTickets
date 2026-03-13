@@ -63,20 +63,6 @@
                             wire:key="{{ $ticket->id }}"
                             x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById('modalDescripcion')?.showModal())"
                         />
-                        {{-- @auth
-                            <x-form.interactive-td
-                                content="{{ $ticket->comentarios }}"
-                                wire:key="{{ $ticket->id }}"
-                                x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById( 'modalCA' )?.showModal())"
-                            />
-                        @endauth
-                        @guest
-                            <x-form.interactive-td
-                                content="{{ $ticket->comentarios }}"
-                                wire:key="{{ $ticket->id }}"
-                                x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById( 'modalCE' )?.showModal())"
-                            />
-                        @endguest --}}
                         <x-form.interactive-td
                             content="{{ $ticket->comentarios }}"
                             wire:key="{{ $ticket->id }}"
@@ -141,6 +127,7 @@
     </script>
     --}}
 
+
     {{-- Modals --}}
 
     {{-- Modal de descripcion --}}
@@ -150,7 +137,6 @@
             legendAccent="{{ $selectedTicket?->id ?? '' }}"
             key="modelD{{ $selectedTicket?->id ?? 'new' }}"
             model="tForm.descripcion"
-            {{-- content="{{ $selectedTicket?->descripcion ?? '' }}" --}}
             readonly
         />
     </x-form.modal>
@@ -176,47 +162,6 @@
             model="cForm.comentarios"
         />
     </x-form.modal>
-
-    {{-- Modal de confirmación --}}
-    @if($showModal && $ticketForConfirmation)
-        <div class="modal modal-open">
-            <div class="modal-box">
-                <h3 class="font-bold text-lg mb-4 text-center">Confirmar cambio de estado</h3>
-                <p class="mb-4 text-center">
-                    ¿Está seguro de que desea cambiar el estado del <strong>ticket {{ $ticketForConfirmation->id }}</strong>?
-                </p>                
-                <input 
-                    type="text" 
-                    placeholder='Ingresa la palabra "{{ $ticketForConfirmation->estado_sigtxt }}" para confirmar'
-                    wire:model="confirmationWord"
-                    wire:keydown.enter="confirmTicketProgress"
-                    class="input input-bordered w-full mb-6" 
-                />
-
-                <div class="modal-action">
-                    <button wire:click="closeModal" class="btn btn-ghost">Cancelar</button>
-                    <button wire:click="confirmTicketProgress" class="btn btn-imjuve hover:brightness-85 text-white btn-ghost">Confirmar</button>
-                </div>
-            </div>
-            <div class="modal-backdrop w-full h-full" wire:click="closeModal"></div>
-        </div>
-    @endif
-
-    {{-- Modal de error --}}
-    @if($showErrorModal)
-        <div class="modal modal-open">
-            <div class="modal-box max-w-sm">
-                <h3 class="font-bold text-lg mb-4 text-red-600 text-center">Error</h3>
-                <p class="mb-6 text-center">
-                    {{ $errorMessage }}
-                </p>
-                <div class="modal-action">
-                    <button wire:click="closeErrorModal" class="btn bg-red-400 hover:bg-red-500">Aceptar</button>
-                </div>
-            </div>
-            <div class="modal-backdrop" wire:click="closeErrorModal"></div>
-        </div>
-    @endif
 
 
     {{-- Elementos ocultos para mantener los estilos de DaisyUI --}}
