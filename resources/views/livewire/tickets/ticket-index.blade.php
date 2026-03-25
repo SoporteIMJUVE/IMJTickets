@@ -56,7 +56,7 @@
                 @foreach ($tickets as $ticket)
                     <tr class="h-14 max-h-14 border-b border-gray-300">
                         <td class="border-r border-gray-300 text-center">{{ $ticket->id }}</td>
-                        <td class="border-r border-gray-300 text-center truncate">{{ $ticket->nombre }}</td>
+                        <td class="border-r border-gray-300 text-center overflow-x-auto">{{ $ticket->nombre }}</td>
                         <td class="border-r border-gray-300 truncate">{{ $ticket->correo }}</td>
                         <x-form.interactive-td
                             content="{{ $ticket->descripcion }}"
@@ -80,7 +80,8 @@
                                 @endguest
 
                                 @auth
-                                    <button for="my_modal_7"
+                                    <button type="button"
+                                            x-on:click="$wire.prepareStatusChange({{ $ticket->id }}).then(() => document.getElementById('modalCambioEstado')?.showModal())"
                                             class="btn btn-{{ $ticket->estado_sty }} w-full h-full">
                                         {{ $ticket->estado_txt }}
                                     </button>
@@ -131,7 +132,9 @@
     {{-- Modals --}}
 
     {{-- Modal de descripcion --}}
-    <x-form.modal id="modalDescripcion" key="{{ $selectedTicket?->id ?? 'new' }}" button="Cerrar">
+    <x-form.modal id="modalDescripcion"
+        key="{{ $selectedTicket?->id ?? 'new' }}"
+        button="Cerrar">
         <x-form.textarea 
             legend="Descripción del ticket"
             legendAccent="{{ $selectedTicket?->id ?? '' }}"
@@ -142,7 +145,9 @@
     </x-form.modal>
 
     {{-- Modal de comentario empleado --}}
-    <x-form.modal id="modalCE" key="{{ $selectedTicket?->id ?? 'new' }}" button="Cerrar">
+    <x-form.modal id="modalCE"
+        key="{{ $selectedTicket?->id ?? 'new' }}"
+        button="Cerrar">
         <x-form.textarea 
             legend="Comentarios del ticket"
             legendAccent="{{ $selectedTicket?->id ?? '' }}"
@@ -152,15 +157,45 @@
     </x-form.modal>
 
     {{-- Modal de comentarios admin --}}
-    <x-form.modal id="modalCA" key="{{ $selectedTicket?->id ?? 'new' }}"
-                    submit="editComments({{ $selectedTicket?->id }})"
-                    subbutton="Cerrar"
-                    button="Editar comentarios">
+    <x-form.modal id="modalCA"
+        key="{{ $selectedTicket?->id ?? 'new' }}"
+        submit="editComments({{ $selectedTicket?->id }})"
+        subbutton="Cerrar"
+        button="Editar">
         <x-form.textarea 
             legend="Comentarios del ticket"
             legendAccent="{{ $selectedTicket?->id ?? '' }}"
             model="cForm.comentarios"
+            wire:key="txt-ca-{{ $selectedTicket?->id ?? 'new' }}-{{ $formKey }}"
         />
+    </x-form.modal>
+
+    {{-- Modal de cambio de estado del ticket --}}
+    <x-form.modal id="modalCambioEstado"
+        key="estado-{{ $selectedTicket?->id ?? 'new' }}-{{ $formKey }}"
+        title="Confirmar cambio de estado"
+        submit="confirmStatus"
+        subbutton="Cancelar"
+        button="Aceptar"
+        target="confirmStatus"
+        message="Validando palabra"
+        wire:ignore.self>
+        <fieldset class="fieldset relative">
+            <legend class="fieldset-legend text-legend text-center">
+                ¿Estás seguro de modificar el estado del ticket
+                <span class="text-imjuve">{{ $selectedTicket?->id ?? '' }}</span>?
+            </legend>
+            <div class="form-control w-full mt-2">
+                <input type="text" 
+                    wire:model="sForm.confirmationWord"
+                    wire:key="txt-estado-{{ $selectedTicket?->id ?? 'new' }}-{{ $formKey }}"
+                    class="input input-bordered w-full @error('sForm.confirmationWord') border-red-500 border-2 @enderror"
+                    placeholder="Ingresa la palabra '{{ $sForm->expectedWord ?? '' }}'">
+            </div>
+            @error('sForm.confirmationWord') 
+                <p class="absolute -bottom-5 right-0 font-bold text-red-500 text-xs">{{ $message }}</p>
+            @enderror
+        </fieldset>
     </x-form.modal>
 
 
