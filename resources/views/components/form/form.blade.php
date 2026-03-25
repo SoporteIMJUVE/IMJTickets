@@ -26,7 +26,7 @@
 
         {{-- Subtítulo del formulario (opcional) --}}
         @if($subtitle)
-            <p class="text-center text-gray-600 mb-5">{{ $subtitle }}</p>
+            <p class="text-center text-gray-800 mb-5">{{ $subtitle }}</p>
         @endif
 
         {{-- Formulario --}}
@@ -41,19 +41,19 @@
                     el subbutton siempre cierra el modal, el button principal ejecuta el submit y luego cierra el modal (probar si no se rompe el form si no hay modal asocado) --}}
                 <div class="modal-action pt-7">
                     <button class="btn btn-soft"
+                            type="button"
                             onclick="document.getElementById('{{ $modalId }}').close()">
                         {{ $subbutton }}
                     </button>
                     <button class="btn btn-imjuve"
-                            type="submit" wire:loading.remove
-                            onclick="document.getElementById('{{ $modalId }}').close()">
+                            type="submit">
                         {{ $button }}
                     </button>
                 </div>
             @else
                 {{-- Si no hay botón secundario se usa despliegue de boton unico --}}
                 <div class="text-center pt-7">
-                    <button wire:loading.remove class="btn btn-imjuve w-full"
+                    <button class="btn btn-imjuve w-full"
                         {{-- Si se manda un modalId se asume que el boton unico cerrara ese modal --}}
                         @if($modalId)
                             onclick="document.getElementById('{{ $modalId }}').close()"

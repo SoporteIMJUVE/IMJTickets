@@ -4,6 +4,7 @@ namespace App\Livewire\Tickets;
 
 use App\Livewire\Forms\TicketForm;
 use App\Livewire\Forms\CommentForm;
+use App\Livewire\Forms\StatusForm;
 
 use Livewire\Component;
 use App\Models\Ticket;
@@ -35,6 +36,9 @@ class TicketIndex extends Component
     public $selectedTicket = null;
     public TicketForm $tForm;
     public CommentForm $cForm;
+    public StatusForm $sForm;
+
+    public $formKey = 0;
 
     
     public function findTicket($id)
@@ -45,40 +49,40 @@ class TicketIndex extends Component
         $this->tForm->descripcion = $ticket->descripcion;
         $this->cForm->comentarios = $ticket->comentarios;
         $this->tForm->estado = $ticket->estado;
+
+        $this->cForm->resetValidation();
+        $this->formKey++;
     }
 
 
     public function editComments($id)
     {
         $this->cForm->edit($id);
+        $this->js("document.getElementById('modalCA').close();");
     }
 
-
-    public function confirmTicketProgress()
+    public function prepareStatusChange($id)
     {
-        if (!$this->ticketForConfirmation) {
-            return;
-        }
+        $ticket = Ticket::find($id);
 
-        // Validar si el campo está vacío
-        if (empty(trim($this->confirmationWord))) {
-            $this->errorMessage = 'Ingresa la palabra para cambiar el estado del ticket.';
-            $this->showErrorModal = true;
-            return;
-        }
+        if ($ticket) {
+            $this->selectedTicket = $ticket;
+            $this->sForm->ticketId = $ticket->id;
+            $this->sForm->expectedWord = $ticket->estado_sigtxt;
 
-        $expectedWord = $this->ticketForConfirmation->estado_sigtxt ?? '';
-        
-        if ($this->confirmationWord !== $expectedWord) {
-            $this->errorMessage = 'La palabra de confirmación no coincide. Intente de nuevo.';
-            $this->showErrorModal = true;
-            return;
+            $this->sForm->confirmationWord = '';
+            $this->sForm->resetValidation();
+            $this->formKey++; 
         }
-
-        $this->ticketProgress($this->ticketForConfirmation->id);
-        $this->closeModal();
     }
 
+    public function confirmStatus()
+    {
+        if($this->sForm->validateStatus()) {
+            $this->ticketProgress($this->sForm->ticketId);
+            $this->js("document.getElementById('modalCambioEstado').close();");
+        }
+    }
 
     public function ticketProgress($id)
     {

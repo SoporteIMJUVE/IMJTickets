@@ -6,7 +6,7 @@
 ])
 
 <fieldset class="fieldset relative">
-    <legend class="fieldset-legend text-legend">{{ $legend }}
+    <legend class="fieldset-legend text-legend text-center">{{ $legend }}
         <span class="text-imjuve">{{ $legendAccent }}</span>
     </legend>
     <textarea {{ $attributes }}
