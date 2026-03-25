@@ -51,7 +51,10 @@ class Ticket extends Model
         "tipo",
         "descripcion",
         "comentarios",
-        "estado"
+        "estado",
+        "cerrado_at",
+        "atendido_by",
+        "cerrado_by"
     ];
 
     protected $casts = [
