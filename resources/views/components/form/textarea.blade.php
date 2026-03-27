@@ -6,7 +6,7 @@
 ])
 
 <fieldset class="fieldset relative">
-    <legend class="fieldset-legend text-legend text-center">{{ $legend }}
+    <legend class="fieldset-legend text-legend">{{ $legend }}
         <span class="text-imjuve">{{ $legendAccent }}</span>
     </legend>
     <textarea {{ $attributes }}
@@ -15,7 +15,7 @@
     </textarea>
 
     @error($model) 
-        <p class="absolute -bottom-4 right-0 font-bold text-red-500 ">{{ $message }}</p>
+        <p class="-bottom-4 font-bold text-red-500 {{ strlen($message) > 80 ? 'text-center' : 'absolute right-0' }}">{{ $message }}</p>
     @enderror
     
 </fieldset>

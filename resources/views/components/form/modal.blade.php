@@ -7,7 +7,8 @@
     'button',
     'subbutton' => null,
     'target' => null,
-    'message' => null
+    'message' => null,
+    'width' => 'max-w-lg'
 ])
 
 <dialog id="{{ $id }}" wire:key="{{ $id }}{{ $key }}" class="modal" {{ $attributes }}>
@@ -25,14 +26,15 @@
         </div>
     @endif
 
-    <div class="modal-box max-w-lg bg-transparent shadow-none border-0 p-0 w-full flex justify-center">
+    <div class="modal-box {{ $width }} bg-transparent shadow-none border-0 p-0 w-full flex justify-center">
         <x-form noBack="true"
                 submit="{{ $submit }}"
                 title="{{ $title }}"
                 subtitle="{{ $subtitle }}" 
                 subbutton="{{ $subbutton }}"
                 button="{{ $button }}"
-                modalId="{{ $id }}">
+                modalId="{{ $id }}"
+                width="{{ $width }}">
 
             {{-- Contenido del modal --}}
             {{ $slot }}

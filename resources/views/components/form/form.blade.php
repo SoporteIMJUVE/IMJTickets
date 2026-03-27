@@ -9,6 +9,7 @@
     'button',
 
     'modalId' => null,
+    'width' => 'max-w-lg'
 ])
 
 @unless($noBack)
@@ -17,7 +18,7 @@
 @endunless
 
     {{-- Tarjeta del formulario --}}
-    <div class="card w-full max-w-lg bg-white shadow-xl p-7">
+    <div class="card w-full {{ $width }} bg-white shadow-xl p-7">
 
         {{-- Título del formulario (opcional) --}}
         @if($title)
