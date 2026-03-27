@@ -107,7 +107,6 @@
                 <th style="width: 17%;">Área</th>
                 <th style="width: 7%;">Estado</th>
                 <th style="width: 7%;">Creado</th>
-                <th style="width: 7%;">Atendido</th>
                 <th style="width: 7%;">Cerrado</th>
             </tr>
         </thead>
@@ -122,8 +121,7 @@
                     <td>{{ $t->area ?? '-' }}</td>
                     <td>{{ \App\Models\Ticket::ESTADOS[$t->estado] ?? $t->estado }}</td>
                     <td>{{ $t->created_at ? $t->created_at->format('d-m-Y') : '-' }}</td>
-                    <td>{{ $t->atendido_at ? $t->atendido_at->format('d-m-Y') : '-' }}</td>
-                    <td>{{ $t->estado == 2 ? ($t->updated_at ? $t->updated_at->format('d-m-Y') : '-') : '-' }}</td>
+                    <td>{{ $t->cerrado_at ? $t->cerrado_at->format('d-m-Y') : '-' }}</td>
                 </tr>
             @endforeach
         </tbody>
