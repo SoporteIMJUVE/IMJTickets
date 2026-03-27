@@ -2,6 +2,10 @@
 
 namespace App\Livewire\Tickets;
 
+use App\Livewire\Forms\TicketForm;
+use App\Livewire\Forms\CommentForm;
+use App\Livewire\Forms\StatusForm;
+
 use Livewire\Component;
 use App\Models\Ticket;
 use App\Models\Area;
@@ -28,75 +32,75 @@ class TicketIndex extends Component
     public array $period = [];
     public array $order = ['created_at', 'desc'];
 
-    // Propiedades para el modal de confirmación
-    public $showModal = false;
-    public $ticketForConfirmation = null;
-    public $confirmationWord = '';
-    public $showErrorModal = false;
-    public $errorMessage = '';
+    // Propiedades para los modals
+    public $selectedTicket = null;
+    public TicketForm $tForm;
+    public CommentForm $cForm;
+    public StatusForm $sForm;
 
+    public $formKey = 0;
 
-    public function openTicketModal($id)
+    
+    public function findTicket($id)
     {
         $ticket = Ticket::find($id);
-        if ($ticket && $ticket->estado < 3) {
-            $this->ticketForConfirmation = $ticket;
-            $this->confirmationWord = '';
-            $this->showModal = true;
-        }
+
+        $this->selectedTicket = $ticket;
+        $this->tForm->descripcion = $ticket->descripcion;
+        $this->cForm->comentarios = $ticket->comentarios;
+        $this->tForm->estado = $ticket->estado;
+
+        $this->cForm->resetValidation();
+        $this->formKey++;
     }
 
 
-    public function closeModal()
+    public function editComments($id)
     {
-        $this->showModal = false;
-        $this->confirmationWord = '';
-        $this->ticketForConfirmation = null;
+        $this->cForm->edit($id);
+        $this->js("document.getElementById('modalCA').close();");
     }
 
-
-    public function closeErrorModal()
+    public function prepareStatusChange($id)
     {
-        $this->showErrorModal = false;
-        $this->errorMessage = '';
+        $ticket = Ticket::find($id);
+
+        if ($ticket) {
+            $this->selectedTicket = $ticket;
+            $this->sForm->ticketId = $ticket->id;
+            $this->sForm->expectedWord = $ticket->estado_sigtxt;
+
+            $this->sForm->confirmationWord = '';
+            $this->sForm->resetValidation();
+            $this->formKey++; 
+        }
     }
 
-
-    public function confirmTicketProgress()
+    public function confirmStatus()
     {
-        if (!$this->ticketForConfirmation) {
-            return;
+        if($this->sForm->validateStatus()) {
+            $this->ticketProgress($this->sForm->ticketId);
+            $this->js("document.getElementById('modalCambioEstado').close();");
         }
-
-        // Validar si el campo está vacío
-        if (empty(trim($this->confirmationWord))) {
-            $this->errorMessage = 'Ingresa la palabra para cambiar el estado del ticket.';
-            $this->showErrorModal = true;
-            return;
-        }
-
-        $expectedWord = $this->ticketForConfirmation->estado_sigtxt ?? '';
-        
-        if ($this->confirmationWord !== $expectedWord) {
-            $this->errorMessage = 'La palabra de confirmación no coincide. Intente de nuevo.';
-            $this->showErrorModal = true;
-            return;
-        }
-
-        $this->ticketProgress($this->ticketForConfirmation->id);
-        $this->closeModal();
     }
-
 
     public function ticketProgress($id)
     {
         $ticket = Ticket::find($id);
-        if ($ticket && $ticket->estado < 3) { // asumimos que 3 = Cerrado
+        if ($ticket && $ticket->estado < 3) { // asumimos que 2 = Cerrado
             $ticket->increment('estado'); // incrementa 1 automáticamente en la BD
 
-            // Si el estado cambia a "Atendiendo"
+            // Si el estado cambia a "Atendido"
             if ($ticket->estado == 1) {
                 $ticket->atendido_at = now();
+                $ticket->atendido_by = Auth::user()->email;
+                $ticket->save();
+            }
+
+            // Si el estado cambia a "Cerrado"
+            if ($ticket->estado == 2) {
+                $ticket->cerrado_at = now();
+                $ticket->cerrado_by = Auth::user()->email;
                 $ticket->save();
             }
 
@@ -200,6 +204,7 @@ class TicketIndex extends Component
                   ->orWhere('nombre', 'like', $searchTerm)
                   ->orWhere('correo', 'like', $searchTerm)
                   ->orWhere('descripcion', 'like', $searchTerm)
+                  ->orWhere('comentarios', 'like', $searchTerm)
                   ->orWhere('area', 'like', $searchTerm)
                   ->orWhere('tipo', 'like', $searchTerm);
             });
@@ -217,7 +222,7 @@ class TicketIndex extends Component
             foreach ($this->period as $field => $range) {
                 if(!empty($range) && isset($range['from']) && $range['from'] != null && isset($range['to']) && $range['to'] != null) {
 
-                    if($field === 'updated_at') {
+                    if($field === 'cerrado_at') {
                         $query->where('estado', 2); // Solo filtrar tickets atendidos
                     }
 
@@ -231,7 +236,7 @@ class TicketIndex extends Component
             $query->orderBy($this->order[0], $this->order[1]); // Ordenamiento simple por fecha de creacion
         } else {
             $query
-                ->orderByRaw('(CASE WHEN estado IS ' . ($this->order[0] === 'atendido_at' ? 'NOT 0' : 2) . ' THEN 0 ELSE 1 END) ASC')
+                ->orderByRaw('(CASE WHEN estado IS 2 THEN 0 ELSE 1 END) ASC')
                 ->orderBy($this->order[0], $this->order[1])
                 ->orderBy('created_at', $this->order[1]);
         }

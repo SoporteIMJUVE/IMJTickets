@@ -50,10 +50,16 @@ class Ticket extends Model
         "area",
         "tipo",
         "descripcion",
-        "estado"
+        "comentarios",
+        "estado",
+        "cerrado_at",
+        "atendido_by",
+        "cerrado_by"
     ];
 
     protected $casts = [
-        'atendido_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'cerrado_at' => 'datetime',
     ];
 }

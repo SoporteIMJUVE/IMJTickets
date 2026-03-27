@@ -35,7 +35,6 @@ class TicketsExcel implements FromCollection, WithHeadings, ShouldAutoSize, With
             'Área',
             'Estado',
             'Creado',
-            'Atendido',
             'Cerrado',
         ];
     }
@@ -51,8 +50,7 @@ class TicketsExcel implements FromCollection, WithHeadings, ShouldAutoSize, With
                 $ticket->area,
                 Ticket::ESTADOS[$ticket->estado] ?? 'Desconocido',
                 $ticket->created_at,
-                $ticket->atendido_at,
-                $ticket->estado === 2 ? $ticket->updated_at : null,
+                $ticket->cerrado_at,
             ];
         });
     }
