@@ -1,14 +1,18 @@
 @props([
     'id',
     'key',
-    'submit' => null,
-    'title' => null,
-    'subtitle' => null,
+    'submit'    => null,
+
+    'title'     => null,
+    'subtitle'  => null,
+
     'button',
     'subbutton' => null,
-    'target' => null,
-    'message' => null,
-    'width' => 'max-w-lg'
+    
+    'target'    => null,
+    'message'   => null,
+    'width'     => 'max-w-lg',
+    'label'     => null
 ])
 
 <dialog id="{{ $id }}" wire:key="{{ $id }}{{ $key }}" class="modal" {{ $attributes }}>
@@ -34,7 +38,8 @@
                 subbutton="{{ $subbutton }}"
                 button="{{ $button }}"
                 modalId="{{ $id }}"
-                width="{{ $width }}">
+                width="{{ $width }}"
+                label="{{ $label }}">
 
             {{-- Contenido del modal --}}
             {{ $slot }}
