@@ -1,15 +1,16 @@
 @props([
 
-    'noBack'=>false,
+    'noBack'    =>false,
 
-    'submit' => null,
-    'title' => null,
-    'subtitle' => null,
+    'submit'    => null,
+    'title'     => null,
+    'subtitle'  => null,
     'subbutton' => null,
     'button',
 
-    'modalId' => null,
-    'width' => 'max-w-lg'
+    'modalId'   => null,
+    'width'     => 'max-w-lg',
+    'label'     => null
 ])
 
 @unless($noBack)
@@ -46,10 +47,18 @@
                             onclick="document.getElementById('{{ $modalId }}').close()">
                         {{ $subbutton }}
                     </button>
-                    <button class="btn btn-imjuve"
-                            type="submit">
-                        {{ $button }}
-                    </button>
+
+                    @if($label)
+                        {{-- Se utiliza label cuando hay importación de Excel porque el dialog (modal.blade) no permite enviar el formulario directamente --}}
+                        <label for="{{ $label }}" class="btn btn-imjuve cursor-pointer inline-flex items-center justify-center">
+                            {{ $button }}
+                        </label>
+                    @else
+                        <button class="btn btn-imjuve"
+                                type="submit">
+                            {{ $button }}
+                        </button>
+                    @endif
                 </div>
             @else
                 {{-- Si no hay botón secundario se usa despliegue de boton unico --}}

@@ -1,4 +1,18 @@
 <div class="min-h-screen bg-gray-100 pt-20 px-4 sm:px-6 lg:px-20 pb-3">
+
+    {{-- Toast de éxito de carga de empleados --}}
+    @if (session()->has('message'))
+        <div x-data="{ show: true }" 
+             x-init="setTimeout(() => show = false, 3000)" 
+             x-show="show" 
+             x-transition.opacity.duration.500ms
+             class="toast toast-center toast-middle z-[99999]">
+            <div class="alert alert-success shadow-lg semibold">
+                <span>{{ session('message') }}</span>
+            </div>
+        </div>
+    @endif
+
     @if($empleados && $empleados->count() > 0)
         <table class="w-full bg-white rounded-box shadow-xl overflow-hidden">
             <thead class="bg-[#681a32] text-white">
@@ -54,40 +68,92 @@
         </div>
     @endif
 
-    {{-- Modal de Instrucciones de Importación --}}
-    <input type="checkbox" id="modal-importar" class="modal-toggle" />
-        <div class="modal modal-bottom sm:modal-middle overflow-hidden">
-            <div class="modal-box relative bg-white p-0 overflow-hidden border-t-4 w-72 sm:w-115">        
-                <div class="p-6 pb-2 text-center">
-                    <h3 class="text-xl font-bold flex items-center justify-center gap-2" style="color: #641332;">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Instrucciones de Importación
-                    </h3>
-                    <p class="text-sm text-gray-500 mt-2">
-                        Asegúrate de que los nombres y el orden de la columnas dentro del archivo Excel coincidan con el siguiente formato:
-                    </p>
-                </div>
-                <div class="px-6 py-3">
-                    <div class="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                        <div class="flex items-center gap-2 text-gray-700 font-medium">Nombre</div>
-                        <div class="flex items-center gap-2 text-gray-700 font-medium">Correo</div>
-                    </div>
-                </div>
-                <div class="p-6 pt-2">
-                    <label for="modal-importar" 
-                           onclick="document.getElementById('input-excel').click()" 
-                           class="btn w-full border-none text-white hover:brightness-85 transition-all"
-                           style="background-color: #641332;">
-                           Seleccionar archivo
-                    </label>
-                <label for="modal-importar" class="btn btn-ghost btn-sm w-full mt-2 text-black font-normal hover:bg-white hover:brightness-90 transition-all">
-                    Cancelar
-                </label>
-            </div>
-        </div>
-    </div>
+    {{-- Modal de instrucciones de importación --}}
+    <x-form.modal id="modalInfoImportarEmpleados"
+        key="InfoImportarExcel"
+        title="Instrucciones de importación"
+        subtitle="Antes de subir tu archivo, verifica lo siguiente:"
+        button="Subir archivo"
+        subbutton="Cerrar"
+        label="archivoExcel">
 
-    {{-- Input oculto --}}
-    <input type="file" id="input-excel" wire:model="fileExcel" class="hidden" accept=".xlsx,.xls,.csv">
+        <div class="py-2">
+            <ul class="text-sm text-gray-700 space-y-3 bg-gray-100 p-4 rounded-xl border border-gray-100 text-left">
+                <li class="flex items-start gap-2">
+                    <svg class="w-5 h-5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    <span>Las columnas deben llamarse estrictamente <strong>Nombre</strong> y <strong>Correo</strong></span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <svg class="w-5 h-5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    <span>Todos los empleados deben tener un <strong>nombre</strong> y un <strong>correo electrónico institucional</strong> asociados</span>
+                </li>
+            </ul>
+            
+            <p class="text-sm text-gray-500 mt-4 text-center">
+                Formatos admitidos: .xlsx, .xls, .csv
+            </p>
+        </div>
+
+        <input type="file" id="archivoExcel" wire:model.live="fileExcel" onchange="document.getElementById('modalInfoImportarEmpleados').close();" class="hidden" accept=".xlsx,.xls,.csv">
+        
+    </x-form.modal>
+
+    {{-- Modal de error de formato --}}
+    <x-form.modal id="modalErrorFormato"
+        key="ErrorFormatoExcel"
+        title="Formato incorrecto"
+        button="Aceptar"
+        target="fileExcel"
+        message="Validando archivo">
+        <div class="py-2 text-center">
+            <p class="text-center text-gray-800 mb-5">
+                {{ $errorMessage }}
+            </p>
+            <p class="text-center text-gray-700 mt-6">
+                Revisa las instrucciones de importación, modifica el archivo y vuelve a intentarlo
+            </p>
+        </div>
+    </x-form.modal>
+
+    {{-- Modal de datos incompletos --}}
+    <x-form.modal id="modalDatosIncompletos"
+        key="DatosIncompletosExcel"
+        button="Aceptar"
+        title="Datos incompletos"
+        subtitle="Falta información de los siguientes empleados:">
+        <div class="py-4 text-center">
+            <div class="max-h-60 overflow-y-auto rounded-xl border border-gray-100 shadow-inner">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-gray-50 text-gray-600 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-3 font-medium">Dato encontrado</th>
+                            <th class="px-4 py-3 font-medium">Dato faltante</th>
+                        </tr> 
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @forelse($empleadosIncompletos as $item)
+                            <tr class="hover:bg-red-50/30 transition-colors">
+                                <td class="px-4 py-3 font-semibold text-gray-800">
+                                    {{ $item['dato'] }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="text-red-600 font-bold text-xs tracking-wider uppercase">
+                                        {{ $item['error'] }}
+                                    </span>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="2" class="text-center py-4 text-gray-500">Ningún dato incompleto</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <p class="text-sm text-gray-700 mt-6">
+                Revisa que todos los empleados tengan un correo y un nombre asociados, modifica el archivo y vuelve a intentarlo
+            </p>
+        </div>
+    </x-form.modal>
+</div>
