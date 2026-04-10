@@ -1,0 +1,14 @@
+# Archivo de configuración local (donde pondrás tu contraseña)
+.env
+
+# Archivos basura de Python
+__pycache__/
+*.pyc
+
+# Carpetas de configuración de VS Code y Streamlit
+.streamlit/
+.vscode/
+
+# (Opcional) Si no quieres que tus Excels se suban a la nube:
+# *.xlsx
+# *.csv
