@@ -8,9 +8,9 @@ import pandas as pd
 
 DB_CONFIG = {
     "host":     "localhost",
-    "database": "Sistemitas",
+    "database": "sistemitas",      # ← minúsculas
     "user":     "postgres",
-    "password": "Pistache07",
+    "password": "Dan040904",       # ← contraseña correcta
     "options":  "-c client_encoding=UTF8"
 }
 

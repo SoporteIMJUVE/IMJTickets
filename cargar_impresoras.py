@@ -2,7 +2,7 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from datetime import datetime
 
-engine = create_engine('postgresql://postgres:Pistache07@127.0.0.1:5432/Sistemitas')
+engine = create_engine('postgresql://postgres:Dan040904@localhost:5432/sistemitas')
 ruta_excel = r"C:\py\SOLICITUDES TONER Y STOCK.xlsx"
 
 def cargar_historial_suministros():
