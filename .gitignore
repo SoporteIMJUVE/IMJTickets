@@ -1,0 +1,14 @@
+# Credenciales locales
+.env
+
+# Archivos basura de Python
+__pycache__/
+*.pyc
+
+# Carpetas de configuración
+.streamlit/
+.vscode/
+
+# Opcional - archivos Excel y CSV
+# *.xlsx
+# *.csv
