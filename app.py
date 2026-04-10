@@ -1,22 +1,21 @@
 # -*- coding: utf-8 -*-
 import os
-os.environ["LANG"]   = "en_US"
-os.environ["LC_ALL"] = "en_US"
-
+from dotenv import load_dotenv  # <-- Nueva librería
 import streamlit as st
 import psycopg2
 import pandas as pd
-from urllib.parse import quote_plus
 from io import BytesIO
 from datetime import datetime
 
-# ── Conexion a la BD ───
+# Esto carga los datos de tu archivo .env
+load_dotenv()
 def get_conn():
-    password = "Dan040904"
     return psycopg2.connect(
-        f"postgresql://postgres:{quote_plus(password)}@localhost:5432/sistemitas"
+        host=os.getenv("DB_HOST"),
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASS")
     )
-
 # ── Generar PDF de equipos ───
 def generar_pdf_equipos(df_mostrar):
     from reportlab.lib.pagesizes import landscape, A4
