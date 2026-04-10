@@ -54,15 +54,13 @@
                     </label>
 
                     {{-- Botón Agregar Empleado --}}
-                    <button class="btn btn-imjuve">
+                    <button class="btn btn-imjuve" onclick="document.getElementById('btn-fantasma-agregar').click();">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                         </svg>
                         <span class="hidden xl:inline">Agregar empleado</span>
-                    </button>
-                    
+                    </button>                    
                 @endif
-
             </div>
         @endif
 
@@ -116,14 +114,14 @@
                                         {{-- Opciones del menú --}}
                                         <a href="{{ route('admin.validar-correos') }}" 
                                            wire:navigate.hover 
-                                           class="block w-full text-left px-4 py-3 hover:bg-blue-600 hover:text-white transition rounded-sm text-gray-800 text-sm cursor-pointer">
+                                           class="block w-full text-left px-4 py-3 hover:bg-emerald-600 hover:text-white transition rounded-sm text-gray-800 text-sm cursor-pointer">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="inline-block w-4 h-4 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                             </svg>
                                             Validar correos
                                         </a>
 
-                                        <button class="w-full text-left px-4 py-3 hover:bg-blue-600 hover:text-white transition rounded-sm text-gray-800 text-sm">
+                                        <button class="w-full text-left px-4 py-3 hover:bg-emerald-600 hover:text-white transition rounded-sm text-gray-800 text-sm">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="inline-block w-4 h-4 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7m0 0c0 2.21-3.582 4-8 4s-8-1.79-8-4m0 0C4 4.79 7.582 3 12 3s8 1.79 8 4" />
                                             </svg>
@@ -132,7 +130,7 @@
 
                                         <div class="border-t border-gray-200 my-1"></div>
                                 
-                                        <button class="w-full text-left px-4 py-3 hover:bg-emerald-600 hover:text-white transition rounded-sm text-gray-800 text-sm">
+                                        <button class="w-full text-left px-4 py-3 hover:bg-blue-600 hover:text-white transition rounded-sm text-gray-800 text-sm">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="inline-block w-4 h-4 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>

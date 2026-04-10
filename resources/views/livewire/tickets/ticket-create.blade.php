@@ -23,14 +23,6 @@
         :options="$areas->pluck('nombre')"
     />
 
-    {{-- Nombre --}}
-    <x-form.input
-        legend="Nombre" 
-        model="form.nombre" 
-        type="text"
-        placeholder="Nombre completo de quien reporta"
-    />
-
     {{-- Correo --}}
     <x-form.input 
         legend="Correo" 
@@ -39,7 +31,7 @@
         placeholder="Correo electrónico institucional de quien reporta"
     />
 
-    {{-- Loading cerrar sesión --}}
+    {{-- Loading crear ticket --}}
     <x-loading target="createTicket" message="Creando ticket"/>
 
 </x-form>

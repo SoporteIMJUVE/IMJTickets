@@ -6,7 +6,6 @@ use Livewire\Form;
 
 class StatusForm extends Form
 {
-    // Escrito con "I" mayúscula para no tener errores
     public $ticketId; 
     public $expectedWord;
     public $confirmationWord = '';
