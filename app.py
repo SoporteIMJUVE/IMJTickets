@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 import os
-from dotenv import load_dotenv  # <-- Nueva librería
+from dotenv import load_dotenv
 import streamlit as st
 import psycopg2
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
 
-# Esto carga los datos de tu archivo .env
 load_dotenv()
+
 def get_conn():
     return psycopg2.connect(
         host=os.getenv("DB_HOST"),
@@ -16,7 +16,7 @@ def get_conn():
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASS")
     )
-# ── Generar PDF de equipos ───
+
 def generar_pdf_equipos(df_mostrar):
     from reportlab.lib.pagesizes import landscape, A4
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -29,8 +29,6 @@ def generar_pdf_equipos(df_mostrar):
                             topMargin=30, bottomMargin=20)
     styles = getSampleStyleSheet()
     elements = []
-
-    # Titulo
     titulo = Paragraph(
         f"<b>Inventario de Equipos de Computo — IMJ</b><br/>"
         f"<font size=9>Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}</font>",
@@ -38,15 +36,11 @@ def generar_pdf_equipos(df_mostrar):
     )
     elements.append(titulo)
     elements.append(Spacer(1, 12))
-
-    # Encabezados y datos
     columnas = ["ID", "Nombre", "Ap. Paterno", "Equipo", "Marca", "Modelo", "Serie", "MAC", "Estatus"]
     data = [columnas]
-    for _, row in df.iterrows():
+    for _, row in df_mostrar.iterrows():
         data.append([str(row.get(c, "") or "") for c in columnas])
-
     col_widths = [30, 70, 80, 60, 55, 60, 75, 110, 65]
-
     tabla = Table(data, colWidths=col_widths, repeatRows=1)
     tabla.setStyle(TableStyle([
         ("BACKGROUND",    (0, 0), (-1, 0),  colors.HexColor("#1a3c5e")),
@@ -62,22 +56,39 @@ def generar_pdf_equipos(df_mostrar):
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
     elements.append(tabla)
-
-    # Pie de pagina con total
     elements.append(Spacer(1, 10))
-    elements.append(Paragraph(f"Total de equipos: <b>{len(df)}</b>", styles["Normal"]))
-
+    elements.append(Paragraph(f"Total de equipos: <b>{len(df_mostrar)}</b>", styles["Normal"]))
     doc.build(elements)
     buffer.seek(0)
     return buffer
 
 
-# ── Configuracion de la pagina ──────
 st.set_page_config(page_title="Sistema IMJ", layout="wide")
+
+st.markdown("""
+    <style>
+    [data-testid="stElementToolbar"] { display: none !important; }
+
+    /* Modo expandido fullscreen */
+    .fullscreen-table [data-testid="stDataFrame"] {
+        position: fixed !important;
+        top: 0 !important; left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 99999 !important;
+        background: #0e1117 !important;
+        padding: 10px !important;
+    }
+    .fullscreen-table [data-testid="stDataFrame"] iframe {
+        width: 100% !important;
+        height: 100vh !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 st.title("Sistema de Inventario IMJ")
 st.markdown("---")
 
-# ── Menu lateral ──────────────────────────────────────────────
 menu = st.sidebar.selectbox("Selecciona un modulo", [
     "🏠 Inicio",
     "👤 Usuarios",
@@ -120,7 +131,6 @@ elif menu == "👤 Usuarios":
     conn = get_conn()
     cur  = conn.cursor()
 
-    # -- Ver usuarios --
     if accion == "Ver usuarios":
         cur.execute("""
             SELECT u.id_usuario, u.nombre, u.apellido_paterno, u.apellido_materno,
@@ -135,67 +145,49 @@ elif menu == "👤 Usuarios":
         if busqueda_u:
             mask = df.apply(lambda col: col.astype(str).str.contains(busqueda_u, case=False, na=False)).any(axis=1)
             df = df[mask].reset_index(drop=True)
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, use_container_width=True, hide_index=True)
         st.caption(f"Total: {len(df)} usuarios")
 
-    # -- Editar usuario --
     elif accion == "Editar usuario":
         if st.session_state.get("usuario_guardado"):
             nombre_guardado = st.session_state.pop("usuario_guardado")
             st.success(f"✅ **{nombre_guardado}** fue actualizado correctamente.")
-
         cur.execute("""
             SELECT id_usuario, nombre, apellido_paterno, apellido_materno,
                    puesto, correo, id_departamento
             FROM usuarios ORDER BY apellido_paterno
         """)
         usuarios = cur.fetchall()
-        opciones_u = {
-            f"{u[2]}, {u[1]}  (ID {u[0]})": u for u in usuarios
-        }
+        opciones_u = {f"{u[2]}, {u[1]}  (ID {u[0]})": u for u in usuarios}
         sel = st.selectbox("Selecciona el usuario a editar", list(opciones_u.keys()))
         u = opciones_u[sel]
         id_usuario = u[0]
-
         st.info(f"Editando ID: **{id_usuario}**")
-
         cur.execute("SELECT id_departamento, nombre FROM departamentos ORDER BY nombre")
         deptos = cur.fetchall()
         idx_dep = next((i for i, d in enumerate(deptos) if d[0] == u[6]), 0)
-
         with st.form("editar_usuario"):
             col1, col2, col3 = st.columns(3)
             nuevo_nombre = col1.text_input("Nombre(s)",        value=u[1] or "")
             nuevo_ap_pat = col2.text_input("Apellido Paterno", value=u[2] or "")
             nuevo_ap_mat = col3.text_input("Apellido Materno", value=u[3] or "")
-
             col4, col5 = st.columns(2)
             nuevo_puesto = col4.text_input("Puesto",  value=u[4] or "")
             nuevo_correo = col5.text_input("Correo",  value=u[5] or "")
-
             depto_sel = st.selectbox("Departamento", [d[1] for d in deptos], index=idx_dep)
             nuevo_id_dep = next(d[0] for d in deptos if d[1] == depto_sel)
-
             if st.form_submit_button("💾 Guardar cambios"):
                 if nuevo_nombre and nuevo_ap_pat:
                     cur.execute("""
-                        UPDATE usuarios
-                        SET nombre            = %s,
-                            apellido_paterno  = %s,
-                            apellido_materno  = %s,
-                            puesto            = %s,
-                            correo            = %s,
-                            id_departamento   = %s
-                        WHERE id_usuario = %s
-                    """, (nuevo_nombre, nuevo_ap_pat, nuevo_ap_mat,
-                          nuevo_puesto, nuevo_correo, nuevo_id_dep, id_usuario))
+                        UPDATE usuarios SET nombre=%s, apellido_paterno=%s, apellido_materno=%s,
+                        puesto=%s, correo=%s, id_departamento=%s WHERE id_usuario=%s
+                    """, (nuevo_nombre, nuevo_ap_pat, nuevo_ap_mat, nuevo_puesto, nuevo_correo, nuevo_id_dep, id_usuario))
                     conn.commit()
                     st.session_state["usuario_guardado"] = f"{nuevo_nombre} {nuevo_ap_pat}"
                     st.rerun()
                 else:
                     st.warning("Nombre y Apellido Paterno son obligatorios.")
 
-    # -- Alta --
     elif accion == "Alta de usuario":
         with st.form("alta_usuario"):
             col1, col2, col3 = st.columns(3)
@@ -220,7 +212,6 @@ elif menu == "👤 Usuarios":
                 else:
                     st.warning("Llena al menos Nombre y Apellido Paterno.")
 
-    # -- Baja --
     elif accion == "Baja de usuario":
         cur.execute("SELECT id_usuario, nombre, apellido_paterno FROM usuarios ORDER BY apellido_paterno")
         usuarios = cur.fetchall()
@@ -232,7 +223,6 @@ elif menu == "👤 Usuarios":
             st.success(f"✅ Usuario {sel} dado de baja.")
             st.rerun()
 
-    # -- Traspaso --
     elif accion == "Traspaso de area":
         cur.execute("SELECT id_usuario, nombre, apellido_paterno FROM usuarios ORDER BY apellido_paterno")
         usuarios = cur.fetchall()
@@ -256,155 +246,166 @@ elif menu == "👤 Usuarios":
 # ════════════════════════════════════════
 elif menu == "💻 Equipos de Computo":
     st.subheader("💻 Equipos de Computo")
-
-    accion = st.radio("Accion", [
-        "Ver equipos",
-        "Editar equipo",
-        "Cambiar estatus",
-        "Reasignar equipo"
-    ])
-
+    accion = st.radio("Accion", ["Ver equipos", "Editar equipo", "Cambiar estatus", "Reasignar equipo"])
     conn = get_conn()
     cur  = conn.cursor()
 
-    # ── Ver equipos ──
     if accion == "Ver equipos":
         filtro = st.selectbox("Filtrar por estatus", ["Todos", "activo", "dañado", "en reparacion"])
-
         if filtro == "Todos":
             cur.execute("""
                 SELECT c.id_computo, u.nombre, u.apellido_paterno, c.nombre_equipo,
                        c.marca, c.modelo, c.serie, c.mac_address, c.estatus
-                FROM computo c
-                LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
+                FROM computo c LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
                 ORDER BY u.apellido_paterno
             """)
         else:
             cur.execute("""
                 SELECT c.id_computo, u.nombre, u.apellido_paterno, c.nombre_equipo,
                        c.marca, c.modelo, c.serie, c.mac_address, c.estatus
-                FROM computo c
-                LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
-                WHERE c.estatus = %s
-                ORDER BY u.apellido_paterno
+                FROM computo c LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
+                WHERE c.estatus = %s ORDER BY u.apellido_paterno
             """, (filtro,))
 
         datos = cur.fetchall()
         columnas = ["ID", "Nombre", "Ap. Paterno", "Equipo", "Marca", "Modelo", "Serie", "MAC", "Estatus"]
         df = pd.DataFrame(datos, columns=columnas)
 
-        busqueda = st.text_input("Buscar en cualquier campo", placeholder="Ej: Adriana, DELL, HLLGW93...")
+        # ── Inicializar estados ──
+        if "buscar_activo" not in st.session_state:
+            st.session_state.buscar_activo = False
+        if "expandido" not in st.session_state:
+            st.session_state.expandido = False
+
+        # ── Toolbar personalizado ──
+        tb1, tb2, tb3, tb4, tb5 = st.columns([0.5, 0.5, 0.5, 0.5, 6])
+
+        with tb1:
+            pdf_bytes = None
+            try:
+                pdf_bytes = generar_pdf_equipos(df).read()
+            except Exception:
+                pass
+            if pdf_bytes:
+                st.download_button("📄 PDF", data=pdf_bytes,
+                    file_name=f"equipos_IMJ_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                    mime="application/pdf", use_container_width=True)
+
+        with tb2:
+            excel_bytes = None
+            try:
+                excel_buffer = BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+                    df.to_excel(writer, index=False, sheet_name="Equipos")
+                excel_bytes = excel_buffer.getvalue()
+            except Exception:
+                pass
+            if excel_bytes:
+                st.download_button("📊 Excel", data=excel_bytes,
+                    file_name=f"equipos_IMJ_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True)
+
+        with tb3:
+            if st.button("🔍", help="Buscar / resaltar en tabla", use_container_width=True):
+                st.session_state.buscar_activo = not st.session_state.buscar_activo
+                st.rerun()
+
+        with tb4:
+            if st.button("⛶", help="Expandir tabla a pantalla completa", use_container_width=True):
+                st.session_state.expandido = not st.session_state.expandido
+                st.rerun()
+
+        # ── Buscador desplegable ──
+        busqueda = ""
+        if st.session_state.buscar_activo:
+            busqueda = st.text_input("🔍 Buscar en tabla",
+                                     placeholder="Ej: Adriana, DELL, HLLGW93...",
+                                     key="input_busqueda")
+
+        # ── Filtrar y resaltar ──
         if busqueda:
             mask = df.apply(lambda col: col.astype(str).str.contains(busqueda, case=False, na=False)).any(axis=1)
             df_mostrar = df[mask].reset_index(drop=True)
+
+            def resaltar_busqueda(row):
+                return ["background-color: #2a5298; color: white"] * len(row)
+
+            df_styled = df_mostrar.style.apply(resaltar_busqueda, axis=1)
         else:
             df_mostrar = df.reset_index(drop=True)
+            df_styled  = df_mostrar
 
-        st.dataframe(df_mostrar, use_container_width=True)
+        # ── Tabla (normal o expandida) ──
+        altura = 750 if st.session_state.expandido else 420
+
+        if st.session_state.expandido:
+            # CSS para simular pantalla completa
+            st.markdown("""
+                <style>
+                section.main > div { padding-top: 0 !important; padding-bottom: 0 !important; }
+                [data-testid="stSidebar"] { display: none !important; }
+                header { display: none !important; }
+                #tabla-expandida [data-testid="stDataFrame"] iframe {
+                    height: 92vh !important;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+            st.markdown('<div id="tabla-expandida">', unsafe_allow_html=True)
+            st.dataframe(df_styled, use_container_width=True, hide_index=True, height=altura)
+            st.markdown('</div>', unsafe_allow_html=True)
+            if st.button("✖ Cerrar pantalla completa"):
+                st.session_state.expandido = False
+                st.rerun()
+        else:
+            st.dataframe(df_styled, use_container_width=True, hide_index=True, height=altura)
+
         if busqueda:
-            st.caption(f"Mostrando: {len(df_mostrar)} de {len(df)} equipos (filtrado por: '{busqueda}')")
+            st.caption(f"🔍 Mostrando: {len(df_mostrar)} de {len(df)} equipos — resaltados por: '{busqueda}'")
         else:
             st.caption(f"Total: {len(df_mostrar)} equipos")
 
-        # Descargas - siempre exportan lo que se ve en pantalla
-        st.markdown("#### Descargar inventario")
-        if busqueda:
-            st.info(f"Se exportaran solo los {len(df_mostrar)} registros filtrados por '{busqueda}'.")
-
-        col_pdf, col_csv, _ = st.columns([1, 1, 2])
-
-        csv_bytes = df_mostrar.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
-
-        try:
-            pdf_bytes = generar_pdf_equipos(df_mostrar).read()
-        except ImportError:
-            pdf_bytes = None
-
-        with col_pdf:
-            if pdf_bytes:
-                st.download_button(
-                    label="Descargar PDF",
-                    data=pdf_bytes,
-                    file_name=f"equipos_IMJ_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
-            else:
-                st.error("Instala reportlab: pip install reportlab")
-
-        with col_csv:
-            st.download_button(
-                label="Descargar CSV/Excel",
-                data=csv_bytes,
-                file_name=f"equipos_IMJ_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-
-    # ── Editar equipo ──
     elif accion == "Editar equipo":
-
-        # Mostrar mensaje de éxito si viene de un guardado anterior
         if st.session_state.get("equipo_guardado"):
             nombre_guardado = st.session_state.pop("equipo_guardado")
             st.success(f"✅ **{nombre_guardado}** fue actualizado correctamente.")
-
         cur.execute("""
             SELECT c.id_computo, u.nombre, u.apellido_paterno,
                    c.nombre_equipo, c.marca, c.modelo, c.serie, c.mac_address, c.estatus
-            FROM computo c
-            LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
+            FROM computo c LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
             ORDER BY u.apellido_paterno
         """)
         equipos = cur.fetchall()
-
-        opciones_eq = {
-            f"{e[1]} {e[2]} — {e[3]} (Serie: {e[6]})": e
-            for e in equipos
-        }
+        opciones_eq = {f"{e[1]} {e[2]} — {e[3]} (Serie: {e[6]})": e for e in equipos}
         sel = st.selectbox("Selecciona el equipo a editar", list(opciones_eq.keys()))
         equipo = opciones_eq[sel]
-
         id_computo = equipo[0]
         st.info(f"Editando equipo ID: **{id_computo}** | Usuario: **{equipo[1]} {equipo[2]}**")
-
         with st.form("editar_equipo"):
             col1, col2 = st.columns(2)
             nuevo_nombre  = col1.text_input("Nombre del equipo", value=equipo[3] or "")
             nueva_marca   = col2.text_input("Marca",             value=equipo[4] or "")
-
             col3, col4 = st.columns(2)
             nuevo_modelo  = col3.text_input("Modelo",            value=equipo[5] or "")
             nueva_serie   = col4.text_input("Serie",             value=equipo[6] or "")
-
             col5, col6 = st.columns(2)
             nueva_mac     = col5.text_input("MAC Address",       value=equipo[7] or "")
             estatus_opts  = ["activo", "dañado", "en reparacion"]
             idx_estatus   = estatus_opts.index(equipo[8]) if equipo[8] in estatus_opts else 0
             nuevo_estatus = col6.selectbox("Estatus", estatus_opts, index=idx_estatus)
-
             if st.form_submit_button("💾 Guardar cambios"):
                 cur.execute("""
-                    UPDATE computo
-                    SET nombre_equipo = %s,
-                        marca         = %s,
-                        modelo        = %s,
-                        serie         = %s,
-                        mac_address   = %s,
-                        estatus       = %s
-                    WHERE id_computo = %s
-                """, (nuevo_nombre, nueva_marca, nuevo_modelo,
-                      nueva_serie, nueva_mac, nuevo_estatus, id_computo))
+                    UPDATE computo SET nombre_equipo=%s, marca=%s, modelo=%s,
+                    serie=%s, mac_address=%s, estatus=%s WHERE id_computo=%s
+                """, (nuevo_nombre, nueva_marca, nuevo_modelo, nueva_serie, nueva_mac, nuevo_estatus, id_computo))
                 conn.commit()
                 st.session_state["equipo_guardado"] = f"{equipo[1]} {equipo[2]} — {nuevo_nombre}"
                 st.rerun()
 
-    # ── Cambiar estatus ──
     elif accion == "Cambiar estatus":
         cur.execute("""
             SELECT c.id_computo, u.nombre, u.apellido_paterno, c.nombre_equipo, c.estatus
-            FROM computo c
-            LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
+            FROM computo c LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
             ORDER BY u.apellido_paterno
         """)
         equipos = cur.fetchall()
@@ -414,18 +415,15 @@ elif menu == "💻 Equipos de Computo":
         st.info(f"Estatus actual: **{estatus_actual}**")
         nuevo_estatus = st.selectbox("Nuevo estatus", ["activo", "dañado", "en reparacion"])
         if st.button("✅ Actualizar estatus"):
-            cur.execute("UPDATE computo SET estatus = %s WHERE id_computo = %s",
-                        (nuevo_estatus, id_computo))
+            cur.execute("UPDATE computo SET estatus = %s WHERE id_computo = %s", (nuevo_estatus, id_computo))
             conn.commit()
             st.success(f"✅ Estatus actualizado a '{nuevo_estatus}'.")
             st.rerun()
 
-    # ── Reasignar equipo ──
     elif accion == "Reasignar equipo":
         cur.execute("""
             SELECT c.id_computo, u.nombre, u.apellido_paterno, c.nombre_equipo
-            FROM computo c
-            LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
+            FROM computo c LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
             ORDER BY u.apellido_paterno
         """)
         equipos = cur.fetchall()
@@ -458,13 +456,12 @@ elif menu == "📱 Telefonos":
         cur.execute("""
             SELECT t.id_telefono, t.numero_general, t.extension,
                    u.nombre, u.apellido_paterno
-            FROM telefonos t
-            LEFT JOIN usuarios u ON t.id_usuario = u.id_usuario
+            FROM telefonos t LEFT JOIN usuarios u ON t.id_usuario = u.id_usuario
             ORDER BY u.apellido_paterno
         """)
         datos = cur.fetchall()
         df = pd.DataFrame(datos, columns=["ID", "Numero General", "Extension", "Nombre", "Ap. Paterno"])
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, use_container_width=True, hide_index=True)
         st.caption(f"Total: {len(df)} telefonos")
 
     elif accion == "Agregar telefono":
@@ -477,10 +474,8 @@ elif menu == "📱 Telefonos":
             sel_usr = st.selectbox("Asignar a usuario", list(opciones_usr.keys()))
             if st.form_submit_button("✅ Agregar"):
                 if extension:
-                    cur.execute("""
-                        INSERT INTO telefonos (numero_general, extension, id_usuario)
-                        VALUES (%s, %s, %s)
-                    """, (numero, extension, opciones_usr[sel_usr]))
+                    cur.execute("INSERT INTO telefonos (numero_general, extension, id_usuario) VALUES (%s, %s, %s)",
+                                (numero, extension, opciones_usr[sel_usr]))
                     conn.commit()
                     st.success("✅ Telefono agregado correctamente.")
                 else:
@@ -489,8 +484,7 @@ elif menu == "📱 Telefonos":
     elif accion == "Reasignar telefono":
         cur.execute("""
             SELECT t.id_telefono, t.extension, u.nombre, u.apellido_paterno
-            FROM telefonos t
-            LEFT JOIN usuarios u ON t.id_usuario = u.id_usuario
+            FROM telefonos t LEFT JOIN usuarios u ON t.id_usuario = u.id_usuario
             ORDER BY u.apellido_paterno
         """)
         telefonos = cur.fetchall()
@@ -523,13 +517,12 @@ elif menu == "🖨️ Impresoras":
         cur.execute("""
             SELECT i.id_impresora, i.marca, i.modelo, i.serie, i.ip_address,
                    i.firmware, u.nombre, u.apellido_paterno
-            FROM impresoras i
-            LEFT JOIN usuarios u ON i.id_usuario = u.id_usuario
+            FROM impresoras i LEFT JOIN usuarios u ON i.id_usuario = u.id_usuario
             ORDER BY u.apellido_paterno
         """)
         datos = cur.fetchall()
         df = pd.DataFrame(datos, columns=["ID","Marca","Modelo","Serie","IP","Firmware","Nombre","Ap. Paterno"])
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, use_container_width=True, hide_index=True)
         st.caption(f"Total: {len(df)} impresoras")
 
     elif accion == "Agregar impresora":
@@ -559,8 +552,7 @@ elif menu == "🖨️ Impresoras":
     elif accion == "Reasignar impresora":
         cur.execute("""
             SELECT i.id_impresora, i.marca, i.modelo, u.nombre, u.apellido_paterno
-            FROM impresoras i
-            LEFT JOIN usuarios u ON i.id_usuario = u.id_usuario
+            FROM impresoras i LEFT JOIN usuarios u ON i.id_usuario = u.id_usuario
             ORDER BY u.apellido_paterno
         """)
         impresoras = cur.fetchall()
@@ -597,13 +589,11 @@ elif menu == "📦 Insumos":
         """)
         datos = cur.fetchall()
         df = pd.DataFrame(datos, columns=["ID","Insumo","No. Parte","Stock Min","Stock Max","Stock Actual"])
-
         def resaltar_stock(row):
             if row["Stock Actual"] <= row["Stock Min"]:
                 return ["background-color: #ffcccc"] * len(row)
             return [""] * len(row)
-
-        st.dataframe(df.style.apply(resaltar_stock, axis=1), use_container_width=True)
+        st.dataframe(df.style.apply(resaltar_stock, axis=1), use_container_width=True, hide_index=True)
         st.caption("🔴 Rojo = stock bajo o agotado")
 
     elif accion == "Agregar insumo":
