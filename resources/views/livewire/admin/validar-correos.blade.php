@@ -13,8 +13,20 @@
         </div>
     @endif
 
-    @if($empleados && $empleados->count() > 0)
-        <div class="w-full overflow-x-auto rounded-box w-full shadow-xl">            
+    @if($empleados->isEmpty() && empty($wordSearch))
+        <div class="flex flex-col items-center justify-center py-20 px-4">
+            <div class="bg-gray-50 rounded-full p-6 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+            </div>
+            <h3 class="text-xl font-medium text-gray-800 mb-2">Aún no se ha cargado ningún correo para validar</h3>
+            <p class="text-gray-500 text-center max-w-sm">
+                Utiliza los botones en la barra superior para importar un archivo Excel o agregar empleados manualmente
+            </p>
+        </div>
+    @else
+        <div class="w-full overflow-x-auto rounded-box shadow-xl">            
             <table class="table table-fixed text-base w-full">
                 <thead class="bg-[#681a32] text-white">
                     <tr>
@@ -27,11 +39,10 @@
 
                 <tbody class="bg-white text-gray-700 whitespace-nowrap">
                     @foreach($empleados as $index => $empleado)
-                        <tr wire:key="empleado-{{ $empleado->id }}" class="h-14 max-h-14 border-b border-gray-300 hover:bg-gray-50 transition-colors">                            
+                        <tr wire:key="empleado-{{ $empleado->id }}" class="h-14 max-h-14 border-b border-gray-300 hover:bg-gray-100 transition-colors">                            
                             <td class="border-r border-gray-300 text-center font-semibold">{{ $empleado->id }}</td>
                             <td class="border-r border-gray-300 text-center truncate px-4">{{ $empleado->nombre }}</td>
                             <td class="border-r border-gray-300 text-center truncate px-4">{{ $empleado->correo }}</td>
-                            
                             <td class="h-14 flex justify-center items-center gap-10">
                                 {{-- Botón Modificar --}}
                                 <button class="cursor-pointer text-blue-700 hover:text-blue-500 hover:scale-150 transition-transform duration-300" type="button"
@@ -47,9 +58,9 @@
                         </tr>
                     @endforeach
 
-                    {{-- Rellenar con filas vacías si hay menos de 10 empleados --}}
+                    {{-- El relleno de filas --}}
                     @for ($i = $empleados->count(); $i < 10; $i++)
-                        <tr wire:key="fila-vacia-{{ $i }}" class="h-14">
+                        <tr class="h-14 border-b border-gray-100">
                             <td colspan="4"></td>
                         </tr>
                     @endfor
@@ -62,18 +73,6 @@
                     {{ $empleados->links() }}
                 </div>
             @endif
-        </div>
-    @else
-        <div class="flex flex-col items-center justify-center py-20 px-4">
-            <div class="bg-gray-50 rounded-full p-6 mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-            </div>
-            <h3 class="text-xl font-medium text-gray-800 mb-2">Aún no se ha cargado ningún correo para validar</h3>
-            <p class="text-gray-500 text-center max-w-sm">
-                Utiliza los botones en la barra superior para importar un archivo Excel o agregar empleados manualmente
-            </p>
         </div>
     @endif
 
