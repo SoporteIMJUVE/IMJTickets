@@ -8,7 +8,7 @@ use Livewire\WithPagination;
 use App\Imports\ImportarEmpleados;
 use App\Livewire\Forms\EmailForm;
 use App\Livewire\Forms\NameForm;
-use App\Livewire\Attributes\On;
+use Livewire\Attributes\On;
 
 class ValidarCorreos extends Component
 {
@@ -20,14 +20,45 @@ class ValidarCorreos extends Component
     public $empleadosIncompletos = [];
     public $empleadoId;
     public $formKey = 0;
+    public $wordSearch = '';
+
     public EmailForm $eForm;
     public NameForm $nForm;
 
     public function render()
     {
         return view('livewire.admin.validar-correos', [
-            'empleados' => \App\Models\Empleado::paginate(10),
+            'empleados' => $this->buildQuery()->paginate(10),
         ]);
+    }
+
+    // Escucha el evento del navbar para la búsqueda de empleados
+    #[On('emitSearch')]
+    public function search($wordSearch)
+    {
+        $this->wordSearch = $wordSearch;
+    }
+
+    // 3. Función constructora de la consulta
+    public function buildQuery()
+    {
+        $query = \App\Models\Empleado::query();
+        $term = trim($this->wordSearch);
+
+        if (!empty($term)) {
+            // Adaptamos la palabra a cómo están guardados los datos en la BD
+            $termUpper = '%' . mb_strtoupper($term, 'UTF-8') . '%';
+            $termLower = '%' . mb_strtolower($term, 'UTF-8') . '%'; 
+            $termId    = '%' . $term . '%';                         
+
+            $query->where(function ($q) use ($termId, $termUpper, $termLower) {
+                $q->where('id', 'like', $termId)
+                  ->orWhere('nombre', 'like', $termUpper)
+                  ->orWhere('correo', 'like', $termLower);
+            });
+        }
+
+        return $query;
     }
 
     // Carga masiva de empleados mediante Excel
