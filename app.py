@@ -18,14 +18,10 @@ def get_conn():
     )
 
 # ════════════════════════════════════════
-# FUNCIONES PDF GENERICAS
+# FUNCIONES PDF
 # ════════════════════════════════════════
 
 def generar_pdf_generico(df, titulo, col_widths=None):
-    """
-    Genera un PDF a partir de cualquier DataFrame.
-    Usa los nombres de columna del DataFrame tal cual.
-    """
     from reportlab.lib.pagesizes import landscape, A4
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet
@@ -51,9 +47,8 @@ def generar_pdf_generico(df, titulo, col_widths=None):
     for _, row in df.iterrows():
         data.append([str(row.get(c, "") or "") for c in columnas])
 
-    # Si no se pasan anchos, distribuir equitativamente
     if col_widths is None:
-        page_width = landscape(A4)[0] - 40  # margen izq + der
+        page_width = landscape(A4)[0] - 40
         col_widths = [page_width / len(columnas)] * len(columnas)
 
     tabla = Table(data, colWidths=col_widths, repeatRows=1)
@@ -79,22 +74,17 @@ def generar_pdf_generico(df, titulo, col_widths=None):
 
 
 def generar_pdf_usuarios(df):
-    """PDF específico para la tabla de usuarios."""
-    # ID, Nombre(s), Ap. Paterno, Ap. Materno, Puesto, Departamento, Correo
     col_widths = [30, 70, 90, 90, 80, 100, 130]
     return generar_pdf_generico(df, "Inventario de Usuarios", col_widths)
 
 
 def generar_pdf_equipos_detalle(df, usuario_nombre=None):
-    """PDF específico para detalles de equipos (Equipo, Marca, Modelo, Serie, MAC, Estatus)."""
     titulo = f"Equipos de Computo — {usuario_nombre}" if usuario_nombre else "Inventario de Equipos de Computo"
-    # Equipo, Marca, Modelo, Serie, MAC, Estatus
     col_widths = [80, 80, 100, 120, 160, 70]
     return generar_pdf_generico(df, titulo, col_widths)
 
 
 def generar_pdf_equipos_resumen(df):
-    """PDF para la vista resumida de equipos (Usuario, Equipos, Series, Total)."""
     col_widths = [140, 160, 180, 50]
     return generar_pdf_generico(df, "Resumen de Equipos de Computo", col_widths)
 
@@ -167,7 +157,6 @@ elif menu == "👤 Usuarios":
         datos = cur.fetchall()
         df = pd.DataFrame(datos, columns=["ID","Nombre(s)","Ap. Paterno","Ap. Materno","Puesto","Departamento","Correo"])
 
-        # --- Búsqueda ---
         busqueda_u = st.text_input("Buscar usuario", placeholder="Nombre, apellido, departamento...")
         if busqueda_u:
             mask = df.apply(lambda col: col.astype(str).str.contains(busqueda_u, case=False, na=False)).any(axis=1)
@@ -176,10 +165,7 @@ elif menu == "👤 Usuarios":
         st.dataframe(df, use_container_width=True, hide_index=True)
         st.caption(f"Total: {len(df)} usuarios")
 
-        # --- Botones de exportación ---
         col1, col2 = st.columns(2)
-
-        # Excel — usa el df filtrado actual
         with col1:
             try:
                 excel_buffer = BytesIO()
@@ -194,8 +180,6 @@ elif menu == "👤 Usuarios":
                 )
             except Exception as e:
                 st.error(f"Error al generar Excel: {e}")
-
-        # PDF — usa función específica para usuarios con columnas correctas
         with col2:
             try:
                 pdf_bytes = generar_pdf_usuarios(df).read()
@@ -208,6 +192,98 @@ elif menu == "👤 Usuarios":
                 )
             except Exception as e:
                 st.error(f"Error al generar PDF: {e}")
+
+    elif accion == "Editar usuario":
+        if st.session_state.get("usuario_guardado"):
+            nombre_guardado = st.session_state.pop("usuario_guardado")
+            st.success(f"✅ **{nombre_guardado}** fue actualizado correctamente.")
+        cur.execute("""
+            SELECT id_usuario, nombre, apellido_paterno, apellido_materno,
+                   puesto, correo, id_departamento
+            FROM usuarios ORDER BY apellido_paterno
+        """)
+        usuarios = cur.fetchall()
+        opciones_u = {f"{u[2]}, {u[1]}  (ID {u[0]})": u for u in usuarios}
+        sel = st.selectbox("Selecciona el usuario a editar", list(opciones_u.keys()))
+        u = opciones_u[sel]
+        id_usuario = u[0]
+        st.info(f"Editando ID: **{id_usuario}**")
+        cur.execute("SELECT id_departamento, nombre FROM departamentos ORDER BY nombre")
+        deptos = cur.fetchall()
+        idx_dep = next((i for i, d in enumerate(deptos) if d[0] == u[6]), 0)
+        with st.form("editar_usuario"):
+            col1, col2, col3 = st.columns(3)
+            nuevo_nombre = col1.text_input("Nombre(s)",        value=u[1] or "")
+            nuevo_ap_pat = col2.text_input("Apellido Paterno", value=u[2] or "")
+            nuevo_ap_mat = col3.text_input("Apellido Materno", value=u[3] or "")
+            col4, col5 = st.columns(2)
+            nuevo_puesto = col4.text_input("Puesto",  value=u[4] or "")
+            nuevo_correo = col5.text_input("Correo",  value=u[5] or "")
+            depto_sel = st.selectbox("Departamento", [d[1] for d in deptos], index=idx_dep)
+            nuevo_id_dep = next(d[0] for d in deptos if d[1] == depto_sel)
+            if st.form_submit_button("💾 Guardar cambios"):
+                if nuevo_nombre and nuevo_ap_pat:
+                    cur.execute("""
+                        UPDATE usuarios SET nombre=%s, apellido_paterno=%s, apellido_materno=%s,
+                        puesto=%s, correo=%s, id_departamento=%s WHERE id_usuario=%s
+                    """, (nuevo_nombre, nuevo_ap_pat, nuevo_ap_mat, nuevo_puesto, nuevo_correo, nuevo_id_dep, id_usuario))
+                    conn.commit()
+                    st.session_state["usuario_guardado"] = f"{nuevo_nombre} {nuevo_ap_pat}"
+                    st.rerun()
+                else:
+                    st.warning("Nombre y Apellido Paterno son obligatorios.")
+
+    elif accion == "Alta de usuario":
+        with st.form("alta_usuario"):
+            col1, col2, col3 = st.columns(3)
+            nombre = col1.text_input("Nombre(s)")
+            ap_pat = col2.text_input("Apellido Paterno")
+            ap_mat = col3.text_input("Apellido Materno")
+            col4, col5 = st.columns(2)
+            puesto = col4.text_input("Puesto")
+            correo = col5.text_input("Correo")
+            cur.execute("SELECT id_departamento, nombre FROM departamentos ORDER BY nombre")
+            deptos = cur.fetchall()
+            depto_sel = st.selectbox("Departamento", [d[1] for d in deptos])
+            id_depto  = next(d[0] for d in deptos if d[1] == depto_sel)
+            if st.form_submit_button("✅ Dar de Alta"):
+                if nombre and ap_pat:
+                    cur.execute("""
+                        INSERT INTO usuarios (nombre, apellido_paterno, apellido_materno, puesto, correo, id_departamento)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (nombre, ap_pat, ap_mat, puesto, correo, id_depto))
+                    conn.commit()
+                    st.success(f"✅ Usuario {nombre} {ap_pat} dado de alta.")
+                else:
+                    st.warning("Llena al menos Nombre y Apellido Paterno.")
+
+    elif accion == "Baja de usuario":
+        cur.execute("SELECT id_usuario, nombre, apellido_paterno FROM usuarios ORDER BY apellido_paterno")
+        usuarios = cur.fetchall()
+        opciones = {f"{u[1]} {u[2]}": u[0] for u in usuarios}
+        sel = st.selectbox("Selecciona el usuario a dar de baja", list(opciones.keys()))
+        st.warning(f"⚠️ Esta acción eliminará permanentemente a **{sel}**.")
+        if st.button("🗑️ Dar de Baja"):
+            cur.execute("DELETE FROM usuarios WHERE id_usuario = %s", (opciones[sel],))
+            conn.commit()
+            st.success(f"✅ Usuario {sel} dado de baja.")
+            st.rerun()
+
+    elif accion == "Traspaso de area":
+        cur.execute("SELECT id_usuario, nombre, apellido_paterno FROM usuarios ORDER BY apellido_paterno")
+        usuarios = cur.fetchall()
+        opciones = {f"{u[1]} {u[2]}": u[0] for u in usuarios}
+        sel = st.selectbox("Selecciona el usuario", list(opciones.keys()))
+        cur.execute("SELECT id_departamento, nombre FROM departamentos ORDER BY nombre")
+        deptos = cur.fetchall()
+        depto_sel = st.selectbox("Nuevo departamento", [d[1] for d in deptos])
+        id_depto  = next(d[0] for d in deptos if d[1] == depto_sel)
+        if st.button("🔄 Traspasar"):
+            cur.execute("UPDATE usuarios SET id_departamento = %s WHERE id_usuario = %s",
+                        (id_depto, opciones[sel]))
+            conn.commit()
+            st.success(f"✅ {sel} trasladado a {depto_sel}.")
+            st.rerun()
 
     cur.close()
     conn.close()
@@ -241,20 +317,17 @@ elif menu == "💻 Equipos de Computo":
         datos = cur.fetchall()
         df = pd.DataFrame(datos, columns=["Usuario", "Equipos", "Series", "Total"])
 
-        # ── Inicializar estados ──
         if "buscar_activo" not in st.session_state:
             st.session_state.buscar_activo = False
         if "expandido" not in st.session_state:
             st.session_state.expandido = False
 
-        # ── Lógica de Buscador ──
         if st.session_state.buscar_activo:
             busqueda = st.text_input("🔍 Buscar usuario o equipo", placeholder="Ej: Adriana...")
             if busqueda:
                 mask = df.apply(lambda col: col.astype(str).str.contains(busqueda, case=False, na=False)).any(axis=1)
                 df = df[mask].reset_index(drop=True)
 
-        # ── TABLA PRINCIPAL ──
         altura = 700 if st.session_state.expandido else 420
         seleccion = st.dataframe(
             df,
@@ -265,7 +338,6 @@ elif menu == "💻 Equipos de Computo":
             selection_mode="single-row"
         )
 
-        # ── DETALLES DEL USUARIO SELECCIONADO ──
         df_detalles = None
         usuario_sel = None
 
@@ -290,19 +362,14 @@ elif menu == "💻 Equipos de Computo":
             )
             st.table(df_detalles)
 
-        # ── TOOLBAR con exportación inteligente ──
-        # Si hay usuario seleccionado → exporta SUS equipos detallados
-        # Si no → exporta el resumen completo
         tb1, tb2, tb3, tb4, _ = st.columns([0.8, 0.8, 0.5, 0.5, 6])
 
         with tb1:
             try:
                 if df_detalles is not None and not df_detalles.empty:
-                    # Exportar detalle del usuario seleccionado
                     pdf_bytes = generar_pdf_equipos_detalle(df_detalles, usuario_sel).read()
                     nombre_archivo = f"equipos_{usuario_sel.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
                 else:
-                    # Exportar resumen general
                     pdf_bytes = generar_pdf_equipos_resumen(df).read()
                     nombre_archivo = f"equipos_resumen_{datetime.now().strftime('%Y%m%d')}.pdf"
                 st.download_button("📄 PDF", data=pdf_bytes, file_name=nombre_archivo, mime="application/pdf", use_container_width=True)
@@ -314,12 +381,10 @@ elif menu == "💻 Equipos de Computo":
             try:
                 excel_buffer = BytesIO()
                 if df_detalles is not None and not df_detalles.empty:
-                    # Exportar detalle del usuario seleccionado
                     with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
                         df_detalles.to_excel(writer, index=False, sheet_name="Equipos")
                     nombre_archivo = f"equipos_{usuario_sel.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
                 else:
-                    # Exportar resumen general
                     with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
                         df.to_excel(writer, index=False, sheet_name="Equipos")
                     nombre_archivo = f"equipos_resumen_{datetime.now().strftime('%Y%m%d')}.xlsx"
@@ -372,15 +437,45 @@ elif menu == "💻 Equipos de Computo":
                 st.rerun()
 
     elif accion == "Cambiar estatus":
-        cur.execute("SELECT c.id_computo, u.nombre, u.apellido_paterno, c.nombre_equipo, c.estatus FROM computo c JOIN usuarios u ON c.id_usuario = u.id_usuario")
+        cur.execute("""
+            SELECT c.id_computo, u.nombre, u.apellido_paterno, c.nombre_equipo, c.estatus
+            FROM computo c JOIN usuarios u ON c.id_usuario = u.id_usuario
+            ORDER BY u.apellido_paterno
+        """)
         equipos = cur.fetchall()
         opciones = {f"{e[1]} {e[2]} — {e[3]}": (e[0], e[4]) for e in equipos}
         sel = st.selectbox("Selecciona equipo", list(opciones.keys()))
-        if st.button("✅ Actualizar"):
+        id_eq, estatus_actual = opciones[sel]
+        nuevo_estatus = st.selectbox(
+            "Nuevo estatus", ["activo", "dañado", "en reparacion"],
+            index=["activo", "dañado", "en reparacion"].index(estatus_actual)
+                  if estatus_actual in ["activo", "dañado", "en reparacion"] else 0
+        )
+        if st.button("✅ Actualizar estatus"):
+            cur.execute("UPDATE computo SET estatus=%s WHERE id_computo=%s", (nuevo_estatus, id_eq))
+            conn.commit()
+            st.success(f"✅ Estatus actualizado a '{nuevo_estatus}'.")
             st.rerun()
 
     elif accion == "Reasignar equipo":
-        st.write("Selecciona equipo y nuevo usuario")
+        cur.execute("""
+            SELECT c.id_computo, u.nombre, u.apellido_paterno, c.nombre_equipo, c.serie
+            FROM computo c JOIN usuarios u ON c.id_usuario = u.id_usuario
+            ORDER BY u.apellido_paterno
+        """)
+        equipos = cur.fetchall()
+        opciones_eq = {f"{e[1]} {e[2]} — {e[3]} (Serie: {e[4]})": e[0] for e in equipos}
+        sel_eq = st.selectbox("Selecciona el equipo", list(opciones_eq.keys()))
+        cur.execute("SELECT id_usuario, nombre, apellido_paterno FROM usuarios ORDER BY apellido_paterno")
+        usuarios = cur.fetchall()
+        opciones_usr = {f"{u[1]} {u[2]}": u[0] for u in usuarios}
+        sel_usr = st.selectbox("Asignar a usuario", list(opciones_usr.keys()))
+        if st.button("🔄 Reasignar"):
+            cur.execute("UPDATE computo SET id_usuario=%s WHERE id_computo=%s",
+                        (opciones_usr[sel_usr], opciones_eq[sel_eq]))
+            conn.commit()
+            st.success(f"✅ Equipo reasignado a {sel_usr}.")
+            st.rerun()
 
     cur.close()
     conn.close()
