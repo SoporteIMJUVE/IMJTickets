@@ -681,3 +681,4 @@ elif menu == "📦 Insumos":
 
     cur.close()
     conn.close()
+    # Borrar despues de probar
