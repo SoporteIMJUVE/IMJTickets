@@ -1,11 +1,11 @@
-# Credenciales locales
+# Archivo de configuración local y credenciales
 .env
 
 # Archivos basura de Python
 __pycache__/
 *.pyc
 
-# Carpetas de configuración
+# Carpetas de configuración de VS Code y Streamlit
 .streamlit/
 .vscode/
 

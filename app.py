@@ -271,6 +271,161 @@ elif menu == "👤 Usuarios":
     conn.close()
 
 # ════════════════════════════════════════
+# USUARIOS
+# ════════════════════════════════════════
+elif menu == "👤 Usuarios":
+    st.subheader("👤 Gestion de Usuarios")
+    accion = st.radio("Accion", ["Ver usuarios", "Editar usuario", "Alta de usuario", "Baja de usuario", "Traspaso de area"])
+    conn = get_conn()
+    cur  = conn.cursor()
+
+    if accion == "Ver usuarios":
+        cur.execute("""
+            SELECT u.id_usuario, u.nombre, u.apellido_paterno, u.apellido_materno,
+                   u.puesto, d.nombre as departamento, u.correo
+            FROM usuarios u
+            LEFT JOIN departamentos d ON u.id_departamento = d.id_departamento
+            ORDER BY u.apellido_paterno
+        """)
+        datos = cur.fetchall()
+        df = pd.DataFrame(datos, columns=["ID","Nombre(s)","Ap. Paterno","Ap. Materno","Puesto","Departamento","Correo"])
+
+        # --- Búsqueda ---
+        busqueda_u = st.text_input("Buscar usuario", placeholder="Nombre, apellido, departamento...")
+        if busqueda_u:
+            mask = df.apply(lambda col: col.astype(str).str.contains(busqueda_u, case=False, na=False)).any(axis=1)
+            df = df[mask].reset_index(drop=True)
+
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.caption(f"Total: {len(df)} usuarios")
+
+        # --- Botones de exportación ---
+        col1, col2 = st.columns(2)
+
+        # Exportar a Excel
+        with col1:
+            try:
+                excel_buffer = BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+                    df.to_excel(writer, index=False, sheet_name="Usuarios")
+                st.download_button(
+                    "📊 Exportar a Excel",
+                    data=excel_buffer.getvalue(),
+                    file_name=f"usuarios_IMJ_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.error(f"Error al generar Excel: {e}")
+
+        # Exportar a PDF
+        with col2:
+            try:
+                pdf_bytes = generar_pdf_generico(df, "Usuarios").read()
+                st.download_button(
+                    "📄 Exportar a PDF",
+                    data=pdf_bytes,
+                    file_name=f"usuarios_IMJ_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.error(f"Error al generar PDF: {e}")
+
+    elif accion == "Editar usuario":
+        if st.session_state.get("usuario_guardado"):
+            nombre_guardado = st.session_state.pop("usuario_guardado")
+            st.success(f"✅ **{nombre_guardado}** fue actualizado correctamente.")
+        cur.execute("""
+            SELECT id_usuario, nombre, apellido_paterno, apellido_materno,
+                   puesto, correo, id_departamento
+            FROM usuarios ORDER BY apellido_paterno
+        """)
+        usuarios = cur.fetchall()
+        opciones_u = {f"{u[2]}, {u[1]}  (ID {u[0]})": u for u in usuarios}
+        sel = st.selectbox("Selecciona el usuario a editar", list(opciones_u.keys()))
+        u = opciones_u[sel]
+        id_usuario = u[0]
+        st.info(f"Editando ID: **{id_usuario}**")
+        cur.execute("SELECT id_departamento, nombre FROM departamentos ORDER BY nombre")
+        deptos = cur.fetchall()
+        idx_dep = next((i for i, d in enumerate(deptos) if d[0] == u[6]), 0)
+        with st.form("editar_usuario"):
+            col1, col2, col3 = st.columns(3)
+            nuevo_nombre = col1.text_input("Nombre(s)",        value=u[1] or "")
+            nuevo_ap_pat = col2.text_input("Apellido Paterno", value=u[2] or "")
+            nuevo_ap_mat = col3.text_input("Apellido Materno", value=u[3] or "")
+            col4, col5 = st.columns(2)
+            nuevo_puesto = col4.text_input("Puesto",  value=u[4] or "")
+            nuevo_correo = col5.text_input("Correo",  value=u[5] or "")
+            depto_sel = st.selectbox("Departamento", [d[1] for d in deptos], index=idx_dep)
+            nuevo_id_dep = next(d[0] for d in deptos if d[1] == depto_sel)
+            if st.form_submit_button("💾 Guardar cambios"):
+                if nuevo_nombre and nuevo_ap_pat:
+                    cur.execute("""
+                        UPDATE usuarios SET nombre=%s, apellido_paterno=%s, apellido_materno=%s,
+                        puesto=%s, correo=%s, id_departamento=%s WHERE id_usuario=%s
+                    """, (nuevo_nombre, nuevo_ap_pat, nuevo_ap_mat, nuevo_puesto, nuevo_correo, nuevo_id_dep, id_usuario))
+                    conn.commit()
+                    st.session_state["usuario_guardado"] = f"{nuevo_nombre} {nuevo_ap_pat}"
+                    st.rerun()
+                else:
+                    st.warning("Nombre y Apellido Paterno son obligatorios.")
+
+    elif accion == "Alta de usuario":
+        with st.form("alta_usuario"):
+            col1, col2, col3 = st.columns(3)
+            nombre = col1.text_input("Nombre(s)")
+            ap_pat = col2.text_input("Apellido Paterno")
+            ap_mat = col3.text_input("Apellido Materno")
+            col4, col5 = st.columns(2)
+            puesto = col4.text_input("Puesto")
+            correo = col5.text_input("Correo")
+            cur.execute("SELECT id_departamento, nombre FROM departamentos ORDER BY nombre")
+            deptos = cur.fetchall()
+            depto_sel = st.selectbox("Departamento", [d[1] for d in deptos])
+            id_depto  = next(d[0] for d in deptos if d[1] == depto_sel)
+            if st.form_submit_button("✅ Dar de Alta"):
+                if nombre and ap_pat:
+                    cur.execute("""
+                        INSERT INTO usuarios (nombre, apellido_paterno, apellido_materno, puesto, correo, id_departamento)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (nombre, ap_pat, ap_mat, puesto, correo, id_depto))
+                    conn.commit()
+                    st.success(f"✅ Usuario {nombre} {ap_pat} dado de alta.")
+                else:
+                    st.warning("Llena al menos Nombre y Apellido Paterno.")
+
+    elif accion == "Baja de usuario":
+        cur.execute("SELECT id_usuario, nombre, apellido_paterno FROM usuarios ORDER BY apellido_paterno")
+        usuarios = cur.fetchall()
+        opciones = {f"{u[1]} {u[2]}": u[0] for u in usuarios}
+        sel = st.selectbox("Selecciona el usuario a dar de baja", list(opciones.keys()))
+        if st.button("🗑️ Dar de Baja"):
+            cur.execute("DELETE FROM usuarios WHERE id_usuario = %s", (opciones[sel],))
+            conn.commit()
+            st.success(f"✅ Usuario {sel} dado de baja.")
+            st.rerun()
+
+    elif accion == "Traspaso de area":
+        cur.execute("SELECT id_usuario, nombre, apellido_paterno FROM usuarios ORDER BY apellido_paterno")
+        usuarios = cur.fetchall()
+        opciones = {f"{u[1]} {u[2]}": u[0] for u in usuarios}
+        sel = st.selectbox("Selecciona el usuario", list(opciones.keys()))
+        cur.execute("SELECT id_departamento, nombre FROM departamentos ORDER BY nombre")
+        deptos = cur.fetchall()
+        depto_sel = st.selectbox("Nuevo departamento", [d[1] for d in deptos])
+        id_depto  = next(d[0] for d in deptos if d[1] == depto_sel)
+        if st.button("🔄 Traspasar"):
+            cur.execute("UPDATE usuarios SET id_departamento = %s WHERE id_usuario = %s",
+                        (id_depto, opciones[sel]))
+            conn.commit()
+            st.success(f"✅ {sel} trasladado a {depto_sel}.")
+
+    cur.close()
+    conn.close()
+
+# ════════════════════════════════════════
 # EQUIPOS DE COMPUTO
 # ════════════════════════════════════════
 elif menu == "💻 Equipos de Computo":
