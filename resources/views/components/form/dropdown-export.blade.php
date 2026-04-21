@@ -2,7 +2,10 @@
     <div class="dropdown">
 
         <button tabindex="0" role="button" class="btn btn-imjuve">
-            <span>Exportar</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7zm-8 2V5h2v6h1.17L12 13.17L9.83 11zm-6 7h14v2H5z"/>
+            </svg>
+            <span class="hidden xl:inline">Descargar tickets</span>
         </button>
 
         <ul tabindex="0" class="dropdown-content absolute left-1/2 top-full mt-2 -translate-x-1/2 p-2 shadow bg-base-100 rounded-box w-72 z-[1]">

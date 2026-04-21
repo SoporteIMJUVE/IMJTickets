@@ -1,115 +1,126 @@
-<div class="min-h-screen bg-gray-100 pt-20 px-4 sm:px-6 lg:px-20 pb-3 flex items-center">
+<div class="min-h-screen bg-gray-100 pt-20 px-4 sm:px-6 lg:px-20 pb-3">
 
-    {{-- Tabla de tickets --}}
-    <div class="w-full overflow-x-auto rounded-box w-full shadow-xl">
-        <table id="tickets-table" class="table table-fixed text-xs min-w-[1200px]">
-            
-            <!-- head -->
-            <thead class="bg-[#681a32] text-white">
-                <tr>
-                    <th colspan="id" class="text-center w-13">ID</th>
-                    <th colspan="nombre" class="text-center w-30">Nombre</th>
-                    <th colspan="correo" class="text-center w-40">Correo</th>
-                    <th colspan="descripcion" class="text-center min-w-70">Descripción</th>
-                    <th colspan="comentarios" class="text-center min-w-70">Comentarios</th>
-                    <th colspan="tipo" class="text-center w-25 h-10 p-1">
-                        <x-form.dropdown-checkbox 
-                            title="Tipo"
-                            field="tipo" 
-                            :filters="$tipos"
-                        />
-                    </th>
-                    <th colspan="area" class="text-center w-25 h-10 p-1">
-                        <x-form.dropdown-checkbox 
-                            title="Área" 
-                            field="area" 
-                            :filters="$areas"
-                        />
-                    </th>
-                    <th colspan="estado" class="text-center w-35 h-10 p-1">
-                        <x-form.dropdown-checkbox 
-                            title="Estado" 
-                            field="estado" 
-                            :filters="$estados"
-                            filterType="id"
-                        />
-                    </th>
-                    <th colspan="creado" class="text-center w-35 h-10 p-1">
-                        <x-form.dropdown-date 
-                            title="Creado"
-                            checked="checked"
-                            field="created_at" 
-                        />
-                    </th>
-                    <th colspan="cerrado" class="text-center w-35 h-10 p-1">
-                        <x-form.dropdown-date 
-                            title="Cerrado" 
-                            field="cerrado_at" 
-                        />
-                    </th>
-                </tr>
-            </thead>
-
-            <!-- body -->
-            <tbody class="bg-white text-gray-700 whitespace-nowrap">
-
-                @foreach ($tickets as $ticket)
-                    <tr class="h-14 max-h-14 border-b border-gray-300">
-                        <td class="border-r border-gray-300 text-center">{{ $ticket->id }}</td>
-                        <td class="border-r border-gray-300 text-center overflow-x-auto">{{ $ticket->nombre }}</td>
-                        <td class="border-r border-gray-300 truncate">{{ $ticket->correo }}</td>
-                        <x-form.interactive-td
-                            content="{{ $ticket->descripcion }}"
-                            wire:key="{{ $ticket->id }}"
-                            x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById('modalDescripcion')?.showModal())"
-                        />
-                        <x-form.interactive-td
-                            content="{{ $ticket->comentarios }}"
-                            wire:key="{{ $ticket->id }}"
-                            x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById('{{ auth()->check() ? 'modalCA' : 'modalCE' }}')?.showModal())"
-                            :noGlow="empty($ticket->comentarios) && !auth()->check()"
-                        />
-                        <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->tipo }}</td>
-                        <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->area }}</td>
-                        <td class="h-14 flex justify-center border-r border-gray-300">
-                            @if( $ticket->estado == $numEstados-1 )
-                                <div class="badge badge-outline badge-{{ $ticket->estado_sty }} w-full h-full">{{ $ticket->estado_txt }}</div>
-                            @else
-                                @guest
-                                    <div class="badge badge-outline badge-{{ $ticket->estado_sty }} w-full h-full">{{ $ticket->estado_txt }}</div>
-                                @endguest
-
-                                @auth
-                                    <button type="button"
-                                            x-on:click="$wire.prepareStatusChange({{ $ticket->id }}).then(() => document.getElementById('modalCambioEstado')?.showModal())"
-                                            class="btn btn-{{ $ticket->estado_sty }} w-full h-full">
-                                        {{ $ticket->estado_txt }}
-                                    </button>
-                                @endauth
-                            @endif
-                        </td>
-                        <td class="border-r border-gray-300 text-center">{{ $ticket->created_at }}</td>
-                        <td class="border-r border-gray-300 text-center">{{ $ticket->cerrado_at }}</td>
-                    </tr>
-                @endforeach
-                
-                {{-- Rellenar con filas vacías si hay menos de 10 tickets --}}
-                @for ($i = $tickets->count(); $i < 10; $i++)
-                    <tr class="h-14">
-                        <td colspan="10"></td>
-                    </tr>
-                @endfor
-
-            </tbody>
-        </table>
-
-        <!-- Paginación -->
-        <div class="w-full bg-white shadow-xl py-2 px-5 text-gray-700">
-            {{ $tickets->links() }}
+    @if($tickets->count() === 0 && empty($wordSearch))
+        <div class="flex flex-col items-center justify-center py-20 px-4">
+            <div class="bg-gray-50 rounded-full p-6 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-300" viewBox="0 0 46 48"><!-- Icon from IconPark Outline by ByteDance - https://github.com/bytedance/IconPark/blob/master/LICENSE --><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4"><path stroke-linejoin="round" d="M9 16L34 6l4 10M4 16h40v6c-3 0-6 2-6 5.5s3 6.5 6 6.5v6H4v-6c3 0 6-2 6-6s-3-6-6-6z"/><path d="M17 25.385h6m-6 6h14"/></g></svg>
+            </div>
+            <h3 class="text-xl font-medium text-gray-800 mb-2">Aún no se ha generado ningún ticket</h3>
+            <p class="text-gray-500 text-center max-w-sm">
+                Espere a que alguien suba una incidencia y genere un ticket para que pueda aparecer en esta sección
+            </p>
         </div>
+    @else
+    {{-- Tabla de tickets --}}
+        <div class="w-full overflow-x-auto rounded-box w-full shadow-xl">
+            <table id="tickets-table" class="table table-fixed text-xs min-w-[1200px]">
+                
+                <!-- head -->
+                <thead class="bg-[#681a32] text-white">
+                    <tr>
+                        <th colspan="id" class="text-center w-13">ID</th>
+                        <th colspan="nombre" class="text-center w-30">Nombre</th>
+                        <th colspan="correo" class="text-center w-40">Correo</th>
+                        <th colspan="descripcion" class="text-center min-w-70">Descripción</th>
+                        <th colspan="comentarios" class="text-center min-w-70">Comentarios</th>
+                        <th colspan="tipo" class="text-center w-25 h-10 p-1">
+                            <x-form.dropdown-checkbox 
+                                title="Tipo"
+                                field="tipo" 
+                                :filters="$tipos"
+                            />
+                        </th>
+                        <th colspan="area" class="text-center w-25 h-10 p-1">
+                            <x-form.dropdown-checkbox 
+                                title="Área" 
+                                field="area" 
+                                :filters="$areas"
+                            />
+                        </th>
+                        <th colspan="estado" class="text-center w-35 h-10 p-1">
+                            <x-form.dropdown-checkbox 
+                                title="Estado" 
+                                field="estado" 
+                                :filters="$estados"
+                                filterType="id"
+                            />
+                        </th>
+                        <th colspan="creado" class="text-center w-35 h-10 p-1">
+                            <x-form.dropdown-date 
+                                title="Creado"
+                                checked="checked"
+                                field="created_at" 
+                            />
+                        </th>
+                        <th colspan="cerrado" class="text-center w-35 h-10 p-1">
+                            <x-form.dropdown-date 
+                                title="Cerrado" 
+                                field="cerrado_at" 
+                            />
+                        </th>
+                    </tr>
+                </thead>
 
-    </div>
+                <!-- body -->
+                <tbody class="bg-white text-gray-700 whitespace-nowrap">
 
+                    @foreach ($tickets as $ticket)
+                        <tr class="h-14 max-h-14 border-b border-gray-300">
+                            <td class="border-r border-gray-300 text-center">{{ $ticket->id }}</td>
+                            <td class="border-r border-gray-300 text-center overflow-x-auto">{{ $ticket->nombre }}</td>
+                            <td class="border-r border-gray-300 truncate">{{ $ticket->correo }}</td>
+                            <x-form.interactive-td
+                                content="{{ $ticket->descripcion }}"
+                                wire:key="{{ $ticket->id }}"
+                                x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById('modalDescripcion')?.showModal())"
+                            />
+                            <x-form.interactive-td
+                                content="{{ $ticket->comentarios }}"
+                                wire:key="{{ $ticket->id }}"
+                                x-on:click="$wire.findTicket({{ $ticket->id }}).then(() => document.getElementById('{{ auth()->check() ? 'modalCA' : 'modalCE' }}')?.showModal())"
+                                :noGlow="empty($ticket->comentarios) && !auth()->check()"
+                            />
+                            <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->tipo }}</td>
+                            <td class="border-r border-gray-300 overflow-x-auto">{{ $ticket->area }}</td>
+                            <td class="h-14 flex justify-center border-r border-gray-300">
+                                @if( $ticket->estado == $numEstados-1 )
+                                    <div class="badge badge-outline badge-{{ $ticket->estado_sty }} w-full h-full">{{ $ticket->estado_txt }}</div>
+                                @else
+                                    @guest
+                                        <div class="badge badge-outline badge-{{ $ticket->estado_sty }} w-full h-full">{{ $ticket->estado_txt }}</div>
+                                    @endguest
+
+                                    @auth
+                                        <button type="button"
+                                                x-on:click="$wire.prepareStatusChange({{ $ticket->id }}).then(() => document.getElementById('modalCambioEstado')?.showModal())"
+                                                class="btn btn-{{ $ticket->estado_sty }} w-full h-full">
+                                            {{ $ticket->estado_txt }}
+                                        </button>
+                                    @endauth
+                                @endif
+                            </td>
+                            <td class="border-r border-gray-300 text-center">{{ $ticket->created_at }}</td>
+                            <td class="border-r border-gray-300 text-center">{{ $ticket->cerrado_at }}</td>
+                        </tr>
+                    @endforeach
+                    
+                    {{-- Rellenar con filas vacías si hay menos de 10 tickets --}}
+                    @for ($i = $tickets->count(); $i < 10; $i++)
+                        <tr class="h-14">
+                            <td colspan="10"></td>
+                        </tr>
+                    @endfor
+
+                </tbody>
+            </table>
+
+            <!-- Paginación -->
+            <div class="w-full bg-white shadow-xl py-2 px-5 text-gray-700">
+                {{ $tickets->links() }}
+            </div>
+
+        </div>
+    @endif
 
     {{--
     <!-- jQuery (necesario para colResizable) -->

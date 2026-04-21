@@ -7,7 +7,7 @@
              x-show="show" 
              x-transition.opacity.duration.500ms
              class="toast toast-center toast-middle z-[99999]">
-            <div class="alert alert-success shadow-lg text-semibold">
+            <div class="alert alert-success shadow-lg font-bold">
                 <span>{{ session('message') }}</span>
             </div>
         </div>
@@ -60,7 +60,7 @@
 
                     {{-- El relleno de filas --}}
                     @for ($i = $empleados->count(); $i < 10; $i++)
-                        <tr class="h-14 border-b border-gray-100">
+                        <tr class="h-14">
                             <td colspan="4"></td>
                         </tr>
                     @endfor
@@ -84,8 +84,8 @@
         button="Subir archivo"
         subbutton="Cerrar"
         label="archivoExcel">
-        <div class="py-2">
-            <ul class="text-sm text-gray-700 space-y-3 bg-gray-100 p-4 rounded-xl border border-gray-100 text-left">
+        <div>
+            <ul class="text-base text-gray-700 space-y-3 bg-gray-100 p-4 rounded-xl border border-gray-100 text-left">
                 <li class="flex items-start gap-2">
                     <svg class="w-5 h-5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                     <span>Las columnas deben llamarse estrictamente <strong>Nombre</strong> y <strong>Correo</strong></span>
@@ -109,7 +109,7 @@
         button="Aceptar"
         target="fileExcel"
         message="Validando archivo">
-        <div class="py-2 text-center">
+        <div class="text-center">
             <p class="text-center text-gray-800 mb-5">
                 {{ $errorMessage }}
             </p>
@@ -125,7 +125,7 @@
         button="Aceptar"
         title="Datos incompletos"
         subtitle="Falta información de los siguientes empleados:">
-        <div class="py-4 text-center">
+        <div class="text-center">
             <div class="max-h-60 overflow-y-auto rounded-xl border border-gray-100 shadow-inner">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-gray-50 text-gray-600 sticky top-0">
@@ -171,7 +171,7 @@
         target="agregarEmpleado"
         message="Validando datos"
         wire:ignore.self>
-        <div class="py-4 text-left flex flex-col space-y-4.5" wire:key="container-add-{{ $formKey }}">            
+        <div class="text-left flex flex-col space-y-4.5" wire:key="container-add-{{ $formKey }}">            
             <x-form.input
                 legend="Nombre completo" 
                 model="nForm.nombre" 
@@ -198,7 +198,7 @@
         message="Validando datos"
         wire:ignore.self>
 
-        <div class="py-4 text-left flex flex-col gap-6" wire:key="container-edit-{{ $empleadoId }}-{{ $formKey }}">
+        <div class="text-left flex flex-col gap-6" wire:key="container-edit-{{ $empleadoId }}-{{ $formKey }}">
             <x-form.input
                 legend="Nombre completo" 
                 model="nForm.nombre" 

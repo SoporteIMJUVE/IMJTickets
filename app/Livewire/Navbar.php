@@ -11,6 +11,7 @@ class Navbar extends Component
     public $showCentralNav = false;
     public $showExport = false;
     public $showEmailValidation = false;
+    public $showTicketsManagement = false;
 
 
     public $wordSearch = '';
@@ -62,9 +63,10 @@ class Navbar extends Component
     public function mount()
     {
         // evaluar ruta una sola vez al montar el componente
-        $this->showCentralNav = request()->routeIs('tickets.user') || request()->routeIs('tickets.index') || request()->routeIs('admin.validar-correos');
+        $this->showCentralNav = request()->routeIs('tickets.user') || request()->routeIs('tickets.index') || request()->routeIs('admin.validar-correos') || request()->routeIs('admin.gestionar-tickets');
         $this->showExport = request()->routeIs('tickets.*');
         $this->showEmailValidation = request()->routeIs('admin.validar-correos');
+        $this->showTicketsManagement = request()->routeIs('admin.gestionar-tickets');
     }
     
     public function render()
