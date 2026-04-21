@@ -28,7 +28,7 @@
 
         {{-- Subtítulo del formulario (opcional) --}}
         @if($subtitle)
-            <p class="text-center text-gray-800 mb-5">{{ $subtitle }}</p>
+            <p class="text-center text-base text-gray-800 mb-5">{{ $subtitle }}</p>
         @endif
 
         {{-- Formulario --}}
