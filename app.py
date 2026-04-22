@@ -108,6 +108,7 @@ menu = st.sidebar.selectbox("Selecciona un modulo", [
     "🏠 Inicio",
     "👤 Usuarios",
     "💻 Equipos de Computo",
+    "🌐 Direccionamiento IP",
     "📱 Telefonos",
     "🖨️ Impresoras",
     "📦 Insumos",
@@ -678,6 +679,76 @@ elif menu == "📦 Insumos":
                 conn.commit()
                 st.success(f"✅ Entrega registrada. Nuevo stock: {stock_actual - cantidad}")
                 st.rerun()
+
+    cur.close()
+    conn.close()
+
+# ════════════════════════════════════════
+# DIRECCIONAMIENTO IP (NUEVO MÓDULO)
+# ════════════════════════════════════════
+elif menu == "🌐 Direccionamiento IP":
+    st.subheader("🌐 Gestión de Direccionamiento IP")
+    
+    conn = get_conn()
+    cur = conn.cursor()
+
+    try:
+        # 1. Obtener las áreas para el filtro (usando area_excel como definiste)
+        cur.execute("SELECT DISTINCT area_excel FROM inventario_ips_completo ORDER BY area_excel")
+        areas = ["Todas"] + [a[0] for a in cur.fetchall() if a[0]]
+        
+        col_f1, col_f2 = st.columns([1, 2])
+        area_sel = col_f1.selectbox("Filtrar por Área (Excel)", areas)
+        busqueda = col_f2.text_input("Buscar por IP, Usuario o MAC", placeholder="Ej: 192.168... o Juan...")
+
+        # 2. Consulta con tus nombres reales de columnas
+        query = """
+            SELECT ip, usuario, tipo_equipo, mac, area_excel, estatus, observaciones 
+            FROM inventario_ips_completo 
+            WHERE 1=1
+        """
+        params = []
+
+        if area_sel != "Todas":
+            query += " AND area_excel = %s"
+            params.append(area_sel)
+        
+        if busqueda:
+            query += " AND (ip LIKE %s OR usuario LIKE %s OR mac LIKE %s OR tipo_equipo LIKE %s)"
+            term = f"%{busqueda}%"
+            params.extend([term, term, term, term])
+
+        query += " ORDER BY area_excel, ip"
+        
+        cur.execute(query, params)
+        datos = cur.fetchall()
+        
+        # Columnas amigables para el DataFrame
+        df_ip = pd.DataFrame(datos, columns=[
+            "Dirección IP", "Usuario", "Equipo", "MAC Address", "Área Origen", "Estatus", "Notas"
+        ])
+
+        # Métricas de resumen
+        c1, c2, c3 = st.columns(3)
+        c1.metric("IPs Listadas", len(df_ip))
+        
+        # Mostrar la tabla
+        st.dataframe(df_ip, use_container_width=True, hide_index=True, height=500)
+
+        # Botón de descarga
+        if not df_ip.empty:
+            excel_data = BytesIO()
+            df_ip.to_excel(excel_data, index=False)
+            st.download_button(
+                label="📥 Exportar búsqueda a Excel",
+                data=excel_data.getvalue(),
+                file_name=f"reporte_ips_{datetime.now().strftime('%H%M')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+    except Exception as e:
+        st.error(f"Error: {e}")
+        st.warning("Asegúrate de que la tabla 'inventario_ips_completo' tenga datos.")
 
     cur.close()
     conn.close()
