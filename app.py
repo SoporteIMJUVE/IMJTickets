@@ -242,7 +242,7 @@ elif menu == "👤 Usuarios":
     conn.close()
 
 # ════════════════════════════════════════
-# EQUIPOS DE COMPUTO 
+# EQUIPOS DE COMPUTO  
 # ════════════════════════════════════════
 elif menu == "💻 Equipos de Computo":
     st.subheader("💻 Equipos de Computo")
