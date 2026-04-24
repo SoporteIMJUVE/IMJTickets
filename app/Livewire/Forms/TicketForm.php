@@ -10,7 +10,6 @@ class TicketForm extends EmailForm
     public $descripcion;
     public $tipo = "error";
     public $area = "error";
-    public $nombre;
 
     public function rules()
     {
@@ -37,7 +36,7 @@ class TicketForm extends EmailForm
             ],
             'tipo'        => ['required', Rule::notIn(['error'])],
             'area'        => ['required', Rule::notIn(['error'])],
-            'nombre'      => ['required', 'max:30', 'regex:/^\w+\s+\w+/'],
+            'correo'      => array_merge(parent::rules()['correo'], ['exists:empleados,correo']),
         ]);
     }
 
@@ -48,9 +47,7 @@ class TicketForm extends EmailForm
             'descripcion.min'       => 'La descripción debe tener al menos 5 caracteres',
             'tipo.not_in'           => 'Es necesario ingresar un tipo de incidente',
             'area.not_in'           => 'Es necesario ingresar un área',
-            'nombre.required'       => 'Es necesario ingresar un nombre',
-            'nombre.max'            => 'El nombre no puede exceder los 30 caracteres',
-            'nombre.regex'          => 'Debes ingresar al menos un nombre y un apellido',
+            'correo.exists'         => 'El correo no está registrado en el sistema',
         ]);
     }
 
@@ -58,8 +55,10 @@ class TicketForm extends EmailForm
     {
         $this->validate();
 
+        $empleado = \App\Models\Empleado::where('correo', $this->correo)->first();
+
         $ticket = Ticket::create([
-            'nombre'      => $this->nombre,
+            'nombre'      => $empleado->nombre,
             'correo'      => $this->correo,
             'area'        => $this->area,
             'tipo'        => $this->tipo,

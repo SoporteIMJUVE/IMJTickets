@@ -1,6 +1,4 @@
-<div class="min-h-screen bg-gray-100 pt-20 px-4 sm:px-6 lg:px-20 pb-3 flex items-center">
-
-    {{-- Tabla de tickets --}}
+<div class="min-h-screen bg-gray-100 pt-20 px-4 sm:px-6 lg:px-20 pb-3">
     <div class="w-full overflow-x-auto rounded-box w-full shadow-xl">
         <table id="tickets-table" class="table table-fixed text-xs min-w-[1200px]">
             
@@ -109,7 +107,6 @@
         </div>
 
     </div>
-
 
     {{--
     <!-- jQuery (necesario para colResizable) -->

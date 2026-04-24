@@ -45,6 +45,7 @@ class Ticket extends Model
     }
 
     protected $fillable = [
+        "id",
         "nombre",
         "correo",
         "area",
