@@ -134,7 +134,7 @@
                                 <div class="mt-auto space-y-3">
                                     <div class="bg-white/60 p-3 rounded-lg border border-emerald-100 text-center">
                                         <p class="text-xs text-gray-800 leading-relaxed">
-                                            Deberá estar firmado por el <span class="font-bold">Director</span>, <span class="font-bold">Encargado(a) de la Dirección</span> o por el <span class="font-bold">Subdirector(a)</span> del área
+                                            Deberá estar firmado por el <span class="font-bold">Director(a)</span>, <span class="font-bold">Encargado(a) de la Dirección</span> o por el <span class="font-bold">Subdirector(a)</span> del área
                                         </p>
                                     </div>
                     

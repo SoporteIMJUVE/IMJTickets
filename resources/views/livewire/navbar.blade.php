@@ -55,6 +55,7 @@
 
                     {{-- Botón agregar empleado --}}
                     <button class="btn btn-imjuve" onclick="document.getElementById('btn-fantasma-agregar').click();">
+                        
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                         </svg>
@@ -71,7 +72,7 @@
                     </button>
 
                     {{-- Botón exportar y eliminar BD --}}
-                    <button class="btn btn-imjuve" onclick="document.getElementById('modalPurgarBD').showModal()">
+                    <button class="btn btn-imjuve" x-on:click="$dispatch('preparar-eliminacion-bd'); document.getElementById('modalExportarEliminarBD').showModal()">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24">
                             <path fill="currentColor" d="M20 13.09V7c0-2.21-3.58-4-8-4S4 4.79 4 7v10c0 2.21 3.59 4 8 4c.46 0 .9 0 1.33-.06A6 6 0 0 1 13 19v-.05c-.32.05-.65.05-1 .05c-3.87 0-6-1.5-6-2v-2.23c1.61.78 3.72 1.23 6 1.23c.65 0 1.27-.04 1.88-.11A5.99 5.99 0 0 1 19 13c.34 0 .67.04 1 .09m-2-.64c-1.3.95-3.58 1.55-6 1.55s-4.7-.6-6-1.55V9.64c1.47.83 3.61 1.36 6 1.36s4.53-.53 6-1.36zM12 9C8.13 9 6 7.5 6 7s2.13-2 6-2s6 1.5 6 2s-2.13 2-6 2m11 9v2h-8v-2z"/>
                         </svg>
