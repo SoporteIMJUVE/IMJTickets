@@ -2,7 +2,7 @@
 <html lang="es">
     <head>
         <meta charset="utf-8">
-        <title>Reporte de tickets IMJUVE</title>
+        <title>{{ $titulo ?? 'Reporte de tickets IMJUVE' }}</title>
         <style>
             body { 
                 font-family: DejaVu Sans, sans-serif; 
@@ -115,7 +115,7 @@
                 <td class="text-cell">
                     <h1 class="title-main">Instituto Mexicano de la Juventud</h1>
                     <h2 class="title-sub">Subdirección de Sistemas</h2>
-                    <h3 class="report-name">Reporte de Tickets</h3>
+                    <h3 class="report-name">{{ $titulo ?? 'Reporte de Tickets' }}</h3>
                     <p class="meta-info">
                         Generado el: {{ now()->format('d/m/Y') }} &bull; Hora: {{ now()->format('H:i') }}
                     </p>

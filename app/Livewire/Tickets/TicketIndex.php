@@ -261,6 +261,8 @@ class TicketIndex extends Component
 
     public function render()
     {
+        $this->totalTickets = Ticket::count();
+        
         return view('livewire.tickets.ticket-index', [
             'tickets' => $this->buildQuery()->paginate(10),
             'tipos' => Type::pluck('nombre', 'id')->toArray(),
