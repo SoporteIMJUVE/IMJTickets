@@ -687,55 +687,101 @@ elif menu == "📦 Insumos":
 # DIRECCIONAMIENTO IP (NUEVO MÓDULO)
 # ════════════════════════════════════════
 elif menu == "🌐 Direccionamiento IP":
-    st.subheader("🌐 Gestión de Direccionamiento IP")
+    st.subheader("🌐 Gestión de Direccionamiento IP - IMJUVE")
     
     conn = get_conn()
     cur = conn.cursor()
 
     try:
-        # 1. Obtener las áreas para el filtro (usando area_excel como definiste)
-        cur.execute("SELECT DISTINCT area_excel FROM inventario_ips_completo ORDER BY area_excel")
-        areas = ["Todas"] + [a[0] for a in cur.fetchall() if a[0]]
+        # --- NUEVA SECCIÓN: RESUMEN ESTRATÉGICO (Pestaña RANGO) ---
+        st.markdown("### Rangos y Disponibilidad")
+        
+        query_resumen = """
+            SELECT 
+                r.area_nombre as "Área",
+                r.ip_inicial || ' a ' || r.ip_final as "Rango de IPs",
+                r.capacidad_total as "Total IPs",
+                COUNT(i.ip) FILTER (WHERE i.estatus ILIKE 'Ocupada%') as "Ocupadas",
+                COUNT(i.ip) FILTER (WHERE i.estatus ILIKE 'Libre%') as "Libres",
+                COUNT(i.ip) FILTER (WHERE i.estatus ILIKE 'En Conflicto%') as "En Conflicto"
+            FROM cat_rangos_ips r
+            LEFT JOIN inventario_ips_completo i 
+                ON UPPER(TRIM(r.area_nombre)) = UPPER(TRIM(i.departamento_pestana))
+            GROUP BY r.area_nombre, r.ip_inicial, r.ip_final, r.capacidad_total
+            ORDER BY r.area_nombre;
+        """
+        
+        cur.execute(query_resumen)
+        resumen_data = cur.fetchall()
+        
+        if resumen_data:
+            df_r = pd.DataFrame(resumen_data, columns=["Área", "Rango de IPs", "Total IPs", "Ocupadas", "Libres", "En Conflicto"])
+            
+            # --- CÁLCULO DE % Y SEMÁFORO ---
+            df_r['%_num'] = (df_r['Ocupadas'] / df_r['Total IPs'] * 100).round(1)
+            df_r['% Usado'] = df_r['%_num'].astype(str) + '%'
+            
+            def color_semaforo(val):
+                try:
+                    num = float(val.replace('%', ''))
+                    if num >= 90: color = '#ff4b4b' # Rojo
+                    elif num >= 70: color = '#ffa500' # Naranja
+                    else: color = '#09ab3b' # Verde
+                    return f'background-color: {color}; color: white; font-weight: bold'
+                except:
+                    return ''
+
+            df_styled = df_r.drop(columns=['%_num']).style.applymap(color_semaforo, subset=['% Usado'])
+            st.table(df_styled)
+        else:
+            st.info("💡 No hay datos en el catálogo de rangos. Verifica 'cat_rangos_ips'.")
+
+        st.divider()
+
+        # --- SECCIÓN DE BÚSQUEDA DETALLADA ---
+        st.markdown("### 🔍 Buscador de IPs")
+        
+        # 1. Obtener las áreas para el filtro
+        cur.execute("SELECT DISTINCT departamento_pestana FROM inventario_ips_completo WHERE departamento_pestana IS NOT NULL ORDER BY departamento_pestana")
+        areas_db = [a[0] for a in cur.fetchall()]
+        areas_filtro = ["Todas"] + areas_db
         
         col_f1, col_f2 = st.columns([1, 2])
-        area_sel = col_f1.selectbox("Filtrar por Área (Excel)", areas)
-        busqueda = col_f2.text_input("Buscar por IP, Usuario o MAC", placeholder="Ej: 192.168... o Juan...")
+        area_sel = col_f1.selectbox("Filtrar por Área (Pestaña)", areas_filtro)
+        busqueda = col_f2.text_input("Buscar por IP, Usuario, MAC o Uso", placeholder="Ej: 172.17... o Personal...")
 
-        # 2. Consulta con tus nombres reales de columnas
-        query = """
-            SELECT ip, usuario, tipo_equipo, mac, area_excel, estatus, observaciones 
+        # 2. Consulta dinámica (Agregamos institucional_o_personal)
+        query_busqueda = """
+            SELECT ip, usuario, tipo_equipo, institucional_o_personal, mac, departamento_pestana, estatus, observaciones 
             FROM inventario_ips_completo 
             WHERE 1=1
         """
         params = []
 
         if area_sel != "Todas":
-            query += " AND area_excel = %s"
+            query_busqueda += " AND departamento_pestana = %s"
             params.append(area_sel)
         
         if busqueda:
-            query += " AND (ip LIKE %s OR usuario LIKE %s OR mac LIKE %s OR tipo_equipo LIKE %s)"
+            query_busqueda += " AND (ip LIKE %s OR usuario LIKE %s OR mac LIKE %s OR tipo_equipo LIKE %s OR institucional_o_personal LIKE %s)"
             term = f"%{busqueda}%"
-            params.extend([term, term, term, term])
+            params.extend([term, term, term, term, term])
 
-        query += " ORDER BY area_excel, ip"
+        query_busqueda += " ORDER BY departamento_pestana, ip"
         
-        cur.execute(query, params)
+        cur.execute(query_busqueda, params)
         datos = cur.fetchall()
         
-        # Columnas amigables para el DataFrame
+        # 3. DataFrame con la columna "Uso" después de "Equipo"
         df_ip = pd.DataFrame(datos, columns=[
-            "Dirección IP", "Usuario", "Equipo", "MAC Address", "Área Origen", "Estatus", "Notas"
+            "Dirección IP", "Usuario", "Equipo", "Uso (Inst./Pers.)", "MAC Address", "Área Origen", "Estatus", "Notas"
         ])
 
-        # Métricas de resumen
-        c1, c2, c3 = st.columns(3)
-        c1.metric("IPs Listadas", len(df_ip))
-        
-        # Mostrar la tabla
-        st.dataframe(df_ip, use_container_width=True, hide_index=True, height=500)
+        # Mostrar métricas y tabla
+        st.metric("Resultados encontrados", len(df_ip))
+        st.dataframe(df_ip, use_container_width=True, hide_index=True, height=400)
 
-        # Botón de descarga
+        # 4. Botón de descarga
         if not df_ip.empty:
             excel_data = BytesIO()
             df_ip.to_excel(excel_data, index=False)
@@ -747,8 +793,8 @@ elif menu == "🌐 Direccionamiento IP":
             )
 
     except Exception as e:
-        st.error(f"Error: {e}")
-        st.warning("Asegúrate de que la tabla 'inventario_ips_completo' tenga datos.")
+        st.error(f"Error en el sistema: {e}")
+        st.warning("Verifica la conexión y las tablas en pgAdmin.")
 
     cur.close()
     conn.close()
