@@ -119,22 +119,59 @@ menu = st.sidebar.selectbox("Selecciona un modulo", [
 # ════════════════════════════════════════
 if menu == "🏠 Inicio":
     st.subheader("Bienvenido al Sistema de Inventario del IMJ")
-    st.info("Usa el menu de la izquierda para navegar entre los modulos.")
     try:
         conn = get_conn()
         cur  = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM usuarios")
+
+        cur.execute("SELECT COUNT(*) FROM usuarios WHERE activo = true")
         total_usuarios = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM computo")
         total_computo = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM impresoras")
         total_impresoras = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM computo WHERE estatus = 'activo'")
+        equipos_activos = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM computo WHERE estatus IN ('dañado','en reparacion')")
+        equipos_danados = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM inventario_ips_completo WHERE estatus ILIKE 'Libre%'")
+        ips_libres = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM inventario_ips_completo WHERE estatus ILIKE 'Ocupada%'")
+        ips_ocupadas = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM insumos WHERE stock_actual <= stock_minimo")
+        insumos_bajos = cur.fetchone()[0]
+
+        cur.execute("""
+            SELECT d.nombre, COUNT(u.id_usuario)
+            FROM departamentos d
+            LEFT JOIN usuarios u ON u.id_departamento = d.id_departamento AND u.activo = true
+            GROUP BY d.nombre ORDER BY COUNT(u.id_usuario) DESC
+        """)
+        df_deptos = pd.DataFrame(cur.fetchall(), columns=["Departamento", "Usuarios"])
+
         cur.close()
         conn.close()
-        col1, col2, col3 = st.columns(3)
-        col1.metric("👤 Usuarios",   total_usuarios)
-        col2.metric("💻 Equipos",    total_computo)
-        col3.metric("🖨️ Impresoras", total_impresoras)
+
+        st.markdown("#### Resumen general")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("👤 Usuarios activos",  total_usuarios)
+        col2.metric("💻 Equipos",           total_computo)
+        col3.metric("🖨️ Impresoras",        total_impresoras)
+        col4.metric("📦 Insumos con stock bajo", insumos_bajos,
+                    delta=f"-{insumos_bajos}" if insumos_bajos > 0 else None,
+                    delta_color="inverse")
+
+        st.markdown("#### Equipos e IPs")
+        col5, col6, col7, col8 = st.columns(4)
+        col5.metric("✅ Equipos activos",     equipos_activos)
+        col6.metric("⚠️ Dañados / Reparacion", equipos_danados,
+                    delta=f"+{equipos_danados}" if equipos_danados > 0 else None,
+                    delta_color="inverse")
+        col7.metric("🟢 IPs libres",   ips_libres)
+        col8.metric("🔴 IPs ocupadas", ips_ocupadas)
+
+        st.markdown("#### Usuarios por departamento")
+        st.bar_chart(df_deptos.set_index("Departamento"), use_container_width=True, height=280)
+
     except Exception as e:
         st.error(f"Error al conectar con la BD: {e}")
 
@@ -143,24 +180,37 @@ if menu == "🏠 Inicio":
 # ════════════════════════════════════════
 elif menu == "👤 Usuarios":
     st.subheader("👤 Gestion de Usuarios")
-    accion = st.radio("Accion", ["Ver usuarios", "Editar usuario", "Alta de usuario", "Baja de usuario", "Traspaso de area"])
+    accion = st.radio("Accion", ["Ver usuarios", "Editar usuario", "Alta de usuario", "Baja de usuario", "Reactivar usuario", "Traspaso de area"])
     conn = get_conn()
     cur  = conn.cursor()
 
     if accion == "Ver usuarios":
+        cur.execute("SELECT nombre FROM departamentos ORDER BY nombre")
+        deptos_lista = ["Todos"] + [r[0] for r in cur.fetchall()]
+        mostrar_inactivos = st.checkbox("Mostrar usuarios inactivos (dados de baja)")
         cur.execute("""
             SELECT u.id_usuario, u.nombre, u.apellido_paterno, u.apellido_materno,
                    u.puesto, d.nombre as departamento, u.correo
             FROM usuarios u
             LEFT JOIN departamentos d ON u.id_departamento = d.id_departamento
+            WHERE u.activo = %s
             ORDER BY u.apellido_paterno
-        """)
-        datos = cur.fetchall()
-        df = pd.DataFrame(datos, columns=["ID","Nombre(s)","Ap. Paterno","Ap. Materno","Puesto","Departamento","Correo"])
+        """, (not mostrar_inactivos,))
+        df = pd.DataFrame(cur.fetchall(), columns=["ID","Nombre(s)","Ap. Paterno","Ap. Materno","Puesto","Departamento","Correo"])
 
-        busqueda_u = st.text_input("Buscar usuario", placeholder="Nombre, apellido, departamento...")
+        col_f1, col_f2, col_f3 = st.columns([1.5, 1, 2])
+        depto_f   = col_f1.selectbox("Departamento", deptos_lista)
+        puesto_f  = col_f2.text_input("Puesto", placeholder="Ej: Jefe...")
+        busqueda_u = col_f3.text_input("Buscar", placeholder="Nombre, apellido, correo...")
+
+        if depto_f != "Todos":
+            df = df[df["Departamento"] == depto_f].reset_index(drop=True)
+        if puesto_f:
+            df = df[df["Puesto"].str.contains(puesto_f, case=False, na=False)].reset_index(drop=True)
         if busqueda_u:
-            mask = df.apply(lambda col: col.astype(str).str.contains(busqueda_u, case=False, na=False)).any(axis=1)
+            mask = df[["Nombre(s)","Ap. Paterno","Ap. Materno","Correo"]].apply(
+                lambda col: col.astype(str).str.contains(busqueda_u, case=False, na=False)
+            ).any(axis=1)
             df = df[mask].reset_index(drop=True)
 
         st.dataframe(df, use_container_width=True, hide_index=True)
@@ -259,16 +309,34 @@ elif menu == "👤 Usuarios":
                     st.warning("Llena al menos Nombre y Apellido Paterno.")
 
     elif accion == "Baja de usuario":
-        cur.execute("SELECT id_usuario, nombre, apellido_paterno FROM usuarios ORDER BY apellido_paterno")
+        cur.execute("SELECT id_usuario, nombre, apellido_paterno FROM usuarios WHERE activo = true ORDER BY apellido_paterno")
         usuarios = cur.fetchall()
-        opciones = {f"{u[1]} {u[2]}": u[0] for u in usuarios}
-        sel = st.selectbox("Selecciona el usuario a dar de baja", list(opciones.keys()))
-        st.warning(f"⚠️ Esta acción eliminará permanentemente a **{sel}**.")
-        if st.button("🗑️ Dar de Baja"):
-            cur.execute("DELETE FROM usuarios WHERE id_usuario = %s", (opciones[sel],))
-            conn.commit()
-            st.success(f"✅ Usuario {sel} dado de baja.")
-            st.rerun()
+        if not usuarios:
+            st.info("No hay usuarios activos.")
+        else:
+            opciones = {f"{u[1]} {u[2]}": u[0] for u in usuarios}
+            sel = st.selectbox("Selecciona el usuario a dar de baja", list(opciones.keys()))
+            st.warning(f"⚠️ **{sel}** quedará inactivo. Sus datos se conservan y puede reactivarse.")
+            if st.button("🔴 Dar de Baja"):
+                cur.execute("UPDATE usuarios SET activo = false WHERE id_usuario = %s", (opciones[sel],))
+                conn.commit()
+                st.success(f"✅ {sel} dado de baja. Puedes reactivarlo desde 'Reactivar usuario'.")
+                st.rerun()
+
+    elif accion == "Reactivar usuario":
+        cur.execute("SELECT id_usuario, nombre, apellido_paterno FROM usuarios WHERE activo = false ORDER BY apellido_paterno")
+        inactivos = cur.fetchall()
+        if not inactivos:
+            st.info("No hay usuarios inactivos.")
+        else:
+            opciones = {f"{u[1]} {u[2]}": u[0] for u in inactivos}
+            sel = st.selectbox("Selecciona el usuario a reactivar", list(opciones.keys()))
+            st.info(f"Se reactivara el acceso de **{sel}**.")
+            if st.button("✅ Reactivar"):
+                cur.execute("UPDATE usuarios SET activo = true WHERE id_usuario = %s", (opciones[sel],))
+                conn.commit()
+                st.success(f"✅ {sel} reactivado correctamente.")
+                st.rerun()
 
     elif accion == "Traspaso de area":
         cur.execute("SELECT id_usuario, nombre, apellido_paterno FROM usuarios ORDER BY apellido_paterno")
@@ -294,12 +362,22 @@ elif menu == "👤 Usuarios":
 # ════════════════════════════════════════
 elif menu == "💻 Equipos de Computo":
     st.subheader("💻 Equipos de Computo")
-    accion = st.radio("Accion", ["Ver equipos", "Editar equipo", "Cambiar estatus", "Reasignar equipo"])
+    accion = st.radio("Accion", ["Ver equipos", "Agregar equipo", "Editar equipo", "Cambiar estatus", "Reasignar equipo"])
     conn = get_conn()
     cur  = conn.cursor()
 
     if accion == "Ver equipos":
-        filtro = st.selectbox("Filtrar por estatus", ["Todos", "activo", "dañado", "en reparacion"])
+        if "expandido" not in st.session_state:
+            st.session_state.expandido = False
+
+        col_f1, col_f2, col_f3 = st.columns([1, 2, 0.4])
+        filtro   = col_f1.selectbox("Estatus", ["Todos", "activo", "dañado", "en reparacion"])
+        busqueda = col_f2.text_input("Buscar usuario o equipo", placeholder="Ej: Adriana, Dell...")
+        with col_f3:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("⛶", help="Expandir tabla"):
+                st.session_state.expandido = not st.session_state.expandido
+                st.rerun()
 
         query_base = """
             SELECT
@@ -315,19 +393,10 @@ elif menu == "💻 Equipos de Computo":
         else:
             cur.execute(query_base + " WHERE c.estatus = %s GROUP BY u.nombre, u.apellido_paterno ORDER BY \"Total\" DESC;", (filtro,))
 
-        datos = cur.fetchall()
-        df = pd.DataFrame(datos, columns=["Usuario", "Equipos", "Series", "Total"])
-
-        if "buscar_activo" not in st.session_state:
-            st.session_state.buscar_activo = False
-        if "expandido" not in st.session_state:
-            st.session_state.expandido = False
-
-        if st.session_state.buscar_activo:
-            busqueda = st.text_input("🔍 Buscar usuario o equipo", placeholder="Ej: Adriana...")
-            if busqueda:
-                mask = df.apply(lambda col: col.astype(str).str.contains(busqueda, case=False, na=False)).any(axis=1)
-                df = df[mask].reset_index(drop=True)
+        df = pd.DataFrame(cur.fetchall(), columns=["Usuario", "Equipos", "Series", "Total"])
+        if busqueda:
+            mask = df.apply(lambda col: col.astype(str).str.contains(busqueda, case=False, na=False)).any(axis=1)
+            df = df[mask].reset_index(drop=True)
 
         altura = 700 if st.session_state.expandido else 420
         seleccion = st.dataframe(
@@ -396,9 +465,7 @@ elif menu == "💻 Equipos de Computo":
                 st.button("📊 Excel", disabled=True)
 
         with tb3:
-            if st.button("🔍", help="Buscar"):
-                st.session_state.buscar_activo = not st.session_state.buscar_activo
-                st.rerun()
+            pass
 
         with tb4:
             if st.button("⛶", help="Pantalla completa"):
@@ -407,6 +474,33 @@ elif menu == "💻 Equipos de Computo":
 
         if not seleccion.selection.rows:
             st.caption(f"💡 Selecciona una fila para ver detalles. Total: {len(df)} usuarios.")
+
+    elif accion == "Agregar equipo":
+        cur.execute("SELECT id_usuario, nombre, apellido_paterno FROM usuarios WHERE activo = true ORDER BY apellido_paterno")
+        usuarios = cur.fetchall()
+        opciones_usr = {f"{u[1]} {u[2]}": u[0] for u in usuarios}
+        with st.form("agregar_equipo"):
+            sel_usr = st.selectbox("Asignar a usuario", list(opciones_usr.keys()))
+            col1, col2 = st.columns(2)
+            nombre_eq = col1.text_input("Nombre del equipo")
+            marca     = col2.text_input("Marca")
+            col3, col4 = st.columns(2)
+            modelo = col3.text_input("Modelo")
+            serie  = col4.text_input("Serie")
+            col5, col6 = st.columns(2)
+            mac    = col5.text_input("MAC Address")
+            estatus = col6.selectbox("Estatus", ["activo", "dañado", "en reparacion"])
+            if st.form_submit_button("✅ Agregar equipo"):
+                if nombre_eq and marca:
+                    cur.execute("""
+                        INSERT INTO computo (id_usuario, nombre_equipo, marca, modelo, serie, mac_address, estatus)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (opciones_usr[sel_usr], nombre_eq, marca, modelo, serie, mac, estatus))
+                    conn.commit()
+                    st.success(f"✅ Equipo **{nombre_eq}** registrado y asignado a {sel_usr}.")
+                    st.rerun()
+                else:
+                    st.warning("Completa al menos Nombre del equipo y Marca.")
 
     elif accion == "Editar equipo":
         cur.execute("""
@@ -497,10 +591,28 @@ elif menu == "📱 Telefonos":
             FROM telefonos t LEFT JOIN usuarios u ON t.id_usuario = u.id_usuario
             ORDER BY u.apellido_paterno
         """)
-        datos = cur.fetchall()
-        df = pd.DataFrame(datos, columns=["ID", "Numero General", "Extension", "Nombre", "Ap. Paterno"])
+        df = pd.DataFrame(cur.fetchall(), columns=["ID", "Numero General", "Extension", "Nombre", "Ap. Paterno"])
+
+        col_f1, col_f2 = st.columns([1, 2])
+        ext_f  = col_f1.text_input("Buscar extension", placeholder="Ej: 1234...")
+        nombre_f = col_f2.text_input("Buscar usuario", placeholder="Ej: Juan...")
+
+        if ext_f:
+            df = df[df["Extension"].astype(str).str.contains(ext_f, case=False, na=False)].reset_index(drop=True)
+        if nombre_f:
+            mask = df[["Nombre","Ap. Paterno"]].apply(
+                lambda col: col.astype(str).str.contains(nombre_f, case=False, na=False)
+            ).any(axis=1)
+            df = df[mask].reset_index(drop=True)
+
         st.dataframe(df, use_container_width=True, hide_index=True)
         st.caption(f"Total: {len(df)} telefonos")
+        if not df.empty:
+            excel_buf = BytesIO()
+            df.to_excel(excel_buf, index=False)
+            st.download_button("📥 Exportar a Excel", data=excel_buf.getvalue(),
+                               file_name=f"telefonos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     elif accion == "Agregar telefono":
         with st.form("agregar_telefono"):
@@ -547,7 +659,7 @@ elif menu == "📱 Telefonos":
 # ════════════════════════════════════════
 elif menu == "🖨️ Impresoras":
     st.subheader("🖨️ Impresoras")
-    accion = st.radio("Accion", ["Ver impresoras", "Agregar impresora", "Reasignar impresora"])
+    accion = st.radio("Accion", ["Ver impresoras", "Agregar impresora", "Editar impresora", "Reasignar impresora"])
     conn = get_conn()
     cur  = conn.cursor()
 
@@ -558,10 +670,34 @@ elif menu == "🖨️ Impresoras":
             FROM impresoras i LEFT JOIN usuarios u ON i.id_usuario = u.id_usuario
             ORDER BY u.apellido_paterno
         """)
-        datos = cur.fetchall()
-        df = pd.DataFrame(datos, columns=["ID","Marca","Modelo","Serie","IP","Firmware","Nombre","Ap. Paterno"])
+        df = pd.DataFrame(cur.fetchall(), columns=["ID","Marca","Modelo","Serie","IP","Firmware","Nombre","Ap. Paterno"])
+
+        cur.execute("SELECT DISTINCT marca FROM impresoras WHERE marca IS NOT NULL ORDER BY marca")
+        marcas = ["Todas"] + [r[0] for r in cur.fetchall()]
+
+        col_f1, col_f2, col_f3 = st.columns([1, 1, 2])
+        marca_f  = col_f1.selectbox("Marca", marcas)
+        ip_f     = col_f2.text_input("IP", placeholder="Ej: 192.168...")
+        usuario_f = col_f3.text_input("Buscar usuario", placeholder="Nombre o apellido...")
+
+        if marca_f != "Todas":
+            df = df[df["Marca"] == marca_f].reset_index(drop=True)
+        if ip_f:
+            df = df[df["IP"].astype(str).str.contains(ip_f, case=False, na=False)].reset_index(drop=True)
+        if usuario_f:
+            mask = df[["Nombre","Ap. Paterno"]].apply(
+                lambda col: col.astype(str).str.contains(usuario_f, case=False, na=False)
+            ).any(axis=1)
+            df = df[mask].reset_index(drop=True)
+
         st.dataframe(df, use_container_width=True, hide_index=True)
         st.caption(f"Total: {len(df)} impresoras")
+        if not df.empty:
+            excel_buf = BytesIO()
+            df.to_excel(excel_buf, index=False)
+            st.download_button("📥 Exportar a Excel", data=excel_buf.getvalue(),
+                               file_name=f"impresoras_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     elif accion == "Agregar impresora":
         with st.form("agregar_impresora"):
@@ -586,6 +722,34 @@ elif menu == "🖨️ Impresoras":
                     st.success(f"✅ Impresora {marca} {modelo} agregada.")
                 else:
                     st.warning("Llena al menos Marca y Modelo.")
+
+    elif accion == "Editar impresora":
+        cur.execute("""
+            SELECT i.id_impresora, i.marca, i.modelo, i.serie, i.ip_address, i.firmware,
+                   u.nombre, u.apellido_paterno
+            FROM impresoras i LEFT JOIN usuarios u ON i.id_usuario = u.id_usuario
+            ORDER BY u.apellido_paterno
+        """)
+        impresoras = cur.fetchall()
+        opciones_imp = {f"{e[1]} {e[2]} — {e[6] or ''} {e[7] or ''} (Serie: {e[3] or 'S/N'})": e for e in impresoras}
+        sel = st.selectbox("Selecciona la impresora a editar", list(opciones_imp.keys()))
+        imp = opciones_imp[sel]
+        with st.form("editar_impresora"):
+            col1, col2 = st.columns(2)
+            nueva_marca  = col1.text_input("Marca",  value=imp[1] or "")
+            nuevo_modelo = col2.text_input("Modelo", value=imp[2] or "")
+            col3, col4 = st.columns(2)
+            nueva_serie  = col3.text_input("Serie",  value=imp[3] or "")
+            nueva_ip     = col4.text_input("IP Address", value=imp[4] or "")
+            nuevo_fw     = st.text_input("Firmware", value=imp[5] or "")
+            if st.form_submit_button("💾 Guardar cambios"):
+                cur.execute("""
+                    UPDATE impresoras SET marca=%s, modelo=%s, serie=%s, ip_address=%s, firmware=%s
+                    WHERE id_impresora=%s
+                """, (nueva_marca, nuevo_modelo, nueva_serie, nueva_ip, nuevo_fw, imp[0]))
+                conn.commit()
+                st.success(f"✅ Impresora actualizada correctamente.")
+                st.rerun()
 
     elif accion == "Reasignar impresora":
         cur.execute("""
@@ -625,14 +789,34 @@ elif menu == "📦 Insumos":
                    stock_minimo, stock_maximo, stock_actual
             FROM insumos ORDER BY nombre_insumo
         """)
-        datos = cur.fetchall()
-        df = pd.DataFrame(datos, columns=["ID","Insumo","No. Parte","Stock Min","Stock Max","Stock Actual"])
+        df = pd.DataFrame(cur.fetchall(), columns=["ID","Insumo","No. Parte","Stock Min","Stock Max","Stock Actual"])
+
+        col_f1, col_f2 = st.columns([2, 1])
+        busqueda_ins = col_f1.text_input("Buscar insumo", placeholder="Nombre o numero de parte...")
+        stock_f = col_f2.selectbox("Stock", ["Todos", "Stock bajo / agotado", "Stock normal"])
+
+        if busqueda_ins:
+            mask = df[["Insumo","No. Parte"]].apply(
+                lambda col: col.astype(str).str.contains(busqueda_ins, case=False, na=False)
+            ).any(axis=1)
+            df = df[mask].reset_index(drop=True)
+        if stock_f == "Stock bajo / agotado":
+            df = df[df["Stock Actual"] <= df["Stock Min"]].reset_index(drop=True)
+        elif stock_f == "Stock normal":
+            df = df[df["Stock Actual"] > df["Stock Min"]].reset_index(drop=True)
+
         def resaltar_stock(row):
             if row["Stock Actual"] <= row["Stock Min"]:
                 return ["background-color: #ffcccc"] * len(row)
             return [""] * len(row)
         st.dataframe(df.style.apply(resaltar_stock, axis=1), use_container_width=True, hide_index=True)
-        st.caption("🔴 Rojo = stock bajo o agotado")
+        st.caption(f"Total: {len(df)} insumos  |  Rojo = stock bajo o agotado")
+        if not df.empty:
+            excel_buf = BytesIO()
+            df.to_excel(excel_buf, index=False)
+            st.download_button("📥 Exportar a Excel", data=excel_buf.getvalue(),
+                               file_name=f"insumos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     elif accion == "Agregar insumo":
         with st.form("agregar_insumo"):
@@ -684,113 +868,267 @@ elif menu == "📦 Insumos":
     conn.close()
 
 # ════════════════════════════════════════
-# DIRECCIONAMIENTO IP (NUEVO MÓDULO)
+# DIRECCIONAMIENTO IP
 # ════════════════════════════════════════
 elif menu == "🌐 Direccionamiento IP":
     st.subheader("🌐 Gestión de Direccionamiento IP - IMJUVE")
-    
+
+    accion = st.radio("Acción", ["Ver IPs y Rangos", "Asignar IP", "Editar asignación", "Liberar IP"])
+
     conn = get_conn()
     cur = conn.cursor()
 
     try:
-        # --- NUEVA SECCIÓN: RESUMEN ESTRATÉGICO (Pestaña RANGO) ---
-        st.markdown("### Rangos y Disponibilidad")
-        
-        query_resumen = """
-            SELECT 
-                r.area_nombre as "Área",
-                r.ip_inicial || ' a ' || r.ip_final as "Rango de IPs",
-                r.capacidad_total as "Total IPs",
-                COUNT(i.ip) FILTER (WHERE i.estatus ILIKE 'Ocupada%') as "Ocupadas",
-                COUNT(i.ip) FILTER (WHERE i.estatus ILIKE 'Libre%') as "Libres",
-                COUNT(i.ip) FILTER (WHERE i.estatus ILIKE 'En Conflicto%') as "En Conflicto"
-            FROM cat_rangos_ips r
-            LEFT JOIN inventario_ips_completo i 
-                ON UPPER(TRIM(r.area_nombre)) = UPPER(TRIM(i.departamento_pestana))
-            GROUP BY r.area_nombre, r.ip_inicial, r.ip_final, r.capacidad_total
-            ORDER BY r.area_nombre;
-        """
-        
-        cur.execute(query_resumen)
-        resumen_data = cur.fetchall()
-        
-        if resumen_data:
-            df_r = pd.DataFrame(resumen_data, columns=["Área", "Rango de IPs", "Total IPs", "Ocupadas", "Libres", "En Conflicto"])
-            
-            # --- CÁLCULO DE % Y SEMÁFORO ---
-            df_r['%_num'] = (df_r['Ocupadas'] / df_r['Total IPs'] * 100).round(1)
-            df_r['% Usado'] = df_r['%_num'].astype(str) + '%'
-            
-            def color_semaforo(val):
-                try:
-                    num = float(val.replace('%', ''))
-                    if num >= 90: color = '#ff4b4b' # Rojo
-                    elif num >= 70: color = '#ffa500' # Naranja
-                    else: color = '#09ab3b' # Verde
-                    return f'background-color: {color}; color: white; font-weight: bold'
-                except:
-                    return ''
+        if accion == "Ver IPs y Rangos":
+            st.markdown("### Rangos y Disponibilidad")
 
-            df_styled = df_r.drop(columns=['%_num']).style.applymap(color_semaforo, subset=['% Usado'])
-            st.table(df_styled)
-        else:
-            st.info("💡 No hay datos en el catálogo de rangos. Verifica 'cat_rangos_ips'.")
+            cur.execute("""
+                SELECT
+                    r.area_nombre,
+                    r.ip_inicial || ' a ' || r.ip_final,
+                    r.capacidad_total,
+                    COUNT(i.ip) FILTER (WHERE i.estatus ILIKE 'Ocupada%'),
+                    COUNT(i.ip) FILTER (WHERE i.estatus ILIKE 'Libre%'),
+                    COUNT(i.ip) FILTER (WHERE i.estatus ILIKE 'En Conflicto%')
+                FROM cat_rangos_ips r
+                LEFT JOIN inventario_ips_completo i
+                    ON UPPER(TRIM(r.area_nombre)) = UPPER(TRIM(i.departamento_pestana))
+                GROUP BY r.area_nombre, r.ip_inicial, r.ip_final, r.capacidad_total
+                ORDER BY r.area_nombre
+            """)
+            resumen_data = cur.fetchall()
 
-        st.divider()
+            if resumen_data:
+                df_r = pd.DataFrame(resumen_data, columns=["Área", "Rango de IPs", "Total IPs", "Ocupadas", "Libres", "En Conflicto"])
+                df_r['%_num'] = (df_r['Ocupadas'] / df_r['Total IPs'] * 100).round(1)
+                df_r['% Usado'] = df_r['%_num'].astype(str) + '%'
 
-        # --- SECCIÓN DE BÚSQUEDA DETALLADA ---
-        st.markdown("### 🔍 Buscador de IPs")
-        
-        # 1. Obtener las áreas para el filtro
-        cur.execute("SELECT DISTINCT departamento_pestana FROM inventario_ips_completo WHERE departamento_pestana IS NOT NULL ORDER BY departamento_pestana")
-        areas_db = [a[0] for a in cur.fetchall()]
-        areas_filtro = ["Todas"] + areas_db
-        
-        col_f1, col_f2 = st.columns([1, 2])
-        area_sel = col_f1.selectbox("Filtrar por Área (Pestaña)", areas_filtro)
-        busqueda = col_f2.text_input("Buscar por IP, Usuario, MAC o Uso", placeholder="Ej: 172.17... o Personal...")
+                def color_semaforo(val):
+                    try:
+                        num = float(val.replace('%', ''))
+                        if num >= 90: color = '#ff4b4b'
+                        elif num >= 70: color = '#ffa500'
+                        else: color = '#09ab3b'
+                        return f'background-color: {color}; color: white; font-weight: bold'
+                    except:
+                        return ''
 
-        # 2. Consulta dinámica (Agregamos institucional_o_personal)
-        query_busqueda = """
-            SELECT ip, usuario, tipo_equipo, institucional_o_personal, mac, departamento_pestana, estatus, observaciones 
-            FROM inventario_ips_completo 
-            WHERE 1=1
-        """
-        params = []
+                df_styled = df_r.drop(columns=['%_num']).style.map(color_semaforo, subset=['% Usado'])
+                st.table(df_styled)
+            else:
+                st.info("💡 No hay datos en el catálogo de rangos. Verifica 'cat_rangos_ips'.")
 
-        if area_sel != "Todas":
-            query_busqueda += " AND departamento_pestana = %s"
-            params.append(area_sel)
-        
-        if busqueda:
-            query_busqueda += " AND (ip LIKE %s OR usuario LIKE %s OR mac LIKE %s OR tipo_equipo LIKE %s OR institucional_o_personal LIKE %s)"
-            term = f"%{busqueda}%"
-            params.extend([term, term, term, term, term])
+            st.divider()
+            st.markdown("### 🔍 Buscador de IPs")
 
-        query_busqueda += " ORDER BY departamento_pestana, ip"
-        
-        cur.execute(query_busqueda, params)
-        datos = cur.fetchall()
-        
-        # 3. DataFrame con la columna "Uso" después de "Equipo"
-        df_ip = pd.DataFrame(datos, columns=[
-            "Dirección IP", "Usuario", "Equipo", "Uso (Inst./Pers.)", "MAC Address", "Área Origen", "Estatus", "Notas"
-        ])
+            cur.execute("SELECT DISTINCT departamento_pestana FROM inventario_ips_completo WHERE departamento_pestana IS NOT NULL ORDER BY departamento_pestana")
+            areas_db = [a[0] for a in cur.fetchall()]
+            col_f1, col_f2, col_f3 = st.columns([1, 2, 1])
+            area_sel   = col_f1.selectbox("Filtrar por Área", ["Todas"] + areas_db)
+            busqueda   = col_f2.text_input("Buscar por IP, Usuario, MAC o Uso", placeholder="Ej: 172.17... o Personal...")
+            estatus_sel = col_f3.selectbox("Estatus", ["Todos", "Libre", "Ocupada", "En Conflicto"])
 
-        # Mostrar métricas y tabla
-        st.metric("Resultados encontrados", len(df_ip))
-        st.dataframe(df_ip, use_container_width=True, hide_index=True, height=400)
+            query_busqueda = "SELECT ip, usuario, tipo_equipo, institucional_o_personal, mac, departamento_pestana, estatus, observaciones FROM inventario_ips_completo WHERE 1=1"
+            params = []
+            if area_sel != "Todas":
+                query_busqueda += " AND departamento_pestana = %s"
+                params.append(area_sel)
+            if estatus_sel != "Todos":
+                query_busqueda += " AND estatus ILIKE %s"
+                params.append(f"{estatus_sel}%")
+            if busqueda:
+                query_busqueda += " AND (ip LIKE %s OR usuario LIKE %s OR mac LIKE %s OR tipo_equipo LIKE %s OR institucional_o_personal LIKE %s)"
+                term = f"%{busqueda}%"
+                params.extend([term, term, term, term, term])
+            query_busqueda += " ORDER BY departamento_pestana, ip"
 
-        # 4. Botón de descarga
-        if not df_ip.empty:
-            excel_data = BytesIO()
-            df_ip.to_excel(excel_data, index=False)
-            st.download_button(
-                label="📥 Exportar búsqueda a Excel",
-                data=excel_data.getvalue(),
-                file_name=f"reporte_ips_{datetime.now().strftime('%H%M')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            cur.execute(query_busqueda, params)
+            df_ip = pd.DataFrame(cur.fetchall(), columns=["Dirección IP", "Usuario", "Equipo", "Uso (Inst./Pers.)", "MAC Address", "Área Origen", "Estatus", "Notas"])
+
+            st.metric("Resultados encontrados", len(df_ip))
+            st.dataframe(df_ip, use_container_width=True, hide_index=True, height=400)
+
+            if not df_ip.empty:
+                excel_data = BytesIO()
+                df_ip.to_excel(excel_data, index=False)
+                st.download_button(
+                    label="📥 Exportar a Excel",
+                    data=excel_data.getvalue(),
+                    file_name=f"reporte_ips_{datetime.now().strftime('%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
+        elif accion == "Asignar IP":
+            st.markdown("### 📌 Asignar IP a Usuario / Equipo")
+
+            cur.execute("SELECT DISTINCT departamento_pestana FROM inventario_ips_completo WHERE estatus ILIKE 'Libre%' AND departamento_pestana IS NOT NULL ORDER BY departamento_pestana")
+            areas_libres = ["Todas"] + [r[0] for r in cur.fetchall()]
+            cur.execute("SELECT ip, usuario, departamento_pestana FROM inventario_ips_completo WHERE estatus ILIKE 'Libre%' ORDER BY departamento_pestana, ip")
+            ips_libres = cur.fetchall()
+
+            if not ips_libres:
+                st.warning("No hay IPs libres disponibles.")
+            else:
+                col_f1, col_f2 = st.columns([1, 2])
+                area_f = col_f1.selectbox("Filtrar por área", areas_libres, key="asignar_area")
+                texto_f = col_f2.text_input("Buscar IP", placeholder="Ej: 172.17.1...", key="asignar_texto")
+
+                ips_filtradas = [
+                    i for i in ips_libres
+                    if (area_f == "Todas" or i[2] == area_f)
+                    and (not texto_f or texto_f.lower() in i[0].lower())
+                ]
+
+                if not ips_filtradas:
+                    st.info("Sin resultados con ese filtro.")
+                else:
+                    st.caption(f"{len(ips_filtradas)} IPs libres encontradas")
+
+                    cur.execute("SELECT nombre || ' ' || apellido_paterno FROM usuarios ORDER BY apellido_paterno")
+                    nombres_usuarios = ["-- Escribir manualmente --"] + [r[0] for r in cur.fetchall()]
+                    usr_rapido = st.selectbox("Seleccionar usuario registrado (opcional)", nombres_usuarios)
+
+                    opciones_ip = {f"{i[0]}  —  {i[2]}": i[0] for i in ips_filtradas}
+
+                    with st.form("asignar_ip"):
+                        ip_sel = st.selectbox("IP a asignar", list(opciones_ip.keys()))
+                        nombre_manual = st.text_input(
+                            "Propietario / Usuario",
+                            value="" if usr_rapido == "-- Escribir manualmente --" else usr_rapido,
+                            help="Puedes editar este campo libremente"
+                        )
+                        col1, col2, col3 = st.columns(3)
+                        tipos = ["PC", "Laptop", "Impresora", "Servidor", "Switch", "Camara", "Otro"]
+                        tipo_equipo = col1.selectbox("Tipo de equipo", tipos)
+                        inst_pers   = col2.selectbox("Uso", ["Institucional", "Personal"])
+                        mac         = col3.text_input("MAC Address")
+                        col4, col5, col6 = st.columns(3)
+                        marca  = col4.text_input("Marca")
+                        modelo = col5.text_input("Modelo")
+                        serie  = col6.text_input("Serie")
+                        observaciones = st.text_area("Observaciones", height=80)
+
+                        if st.form_submit_button("✅ Asignar IP"):
+                            if not nombre_manual.strip():
+                                st.warning("Escribe el nombre del propietario.")
+                            else:
+                                ip_real = opciones_ip[ip_sel]
+                                cur.execute("""
+                                    UPDATE inventario_ips_completo
+                                    SET usuario=%s, tipo_equipo=%s, institucional_o_personal=%s,
+                                        marca=%s, modelo=%s, serie=%s, mac=%s,
+                                        estatus='Ocupada', observaciones=%s
+                                    WHERE ip=%s
+                                """, (nombre_manual.strip(), tipo_equipo, inst_pers, marca, modelo, serie, mac, observaciones, ip_real))
+                                conn.commit()
+                                st.success(f"✅ IP **{ip_real}** asignada a **{nombre_manual.strip()}**.")
+                                st.rerun()
+
+        elif accion == "Editar asignación":
+            st.markdown("### ✏️ Editar Asignación de IP")
+
+            cur.execute("SELECT DISTINCT departamento_pestana FROM inventario_ips_completo WHERE estatus ILIKE 'Ocupada%' AND departamento_pestana IS NOT NULL ORDER BY departamento_pestana")
+            areas_ocup = ["Todas"] + [r[0] for r in cur.fetchall()]
+            cur.execute("""
+                SELECT ip, usuario, tipo_equipo, institucional_o_personal,
+                       marca, modelo, serie, mac, observaciones, departamento_pestana
+                FROM inventario_ips_completo WHERE estatus ILIKE 'Ocupada%'
+                ORDER BY departamento_pestana, ip
+            """)
+            ips_ocupadas = cur.fetchall()
+
+            if not ips_ocupadas:
+                st.info("No hay IPs ocupadas registradas.")
+            else:
+                col_f1, col_f2 = st.columns([1, 2])
+                area_f  = col_f1.selectbox("Filtrar por área", areas_ocup, key="editar_area")
+                texto_f = col_f2.text_input("Buscar por IP o usuario", placeholder="Ej: 172.17... o Juan...", key="editar_texto")
+
+                ips_filtradas = [
+                    i for i in ips_ocupadas
+                    if (area_f == "Todas" or i[9] == area_f)
+                    and (not texto_f or texto_f.lower() in i[0].lower() or texto_f.lower() in (i[1] or "").lower())
+                ]
+
+                if not ips_filtradas:
+                    st.info("Sin resultados con ese filtro.")
+                else:
+                    st.caption(f"{len(ips_filtradas)} IPs encontradas")
+                    opciones_ip = {f"{i[0]}  —  {i[1] or '(sin usuario)'}  |  {i[9]}": i for i in ips_filtradas}
+                    ip_sel_key = st.selectbox("Selecciona la IP a editar", list(opciones_ip.keys()))
+                    d = opciones_ip[ip_sel_key]
+
+                    with st.form("editar_ip"):
+                        nuevo_usuario = st.text_input("Propietario / Usuario", value=d[1] or "")
+                        col1, col2, col3 = st.columns(3)
+                        tipos = ["PC", "Laptop", "Impresora", "Servidor", "Switch", "Camara", "Otro"]
+                        idx_tipo = tipos.index(d[2]) if d[2] in tipos else len(tipos) - 1
+                        tipo_equipo = col1.selectbox("Tipo de equipo", tipos, index=idx_tipo)
+                        usos = ["Institucional", "Personal"]
+                        idx_uso = usos.index(d[3]) if d[3] in usos else 0
+                        inst_pers = col2.selectbox("Uso", usos, index=idx_uso)
+                        mac = col3.text_input("MAC Address", value=d[7] or "")
+                        col4, col5, col6 = st.columns(3)
+                        marca  = col4.text_input("Marca",  value=d[4] or "")
+                        modelo = col5.text_input("Modelo", value=d[5] or "")
+                        serie  = col6.text_input("Serie",  value=d[6] or "")
+                        observaciones = st.text_area("Observaciones", value=d[8] or "", height=80)
+
+                        if st.form_submit_button("💾 Guardar cambios"):
+                            cur.execute("""
+                                UPDATE inventario_ips_completo
+                                SET usuario=%s, tipo_equipo=%s, institucional_o_personal=%s,
+                                    marca=%s, modelo=%s, serie=%s, mac=%s, observaciones=%s
+                                WHERE ip=%s
+                            """, (nuevo_usuario, tipo_equipo, inst_pers, marca, modelo, serie, mac, observaciones, d[0]))
+                            conn.commit()
+                            st.success(f"✅ IP **{d[0]}** actualizada correctamente.")
+                            st.rerun()
+
+        elif accion == "Liberar IP":
+            st.markdown("### 🔓 Liberar IP")
+
+            cur.execute("SELECT DISTINCT departamento_pestana FROM inventario_ips_completo WHERE estatus ILIKE 'Ocupada%' AND departamento_pestana IS NOT NULL ORDER BY departamento_pestana")
+            areas_ocup = ["Todas"] + [r[0] for r in cur.fetchall()]
+            cur.execute("""
+                SELECT ip, usuario, tipo_equipo, departamento_pestana
+                FROM inventario_ips_completo WHERE estatus ILIKE 'Ocupada%'
+                ORDER BY departamento_pestana, ip
+            """)
+            ips_ocupadas = cur.fetchall()
+
+            if not ips_ocupadas:
+                st.info("No hay IPs ocupadas registradas.")
+            else:
+                col_f1, col_f2 = st.columns([1, 2])
+                area_f  = col_f1.selectbox("Filtrar por área", areas_ocup, key="liberar_area")
+                texto_f = col_f2.text_input("Buscar por IP o usuario", placeholder="Ej: 172.17... o Juan...", key="liberar_texto")
+
+                ips_filtradas = [
+                    i for i in ips_ocupadas
+                    if (area_f == "Todas" or i[3] == area_f)
+                    and (not texto_f or texto_f.lower() in i[0].lower() or texto_f.lower() in (i[1] or "").lower())
+                ]
+
+                if not ips_filtradas:
+                    st.info("Sin resultados con ese filtro.")
+                else:
+                    st.caption(f"{len(ips_filtradas)} IPs encontradas")
+                    opciones_ip = {f"{i[0]}  —  {i[1] or '(sin usuario)'}  |  {i[2] or ''}  |  {i[3]}": i[0] for i in ips_filtradas}
+                    ip_sel_key = st.selectbox("Selecciona la IP a liberar", list(opciones_ip.keys()))
+                    ip_real = opciones_ip[ip_sel_key]
+                    st.warning(f"⚠️ Se borrará toda la asignación de **{ip_real}** y quedará como Libre.")
+                    if st.button("🔓 Liberar IP"):
+                        cur.execute("""
+                            UPDATE inventario_ips_completo
+                            SET usuario=NULL, tipo_equipo=NULL, institucional_o_personal=NULL,
+                                marca=NULL, modelo=NULL, serie=NULL, mac=NULL,
+                                estatus='Libre', observaciones=NULL
+                            WHERE ip=%s
+                        """, (ip_real,))
+                        conn.commit()
+                        st.success(f"✅ IP **{ip_real}** liberada correctamente.")
+                        st.rerun()
 
     except Exception as e:
         st.error(f"Error en el sistema: {e}")
