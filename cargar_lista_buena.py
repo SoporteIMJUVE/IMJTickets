@@ -5,18 +5,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-CSV = 'Lista_buena.csv'
+XLSX = 'Lista_IPS.xlsx'
+PESTANAS_OMITIR = {'RANGO', 'DATOS', 'Configuraciones '}
 
 COLUMNAS = {
     'IP':                              'ip',
     'Usuario o nombre del propietario':'usuario',
-    'Tipo de equipo':                  'tipo_equipo',
-    'Institucional o Personal':        'institucional_o_personal',
+    'Tipo de \nequipo':                'tipo_equipo',
+    'Institucional o \nPersonal':      'institucional_o_personal',
     'Marca':                           'marca',
     'modelo':                          'modelo',
-    'Número de Serie':                 'serie',
+    'Número de \nSerie':               'serie',
     'MAC':                             'mac',
-    'Tipo de Conexión':                'tipo_conexion',
+    'Tipo de \nConexión':              'tipo_conexion',
     'Confguración de red':             'config_red',
     'Área':                            'area_excel',
     'Restricciones':                   'restricciones',
@@ -36,24 +37,68 @@ COLUMNAS = {
     'OBSERVACIONES':                   'observaciones',
 }
 
+COLS_BD = [
+    'ip', 'usuario', 'tipo_equipo', 'institucional_o_personal', 'marca', 'modelo',
+    'serie', 'mac', 'tipo_conexion', 'config_red', 'area_excel', 'departamento_pestana',
+    'restricciones', 'youtube', 'vimeo', 'spotify', 'otros_streaming', 'facebook',
+    'tiktok', 'instagram', 'whatsapp_web', 'otra_red_social', 'sitios_gub', 'noticias',
+    'otro_permiso', 'estatus', 'observaciones',
+]
+
 def cargar():
-    # Leer departamento desde la primera fila del CSV
-    with open(CSV, encoding='utf-8-sig') as f:
-        depto = f.readline().split(';')[0].strip().upper()
-    print(f"Departamento detectado: {depto.encode('ascii', 'replace').decode()}")
+    print(f"Leyendo: {XLSX}")
+    xl = pd.ExcelFile(XLSX)
+    pestanas = [s for s in xl.sheet_names if s not in PESTANAS_OMITIR]
+    print(f"Departamentos encontrados: {pestanas}\n")
 
-    # Leer CSV (solo las primeras 27 columnas, ignorar las vacías de la derecha)
-    df = pd.read_csv(CSV, sep=';', skiprows=1, header=0, encoding='utf-8-sig', low_memory=False)
-    df = df.iloc[:, :27]
-    df.columns = [str(c).strip().replace('\n', '') for c in df.columns]
-    df = df.rename(columns=COLUMNAS)
-    df = df.dropna(subset=['ip'])
-    df['ip'] = df['ip'].astype(str).str.strip()
-    df['departamento_pestana'] = depto
-    if 'estatus' in df.columns:
-        df['estatus'] = df['estatus'].astype(str).str.strip()
+    todos = []
+    for depto in pestanas:
+        # Nombre del departamento = primera celda de la hoja (fila del titulo)
+        df_raw = pd.read_excel(XLSX, sheet_name=depto, header=None, nrows=1)
+        nombre_depto = str(df_raw.iloc[0, 0]).strip().upper()
 
-    print(f"Filas a cargar: {len(df)}  |  Ocupadas: {(df['estatus'] == 'Ocupada').sum()}  |  Libres: {(df['estatus'] == 'Libre').sum()}")
+        # Datos reales (row 0 = encabezados de columna, row 1+ = registros)
+        df = pd.read_excel(XLSX, sheet_name=depto, skiprows=1)
+        df = df.rename(columns=COLUMNAS)
+
+        if 'ip' not in df.columns:
+            print(f"  [{depto}] Sin columna IP, omitiendo.")
+            continue
+
+        df['ip'] = df['ip'].astype(str).str.strip()
+        df = df[df['ip'].str.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')]
+        df = df.dropna(subset=['ip'])
+        df['departamento_pestana'] = nombre_depto
+
+        if 'estatus' in df.columns:
+            df['estatus'] = df['estatus'].astype(str).str.strip()
+        if 'institucional_o_personal' in df.columns:
+            df['institucional_o_personal'] = df['institucional_o_personal'].astype(str).str.strip()
+
+        cols_presentes = [c for c in COLS_BD if c in df.columns]
+        todos.append(df[cols_presentes])
+
+        ocup  = (df.get('estatus', pd.Series()) == 'Ocupada').sum()
+        libre = (df.get('estatus', pd.Series()) == 'Libre').sum()
+        print(f"  {nombre_depto}: {len(df)} IPs  (Ocupadas: {ocup}, Libres: {libre})")
+
+    if not todos:
+        print("Sin datos para cargar.")
+        return
+
+    df_final = pd.concat(todos, ignore_index=True)
+
+    # Detectar y eliminar IPs duplicadas entre pestañas (conservar la primera aparición)
+    dups = df_final[df_final.duplicated('ip', keep=False)][['ip','departamento_pestana']]
+    if not dups.empty:
+        print(f"\nADVERTENCIA: IPs duplicadas entre pestañas (se conserva la primera):")
+        print(dups.to_string(index=False))
+    df_final = df_final.drop_duplicates(subset='ip', keep='first').reset_index(drop=True)
+
+    total_ocup  = (df_final['estatus'] == 'Ocupada').sum()
+    total_libre = (df_final['estatus'] == 'Libre').sum()
+    print(f"\nTOTAL: {len(df_final)} IPs en {len(pestanas)} departamentos")
+    print(f"  Ocupadas: {total_ocup}  |  Libres: {total_libre}")
 
     conn = psycopg2.connect(
         host=os.getenv('DB_HOST'),
@@ -64,26 +109,23 @@ def cargar():
     )
     cur = conn.cursor()
 
-    # Eliminar filas existentes para estas IPs (evita duplicados)
-    ips = df['ip'].tolist()
-    cur.execute(f"DELETE FROM inventario_ips_completo WHERE ip IN ({','.join(['%s']*len(ips))})", ips)
-    print(f"Filas anteriores eliminadas: {cur.rowcount}")
+    ips = df_final['ip'].tolist()
+    cur.execute(
+        f"DELETE FROM inventario_ips_completo WHERE ip IN ({','.join(['%s']*len(ips))})",
+        ips
+    )
+    print(f"\nRegistros anteriores eliminados: {cur.rowcount}")
 
-    # Insertar todas las filas del CSV
-    cols_bd = ['ip', 'usuario', 'tipo_equipo', 'institucional_o_personal', 'marca', 'modelo',
-               'serie', 'mac', 'tipo_conexion', 'config_red', 'area_excel', 'departamento_pestana',
-               'restricciones', 'youtube', 'vimeo', 'spotify', 'otros_streaming', 'facebook',
-               'tiktok', 'instagram', 'whatsapp_web', 'otra_red_social', 'sitios_gub', 'noticias',
-               'otro_permiso', 'estatus', 'observaciones']
-
-    cols_presentes = [c for c in cols_bd if c in df.columns]
-    df_final = df[cols_presentes].where(pd.notnull(df[cols_presentes]), None)
-
-    sql = f"INSERT INTO inventario_ips_completo ({', '.join(cols_presentes)}) VALUES ({', '.join(['%s']*len(cols_presentes))})"
-    cur.executemany(sql, [tuple(r) for r in df_final.itertuples(index=False)])
+    cols_insert = [c for c in COLS_BD if c in df_final.columns]
+    df_insert = df_final[cols_insert].where(pd.notnull(df_final[cols_insert]), None)
+    sql = (
+        f"INSERT INTO inventario_ips_completo ({', '.join(cols_insert)}) "
+        f"VALUES ({', '.join(['%s']*len(cols_insert))})"
+    )
+    cur.executemany(sql, [tuple(r) for r in df_insert.itertuples(index=False)])
 
     conn.commit()
-    print(f"OK: {len(df_final)} filas insertadas correctamente en 'inventario_ips_completo'.")
+    print(f"OK: {len(df_final)} filas insertadas en 'inventario_ips_completo'.")
     cur.close()
     conn.close()
 

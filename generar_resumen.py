@@ -167,6 +167,60 @@ CAMBIOS = [
              "consultar los registros dados de baja sin mezclarlos con los activos."),
         ]
     },
+    {
+        "seccion": "12. Optimizaciones de rendimiento y UX",
+        "items": [
+            ("Conexion a BD con cache (@st.cache_resource)",
+             "La funcion get_conn() ahora usa @st.cache_resource de Streamlit. La conexion "
+             "a PostgreSQL se crea una sola vez y se reutiliza en toda la sesion, eliminando "
+             "la latencia de abrir y cerrar conexion en cada render."),
+            ("Manejo de errores consistente",
+             "Cada modulo y cada pestana esta envuelto en try/except con safe_rollback(). "
+             "Si ocurre un error en una operacion, se hace rollback automatico y se muestra "
+             "un mensaje claro al usuario sin romper el resto de la aplicacion."),
+            ("Busqueda global en pagina de Inicio",
+             "Se agrego un campo de busqueda en la pagina de Inicio que consulta "
+             "simultaneamente usuarios, IPs, equipos, telefonos, impresoras e insumos. "
+             "Muestra los resultados con tipo y modulo de origen para navegacion rapida."),
+            ("Validaciones de datos en formularios",
+             "Se agregaron tres funciones de validacion: validar_mac() para formato "
+             "XX:XX:XX:XX:XX:XX, validar_email() para formato correo@dominio.ext, y "
+             "validar_ip_format() para formato X.X.X.X. Se aplican en Alta de usuario, "
+             "Agregar/Editar equipo, Agregar/Editar impresora y Asignar/Editar IP."),
+            ("Tabs en lugar de radio buttons",
+             "Todos los modulos (Usuarios, Equipos, Telefonos, Impresoras, Insumos, "
+             "Direccionamiento IP) reemplazaron st.radio() con st.tabs(). Las acciones "
+             "ahora son pestanas horizontales, mejorando la navegacion y eliminando "
+             "el desplazamiento para encontrar la accion deseada."),
+            ("Confirmacion de acciones destructivas",
+             "Las acciones 'Baja de usuario' y 'Liberar IP' ahora requieren que el usuario "
+             "escriba la palabra CONFIRMAR en un campo de texto antes de que el boton se "
+             "habilite. Esto previene borrados accidentales de datos importantes."),
+        ]
+    },
+    {
+        "seccion": "13. Nuevo fuente de datos para IPs — Lista_IPS.xlsx",
+        "items": [
+            ("Cambio de CSV a Excel como fuente de verdad",
+             "El script cargar_lista_buena.py fue actualizado para usar Lista_IPS.xlsx "
+             "en lugar de Lista_buena.csv. El archivo Excel contiene todos los departamentos "
+             "del IMJUVE en pestanas separadas (DG, DBEJ, DIEJ, DCSR, DAJ, DEC, DF, "
+             "DRHM, DCS, OIC, SS)."),
+            ("Carga completa de todos los departamentos",
+             "El script ahora procesa las 11 pestanas de departamentos en una sola ejecucion, "
+             "cargando 499 IPs distribuidas en todos los departamentos. Ignora automaticamente "
+             "las pestanas RANGO, DATOS y Configuraciones."),
+            ("Deteccion automatica de duplicados entre pestanas",
+             "El script detecta IPs que aparecen en mas de una pestana del Excel, informa "
+             "cuales son y conserva solo la primera aparicion para respetar la restriccion "
+             "UNIQUE de la base de datos. Se detecto y manejo la IP 172.17.1.78 duplicada "
+             "dentro de la pestana DRHM."),
+            ("Uso actualizado",
+             "Cada vez que se actualice Lista_IPS.xlsx (cualquier departamento), ejecutar: "
+             "python cargar_lista_buena.py desde la carpeta Base-de-Datos. "
+             "El script elimina los registros anteriores de esas IPs y los reinserta actualizados."),
+        ]
+    },
 ]
 
 def build_pdf():
