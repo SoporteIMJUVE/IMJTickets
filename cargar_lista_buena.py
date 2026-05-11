@@ -45,6 +45,24 @@ COLS_BD = [
     'otro_permiso', 'estatus', 'observaciones',
 ]
 
+VACIOS = {'nan', 'none', 'null', 'n/a', '-', '/', ''}
+
+def limpiar_valor(v):
+    """Convierte NaN, None y strings vacíos/basura a None real para PostgreSQL."""
+    if v is None:
+        return None
+    if isinstance(v, float) and pd.isna(v):
+        return None
+    s = str(v).strip()
+    return None if s.lower() in VACIOS else s
+
+def limpiar_df(df):
+    """Aplica limpiar_valor a todas las columnas excepto 'ip'."""
+    for col in df.columns:
+        if col != 'ip':
+            df[col] = df[col].apply(limpiar_valor)
+    return df
+
 def cargar():
     print(f"Leyendo: {XLSX}")
     xl = pd.ExcelFile(XLSX)
@@ -70,16 +88,11 @@ def cargar():
         df = df.dropna(subset=['ip'])
         df['departamento_pestana'] = nombre_depto
 
-        if 'estatus' in df.columns:
-            df['estatus'] = df['estatus'].astype(str).str.strip()
-        if 'institucional_o_personal' in df.columns:
-            df['institucional_o_personal'] = df['institucional_o_personal'].astype(str).str.strip()
-
         cols_presentes = [c for c in COLS_BD if c in df.columns]
         todos.append(df[cols_presentes])
 
-        ocup  = (df.get('estatus', pd.Series()) == 'Ocupada').sum()
-        libre = (df.get('estatus', pd.Series()) == 'Libre').sum()
+        ocup  = (df.get('estatus', pd.Series()).astype(str).str.strip() == 'Ocupada').sum()
+        libre = (df.get('estatus', pd.Series()).astype(str).str.strip() == 'Libre').sum()
         print(f"  {nombre_depto}: {len(df)} IPs  (Ocupadas: {ocup}, Libres: {libre})")
 
     if not todos:
@@ -88,12 +101,25 @@ def cargar():
 
     df_final = pd.concat(todos, ignore_index=True)
 
-    # Detectar y eliminar IPs duplicadas entre pestañas (conservar la primera aparición)
+    # Limpiar todos los valores: NaN, "nan", "None", "/" -> NULL real
+    df_final = limpiar_df(df_final)
+
+    # Detectar y eliminar IPs duplicadas entre pestañas (conservar la primera)
     dups = df_final[df_final.duplicated('ip', keep=False)][['ip','departamento_pestana']]
     if not dups.empty:
-        print(f"\nADVERTENCIA: IPs duplicadas entre pestañas (se conserva la primera):")
+        print(f"\nADVERTENCIA: IPs duplicadas (se conserva la primera):")
         print(dups.to_string(index=False))
     df_final = df_final.drop_duplicates(subset='ip', keep='first').reset_index(drop=True)
+
+    # Auto-corregir: usuario asignado pero Estatus Libre -> Ocupada
+    if 'usuario' in df_final.columns and 'estatus' in df_final.columns:
+        mask_fix = (
+            df_final['usuario'].notna() &
+            (df_final['estatus'].astype(str).str.strip().str.lower() == 'libre')
+        )
+        if mask_fix.any():
+            df_final.loc[mask_fix, 'estatus'] = 'Ocupada'
+            print(f"\nAuto-corregidas {mask_fix.sum()} IPs con usuario asignado pero Estatus Libre -> Ocupada")
 
     total_ocup  = (df_final['estatus'] == 'Ocupada').sum()
     total_libre = (df_final['estatus'] == 'Libre').sum()
@@ -117,12 +143,11 @@ def cargar():
     print(f"\nRegistros anteriores eliminados: {cur.rowcount}")
 
     cols_insert = [c for c in COLS_BD if c in df_final.columns]
-    df_insert = df_final[cols_insert].where(pd.notnull(df_final[cols_insert]), None)
     sql = (
         f"INSERT INTO inventario_ips_completo ({', '.join(cols_insert)}) "
         f"VALUES ({', '.join(['%s']*len(cols_insert))})"
     )
-    cur.executemany(sql, [tuple(r) for r in df_insert.itertuples(index=False)])
+    cur.executemany(sql, [tuple(row[c] for c in cols_insert) for _, row in df_final.iterrows()])
 
     conn.commit()
     print(f"OK: {len(df_final)} filas insertadas en 'inventario_ips_completo'.")

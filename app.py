@@ -42,6 +42,62 @@ def safe_rollback():
     except Exception:
         pass
 
+def generar_excel_formateado(df, nombre_hoja="Datos"):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = nombre_hoja
+
+    AZUL    = "1A3C5E"
+    CELESTE = "EAF1FB"
+    BORDE   = "BFBFBF"
+
+    borde = Border(
+        left=Side(style="thin", color=BORDE),
+        right=Side(style="thin", color=BORDE),
+        top=Side(style="thin", color=BORDE),
+        bottom=Side(style="thin", color=BORDE),
+    )
+
+    headers = list(df.columns)
+    for ci, h in enumerate(headers, 1):
+        c = ws.cell(row=1, column=ci, value=h)
+        c.font      = Font(bold=True, color="FFFFFF", size=10)
+        c.fill      = PatternFill("solid", fgColor=AZUL)
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c.border    = borde
+    ws.row_dimensions[1].height = 26
+
+    fill_alt = PatternFill("solid", fgColor=CELESTE)
+    for ri, (_, row) in enumerate(df.iterrows(), 2):
+        for ci, h in enumerate(headers, 1):
+            val = row[h]
+            if val is None or (isinstance(val, float) and pd.isna(val)):
+                val = ""
+            c = ws.cell(row=ri, column=ci, value=val)
+            c.font      = Font(size=9)
+            c.alignment = Alignment(vertical="center")
+            c.border    = borde
+            if ri % 2 == 0:
+                c.fill = fill_alt
+
+    for ci, h in enumerate(headers, 1):
+        vals = [str(h)] + [
+            str(row[h]) if row[h] is not None and not (isinstance(row[h], float) and pd.isna(row[h])) else ""
+            for _, row in df.iterrows()
+        ]
+        ws.column_dimensions[get_column_letter(ci)].width = min(max(len(v) for v in vals) + 4, 45)
+
+    ws.freeze_panes = "A2"
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
 # ════════════════════════════════════════
 # FUNCIONES PDF
 # ════════════════════════════════════════
@@ -343,8 +399,11 @@ elif menu == "👤 Usuarios":
                 guardar = st.button("💾 Guardar cambios", type="primary", use_container_width=True, key="usr_guardar")
             with col_exp1:
                 if not df_edited.empty:
-                    excel_buf = BytesIO()
-                    df_edited.drop(columns=["id_usuario"], errors="ignore").to_excel(excel_buf, index=False)
+                    _df_exp = df_edited.drop(columns=["id_usuario"], errors="ignore").rename(columns={
+                        "nombre": "Nombre(s)", "ap_paterno": "Ap. Paterno", "ap_materno": "Ap. Materno",
+                        "puesto": "Puesto", "correo": "Correo", "departamento": "Departamento",
+                    })
+                    excel_buf = generar_excel_formateado(_df_exp, "Usuarios")
                     st.download_button("📊 Excel", data=excel_buf.getvalue(),
                                        file_name=f"usuarios_IMJ_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -572,14 +631,11 @@ elif menu == "💻 Equipos de Computo":
                     st.caption(f"Error PDF: {e}")
             with tb2:
                 try:
-                    excel_buffer = BytesIO()
                     if df_detalles is not None and not df_detalles.empty:
-                        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-                            df_detalles.to_excel(writer, index=False, sheet_name="Equipos")
+                        excel_buffer = generar_excel_formateado(df_detalles, "Equipos")
                         nombre_archivo = f"equipos_{usuario_sel.replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
                     else:
-                        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
-                            df.to_excel(writer, index=False, sheet_name="Equipos")
+                        excel_buffer = generar_excel_formateado(df, "Resumen")
                         nombre_archivo = f"equipos_resumen_{datetime.now().strftime('%Y%m%d')}.xlsx"
                     st.download_button("📊 Excel", data=excel_buffer.getvalue(), file_name=nombre_archivo,
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -660,8 +716,11 @@ elif menu == "💻 Equipos de Computo":
                 guardar_eq = st.button("💾 Guardar cambios", type="primary", use_container_width=True, key="eq_guardar")
             with col_exp:
                 if not df_edited.empty:
-                    excel_buf = BytesIO()
-                    df_edited.drop(columns=["id_computo"], errors="ignore").to_excel(excel_buf, index=False)
+                    _df_exp = df_edited.drop(columns=["id_computo"], errors="ignore").rename(columns={
+                        "usuario": "Usuario", "nombre_equipo": "Equipo", "marca": "Marca",
+                        "modelo": "Modelo", "serie": "Serie", "mac": "MAC Address", "estatus": "Estatus",
+                    })
+                    excel_buf = generar_excel_formateado(_df_exp, "Equipos")
                     st.download_button("📥 Exportar Excel", data=excel_buf.getvalue(),
                                        file_name=f"equipos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -806,8 +865,10 @@ elif menu == "📱 Telefonos":
                 guardar_tel = st.button("💾 Guardar cambios", type="primary", use_container_width=True, key="tel_guardar")
             with col_exp:
                 if not df_edited.empty:
-                    excel_buf = BytesIO()
-                    df_edited.drop(columns=["id_telefono"], errors="ignore").to_excel(excel_buf, index=False)
+                    _df_exp = df_edited.drop(columns=["id_telefono"], errors="ignore").rename(columns={
+                        "numero_general": "Numero General", "extension": "Extension", "usuario": "Usuario",
+                    })
+                    excel_buf = generar_excel_formateado(_df_exp, "Telefonos")
                     st.download_button("📥 Exportar Excel", data=excel_buf.getvalue(),
                                        file_name=f"telefonos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -931,8 +992,11 @@ elif menu == "🖨️ Impresoras":
                 guardar_imp = st.button("💾 Guardar cambios", type="primary", use_container_width=True, key="imp_guardar")
             with col_exp:
                 if not df_edited.empty:
-                    excel_buf = BytesIO()
-                    df_edited.drop(columns=["id_impresora"], errors="ignore").to_excel(excel_buf, index=False)
+                    _df_exp = df_edited.drop(columns=["id_impresora"], errors="ignore").rename(columns={
+                        "marca": "Marca", "modelo": "Modelo", "serie": "Serie",
+                        "ip": "IP Address", "firmware": "Firmware", "usuario": "Usuario",
+                    })
+                    excel_buf = generar_excel_formateado(_df_exp, "Impresoras")
                     st.download_button("📥 Exportar Excel", data=excel_buf.getvalue(),
                                        file_name=f"impresoras_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1077,8 +1141,11 @@ elif menu == "📦 Insumos":
                 guardar_ins = st.button("💾 Guardar cambios", type="primary", use_container_width=True, key="ins_guardar")
             with col_exp:
                 if not df_edited.empty:
-                    excel_buf = BytesIO()
-                    df_edited.drop(columns=["id_insumo"], errors="ignore").to_excel(excel_buf, index=False)
+                    _df_exp = df_edited.drop(columns=["id_insumo"], errors="ignore").rename(columns={
+                        "nombre": "Insumo", "numero_parte": "No. Parte",
+                        "stock_min": "Stock Min", "stock_max": "Stock Max", "stock_actual": "Stock Actual",
+                    })
+                    excel_buf = generar_excel_formateado(_df_exp, "Insumos")
                     st.download_button("📥 Exportar Excel", data=excel_buf.getvalue(),
                                        file_name=f"insumos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1287,17 +1354,121 @@ elif menu == "🌐 Direccionamiento IP":
                 },
             )
 
-            col_btn, col_exp = st.columns([1, 4])
+            col_btn, col_exp, col_full = st.columns([1, 1, 2])
             with col_btn:
                 guardar = st.button("💾 Guardar cambios", type="primary", use_container_width=True)
             with col_exp:
                 if not df_edited.empty:
-                    excel_data = BytesIO()
-                    df_edited.to_excel(excel_data, index=False)
-                    st.download_button("📥 Exportar Excel", data=excel_data.getvalue(),
+                    _df_exp = df_edited.rename(columns={
+                        "ip": "IP", "usuario": "Usuario", "tipo_equipo": "Tipo Equipo",
+                        "institucional_o_personal": "Uso", "mac": "MAC", "marca": "Marca",
+                        "modelo": "Modelo", "serie": "Serie", "estatus": "Estatus",
+                        "departamento_pestana": "Area", "observaciones": "Observaciones",
+                    })
+                    excel_data = generar_excel_formateado(_df_exp, "IPs")
+                    st.download_button("📥 Exportar filtro", data=excel_data.getvalue(),
                                        file_name=f"ips_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                        use_container_width=True)
+            with col_full:
+                try:
+                    cur_all = get_conn().cursor()
+                    cur_all.execute("""
+                        SELECT ip, usuario, tipo_equipo, institucional_o_personal,
+                               mac, marca, modelo, serie, estatus,
+                               departamento_pestana, observaciones
+                        FROM inventario_ips_completo
+                        ORDER BY departamento_pestana,
+                                 CASE WHEN estatus = 'Ocupada'      THEN 1
+                                      WHEN estatus = 'Libre'        THEN 2
+                                      ELSE 3 END,
+                                 ip
+                    """)
+                    rows_all = cur_all.fetchall()
+                    cur_all.close()
+
+                    if rows_all:
+                        from openpyxl import Workbook
+                        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+                        from openpyxl.utils import get_column_letter
+
+                        COLS_DISPLAY = {
+                            "ip": "IP", "usuario": "Usuario", "tipo_equipo": "Tipo Equipo",
+                            "institucional_o_personal": "Uso", "mac": "MAC",
+                            "marca": "Marca", "modelo": "Modelo", "serie": "Serie",
+                            "estatus": "Estatus", "departamento_pestana": "Area",
+                            "observaciones": "Observaciones",
+                        }
+                        col_keys = list(COLS_DISPLAY.keys())
+                        col_headers = list(COLS_DISPLAY.values())
+
+                        df_all = pd.DataFrame(rows_all, columns=col_keys)
+                        areas = df_all["departamento_pestana"].dropna().unique().tolist()
+
+                        AZUL    = "1A3C5E"
+                        CELESTE = "EAF1FB"
+                        NARANJA = "FFF2CC"
+                        BORDE   = "BFBFBF"
+                        borde = Border(
+                            left=Side(style="thin", color=BORDE),
+                            right=Side(style="thin", color=BORDE),
+                            top=Side(style="thin", color=BORDE),
+                            bottom=Side(style="thin", color=BORDE),
+                        )
+                        fill_libre   = PatternFill("solid", fgColor=CELESTE)
+                        fill_ocup    = PatternFill("solid", fgColor="FFFFFF")
+                        fill_header  = PatternFill("solid", fgColor=AZUL)
+
+                        wb = Workbook()
+                        wb.remove(wb.active)
+
+                        for area in sorted(areas):
+                            df_area = df_all[df_all["departamento_pestana"] == area].copy()
+                            nombre_hoja = area[:31]
+                            ws = wb.create_sheet(title=nombre_hoja)
+
+                            for ci, h in enumerate(col_headers, 1):
+                                c = ws.cell(row=1, column=ci, value=h)
+                                c.font      = Font(bold=True, color="FFFFFF", size=10)
+                                c.fill      = fill_header
+                                c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                                c.border    = borde
+                            ws.row_dimensions[1].height = 26
+                            ws.freeze_panes = "A2"
+
+                            for ri, (_, row) in enumerate(df_area.iterrows(), 2):
+                                es_libre = str(row.get("estatus", "")).strip().lower() == "libre"
+                                for ci, key in enumerate(col_keys, 1):
+                                    val = row[key]
+                                    if val is None or (isinstance(val, float) and pd.isna(val)):
+                                        val = ""
+                                    c = ws.cell(row=ri, column=ci, value=val)
+                                    c.font      = Font(size=9)
+                                    c.alignment = Alignment(vertical="center")
+                                    c.border    = borde
+                                    c.fill      = fill_libre if es_libre else fill_ocup
+
+                            for ci, (key, header) in enumerate(COLS_DISPLAY.items(), 1):
+                                vals = [header] + [
+                                    str(r[key]) if r[key] is not None and not (isinstance(r[key], float) and pd.isna(r[key])) else ""
+                                    for _, r in df_area.iterrows()
+                                ]
+                                ws.column_dimensions[get_column_letter(ci)].width = min(max(len(v) for v in vals) + 4, 40)
+
+                        buf_all = BytesIO()
+                        wb.save(buf_all)
+                        buf_all.seek(0)
+
+                        st.download_button(
+                            "📊 Descargar TODAS las IPs (por area)",
+                            data=buf_all.getvalue(),
+                            file_name=f"IPs_completo_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True,
+                            type="secondary",
+                        )
+                except Exception as e:
+                    st.error(f"Error al generar Excel completo: {e}")
 
             if guardar:
                 def limpiar(v):
