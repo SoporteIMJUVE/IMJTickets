@@ -12,3 +12,7 @@ __pycache__/
 # Opcional - archivos Excel y CSV
 # *.xlsx
 # *.csv
+
+# Backups de Base de Datos
+*.dump
+*.sql
