@@ -375,7 +375,9 @@ elif menu == "👤 Usuarios":
                 ).any(axis=1)
                 df = df[mask].reset_index(drop=True)
 
-            st.caption(f"{len(df)} usuarios — edita en la tabla y presiona **Guardar cambios**. Cambia Departamento para traspasar.")
+            st.caption(f"{len(df)} usuarios — marca ✓ para incluir solo esos en el informe, o deja sin marcar para incluir todos los visibles.")
+
+            df.insert(0, "sel", False)
 
             df_edited = st.data_editor(
                 df,
@@ -384,6 +386,7 @@ elif menu == "👤 Usuarios":
                 num_rows="fixed",
                 key="usuarios_data_editor",
                 column_config={
+                    "sel":          st.column_config.CheckboxColumn("✓", default=False, width="small"),
                     "id_usuario":   None,
                     "nombre":       st.column_config.TextColumn("Nombre(s)"),
                     "ap_paterno":   st.column_config.TextColumn("Ap. Paterno"),
@@ -394,34 +397,153 @@ elif menu == "👤 Usuarios":
                 },
             )
 
-            col_btn, col_exp1, col_exp2 = st.columns([1, 1, 2])
+            n_sel = int(df_edited["sel"].sum()) if "sel" in df_edited.columns else 0
+            if n_sel:
+                st.info(f"✓ {n_sel} usuario(s) seleccionado(s) — el informe incluirá solo esos.")
+
+            # DataFrame para informes: seleccionados o todos los visibles
+            _df_inf_base = df_edited[df_edited["sel"] == True] if n_sel else df_edited
+
+            # Columnas limpias (sin sel ni id_usuario) con nombres en español
+            _RENAME_USR = {
+                "nombre": "Nombre(s)", "ap_paterno": "Ap. Paterno", "ap_materno": "Ap. Materno",
+                "puesto": "Puesto", "correo": "Correo", "departamento": "Departamento",
+            }
+
+            col_btn, col_inf, col_xls, col_pdf = st.columns([1, 1.4, 1, 1])
             with col_btn:
                 guardar = st.button("💾 Guardar cambios", type="primary", use_container_width=True, key="usr_guardar")
-            with col_exp1:
+
+            with col_inf:
+                if not _df_inf_base.empty:
+                    try:
+                        from openpyxl import Workbook
+                        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+                        from openpyxl.utils import get_column_letter as gcl
+
+                        id_usuarios = [int(r) for r in _df_inf_base["id_usuario"].tolist() if pd.notna(r)]
+                        cur_inf = get_conn().cursor()
+
+                        df_h1 = _df_inf_base.drop(columns=["sel","id_usuario"], errors="ignore").rename(columns=_RENAME_USR)
+
+                        cur_inf.execute("""
+                            SELECT u.nombre || ' ' || u.apellido_paterno AS "Usuario",
+                                   c.nombre_equipo AS "Equipo", c.marca AS "Marca",
+                                   c.modelo AS "Modelo", c.serie AS "Serie",
+                                   c.mac_address AS "MAC", c.estatus AS "Estatus"
+                            FROM computo c JOIN usuarios u ON c.id_usuario = u.id_usuario
+                            WHERE u.id_usuario = ANY(%s) ORDER BY u.apellido_paterno
+                        """, (id_usuarios,))
+                        df_h2 = pd.DataFrame(cur_inf.fetchall(),
+                                             columns=["Usuario","Equipo","Marca","Modelo","Serie","MAC","Estatus"])
+
+                        cur_inf.execute("""
+                            SELECT u.nombre || ' ' || u.apellido_paterno AS "Usuario",
+                                   t.numero_general AS "Numero General", t.extension AS "Extension"
+                            FROM telefonos t JOIN usuarios u ON t.id_usuario = u.id_usuario
+                            WHERE u.id_usuario = ANY(%s) ORDER BY u.apellido_paterno
+                        """, (id_usuarios,))
+                        df_h3 = pd.DataFrame(cur_inf.fetchall(), columns=["Usuario","Numero General","Extension"])
+
+                        cur_inf.execute("""
+                            SELECT u.nombre || ' ' || u.apellido_paterno AS "Usuario",
+                                   i.marca AS "Marca", i.modelo AS "Modelo", i.serie AS "Serie",
+                                   COALESCE(i.ip_address::text,'') AS "IP", i.firmware AS "Firmware"
+                            FROM impresoras i JOIN usuarios u ON i.id_usuario = u.id_usuario
+                            WHERE u.id_usuario = ANY(%s) ORDER BY u.apellido_paterno
+                        """, (id_usuarios,))
+                        df_h4 = pd.DataFrame(cur_inf.fetchall(),
+                                             columns=["Usuario","Marca","Modelo","Serie","IP","Firmware"])
+
+                        cur_inf.execute("""
+                            SELECT DISTINCT ON (i.ip)
+                                   u.nombre || ' ' || u.apellido_paterno AS "Usuario Registrado",
+                                   i.usuario AS "Nombre en IP",
+                                   i.ip AS "IP", i.tipo_equipo AS "Tipo Equipo",
+                                   i.mac AS "MAC", i.marca AS "Marca",
+                                   i.modelo AS "Modelo", i.serie AS "Serie",
+                                   i.estatus AS "Estatus", i.departamento_pestana AS "Area"
+                            FROM inventario_ips_completo i
+                            JOIN usuarios u ON (
+                                i.id_usuario = u.id_usuario
+                                OR (i.id_usuario IS NULL AND i.usuario ILIKE '%%' || u.apellido_paterno || '%%')
+                            )
+                            WHERE u.id_usuario = ANY(%s) AND i.estatus != 'Libre'
+                            ORDER BY i.ip
+                        """, (id_usuarios,))
+                        df_h5 = pd.DataFrame(cur_inf.fetchall(), columns=[
+                            "Usuario Registrado","Nombre en IP","IP","Tipo Equipo",
+                            "MAC","Marca","Modelo","Serie","Estatus","Area"
+                        ])
+                        cur_inf.close()
+
+                        AZUL="1A3C5E"; CELESTE="EAF1FB"; BORDE="BFBFBF"
+                        _b = Border(left=Side(style="thin",color=BORDE), right=Side(style="thin",color=BORDE),
+                                    top=Side(style="thin",color=BORDE),  bottom=Side(style="thin",color=BORDE))
+                        def _hoja(wb, df, nombre):
+                            ws = wb.create_sheet(title=nombre)
+                            headers = list(df.columns)
+                            for ci, h in enumerate(headers, 1):
+                                c = ws.cell(row=1, column=ci, value=h)
+                                c.font = Font(bold=True, color="FFFFFF", size=10)
+                                c.fill = PatternFill("solid", fgColor=AZUL)
+                                c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                                c.border = _b
+                            ws.row_dimensions[1].height = 26
+                            ws.freeze_panes = "A2"
+                            fill_alt = PatternFill("solid", fgColor=CELESTE)
+                            for ri, (_, row) in enumerate(df.iterrows(), 2):
+                                for ci, h in enumerate(headers, 1):
+                                    val = row[h]
+                                    if val is None or (isinstance(val, float) and pd.isna(val)):
+                                        val = ""
+                                    c = ws.cell(row=ri, column=ci, value=val)
+                                    c.font = Font(size=9)
+                                    c.alignment = Alignment(vertical="center")
+                                    c.border = _b
+                                    if ri % 2 == 0:
+                                        c.fill = fill_alt
+                            for ci, h in enumerate(headers, 1):
+                                vals = [str(h)] + [str(r[h]) if r[h] is not None and not (isinstance(r[h], float) and pd.isna(r[h])) else "" for _, r in df.iterrows()]
+                                ws.column_dimensions[gcl(ci)].width = min(max(len(v) for v in vals) + 4, 45)
+
+                        wb = Workbook(); wb.remove(wb.active)
+                        _hoja(wb, df_h1, "Usuarios")
+                        if not df_h2.empty: _hoja(wb, df_h2, "Equipos")
+                        if not df_h3.empty: _hoja(wb, df_h3, "Telefonos")
+                        if not df_h4.empty: _hoja(wb, df_h4, "Impresoras")
+                        if not df_h5.empty: _hoja(wb, df_h5, "IPs Asignadas")
+                        buf_inf = BytesIO(); wb.save(buf_inf); buf_inf.seek(0)
+
+                        hojas = 1 + (not df_h2.empty) + (not df_h3.empty) + (not df_h4.empty) + (not df_h5.empty)
+                        lbl = f"📊 Informe ({n_sel} sel.)" if n_sel else f"📊 Informe ({hojas} hojas)"
+                        st.download_button(lbl, data=buf_inf.getvalue(),
+                                           file_name=f"informe_usuarios_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                           use_container_width=True, key="usr_export_excel")
+                    except Exception as e:
+                        st.error(f"Error al generar informe: {e}")
+
+            with col_xls:
                 if not df_edited.empty:
-                    _df_exp = df_edited.drop(columns=["id_usuario"], errors="ignore").rename(columns={
-                        "nombre": "Nombre(s)", "ap_paterno": "Ap. Paterno", "ap_materno": "Ap. Materno",
-                        "puesto": "Puesto", "correo": "Correo", "departamento": "Departamento",
-                    })
-                    excel_buf = generar_excel_formateado(_df_exp, "Usuarios")
-                    st.download_button("📊 Excel", data=excel_buf.getvalue(),
-                                       file_name=f"usuarios_IMJ_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    _df_xls = df_edited.drop(columns=["sel","id_usuario"], errors="ignore").rename(columns=_RENAME_USR)
+                    buf_xls = generar_excel_formateado(_df_xls, "Usuarios")
+                    st.download_button("📥 Solo filtro", data=buf_xls.getvalue(),
+                                       file_name=f"usuarios_filtro_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                       use_container_width=True, key="usr_export_excel")
-            with col_exp2:
+                                       use_container_width=True, key="usr_export_xls")
+
+            with col_pdf:
                 if not df_edited.empty:
                     try:
-                        df_pdf = df_edited.drop(columns=["id_usuario"], errors="ignore").rename(columns={
-                            "nombre": "Nombre(s)", "ap_paterno": "Ap. Paterno",
-                            "ap_materno": "Ap. Materno", "puesto": "Puesto",
-                            "correo": "Correo", "departamento": "Departamento"
-                        })
+                        df_pdf = (_df_inf_base if n_sel else df_edited).drop(columns=["sel","id_usuario"], errors="ignore").rename(columns=_RENAME_USR)
                         pdf_bytes = generar_pdf_usuarios(df_pdf).read()
-                        st.download_button("📄 PDF", data=pdf_bytes,
+                        lbl_pdf = f"📄 PDF ({n_sel} sel.)" if n_sel else "📄 PDF"
+                        st.download_button(lbl_pdf, data=pdf_bytes,
                                            file_name=f"usuarios_IMJ_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
                                            mime="application/pdf", use_container_width=True, key="usr_export_pdf")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        st.error(f"Error PDF: {e}")
 
             if guardar:
                 errores = []
@@ -711,7 +833,7 @@ elif menu == "💻 Equipos de Computo":
                 },
             )
 
-            col_btn, col_exp = st.columns([1, 4])
+            col_btn, col_exp, col_pdf = st.columns([1, 2, 1])
             with col_btn:
                 guardar_eq = st.button("💾 Guardar cambios", type="primary", use_container_width=True, key="eq_guardar")
             with col_exp:
@@ -725,6 +847,18 @@ elif menu == "💻 Equipos de Computo":
                                        file_name=f"equipos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                        use_container_width=True, key="eq_export")
+            with col_pdf:
+                if not df_edited.empty:
+                    try:
+                        _df_p = df_edited.drop(columns=["id_computo"], errors="ignore").rename(columns={
+                            "usuario": "Usuario", "nombre_equipo": "Equipo", "marca": "Marca",
+                            "modelo": "Modelo", "serie": "Serie", "mac": "MAC", "estatus": "Estatus",
+                        })
+                        st.download_button("📄 PDF", data=generar_pdf_generico(_df_p, "Equipos de Computo").read(),
+                                           file_name=f"equipos_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                           mime="application/pdf", use_container_width=True, key="eq_pdf")
+                    except Exception as e:
+                        st.error(f"Error PDF: {e}")
 
             if guardar_eq:
                 errores = []
@@ -860,7 +994,7 @@ elif menu == "📱 Telefonos":
                 },
             )
 
-            col_btn, col_exp = st.columns([1, 4])
+            col_btn, col_exp, col_pdf = st.columns([1, 2, 1])
             with col_btn:
                 guardar_tel = st.button("💾 Guardar cambios", type="primary", use_container_width=True, key="tel_guardar")
             with col_exp:
@@ -873,6 +1007,17 @@ elif menu == "📱 Telefonos":
                                        file_name=f"telefonos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                        use_container_width=True, key="tel_export")
+            with col_pdf:
+                if not df_edited.empty:
+                    try:
+                        _df_p = df_edited.drop(columns=["id_telefono"], errors="ignore").rename(columns={
+                            "numero_general": "Numero General", "extension": "Extension", "usuario": "Usuario",
+                        })
+                        st.download_button("📄 PDF", data=generar_pdf_generico(_df_p, "Telefonos").read(),
+                                           file_name=f"telefonos_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                           mime="application/pdf", use_container_width=True, key="tel_pdf")
+                    except Exception as e:
+                        st.error(f"Error PDF: {e}")
 
             if guardar_tel:
                 try:
@@ -987,7 +1132,7 @@ elif menu == "🖨️ Impresoras":
                 },
             )
 
-            col_btn, col_exp = st.columns([1, 4])
+            col_btn, col_exp, col_pdf = st.columns([1, 2, 1])
             with col_btn:
                 guardar_imp = st.button("💾 Guardar cambios", type="primary", use_container_width=True, key="imp_guardar")
             with col_exp:
@@ -1001,6 +1146,18 @@ elif menu == "🖨️ Impresoras":
                                        file_name=f"impresoras_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                        use_container_width=True, key="imp_export")
+            with col_pdf:
+                if not df_edited.empty:
+                    try:
+                        _df_p = df_edited.drop(columns=["id_impresora"], errors="ignore").rename(columns={
+                            "marca": "Marca", "modelo": "Modelo", "serie": "Serie",
+                            "ip": "IP Address", "firmware": "Firmware", "usuario": "Usuario",
+                        })
+                        st.download_button("📄 PDF", data=generar_pdf_generico(_df_p, "Impresoras").read(),
+                                           file_name=f"impresoras_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                           mime="application/pdf", use_container_width=True, key="imp_pdf")
+                    except Exception as e:
+                        st.error(f"Error PDF: {e}")
 
             if guardar_imp:
                 errores = []
@@ -1136,7 +1293,7 @@ elif menu == "📦 Insumos":
                 },
             )
 
-            col_btn, col_exp = st.columns([1, 4])
+            col_btn, col_exp, col_pdf = st.columns([1, 2, 1])
             with col_btn:
                 guardar_ins = st.button("💾 Guardar cambios", type="primary", use_container_width=True, key="ins_guardar")
             with col_exp:
@@ -1150,6 +1307,18 @@ elif menu == "📦 Insumos":
                                        file_name=f"insumos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                        use_container_width=True, key="ins_export")
+            with col_pdf:
+                if not df_edited.empty:
+                    try:
+                        _df_p = df_edited.drop(columns=["id_insumo"], errors="ignore").rename(columns={
+                            "nombre": "Insumo", "numero_parte": "No. Parte",
+                            "stock_min": "Stock Min", "stock_max": "Stock Max", "stock_actual": "Stock Actual",
+                        })
+                        st.download_button("📄 PDF", data=generar_pdf_generico(_df_p, "Insumos").read(),
+                                           file_name=f"insumos_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                           mime="application/pdf", use_container_width=True, key="ins_pdf")
+                    except Exception as e:
+                        st.error(f"Error PDF: {e}")
 
             if guardar_ins:
                 try:
@@ -1295,7 +1464,12 @@ elif menu == "🌐 Direccionamiento IP":
             cur = get_conn().cursor()
             cur.execute("SELECT DISTINCT departamento_pestana FROM inventario_ips_completo WHERE departamento_pestana IS NOT NULL ORDER BY departamento_pestana")
             areas_db = [a[0] for a in cur.fetchall()]
+            cur.execute("SELECT id_usuario, nombre || ' ' || apellido_paterno FROM usuarios ORDER BY apellido_paterno")
+            rows_u_ip = cur.fetchall()
             cur.close()
+
+            usuarios_ip_map   = {r[1]: r[0] for r in rows_u_ip}
+            usuarios_ip_names = [""] + list(usuarios_ip_map.keys())
 
             col_f1, col_f2, col_f3 = st.columns([1, 1, 2])
             area_sel    = col_f1.selectbox("Area", ["Todas"] + areas_db, key="gest_ip_area")
@@ -1303,26 +1477,36 @@ elif menu == "🌐 Direccionamiento IP":
             busqueda    = col_f3.text_input("Buscar IP, usuario, MAC, marca...", placeholder="Ej: 172.17... o Juan...", key="gest_ip_busq")
 
             query = """
-                SELECT ip, usuario, tipo_equipo, institucional_o_personal,
-                       mac, marca, modelo, serie, estatus, departamento_pestana, observaciones
-                FROM inventario_ips_completo WHERE 1=1
+                SELECT i.ip,
+                       i.id_usuario,
+                       COALESCE(u.nombre || ' ' || u.apellido_paterno, i.usuario) AS usuario_nombre,
+                       i.tipo_equipo, i.institucional_o_personal,
+                       i.mac, i.marca, i.modelo, i.serie, i.estatus,
+                       i.departamento_pestana, i.observaciones
+                FROM inventario_ips_completo i
+                LEFT JOIN usuarios u ON i.id_usuario = u.id_usuario
+                WHERE 1=1
             """
             params = []
             if area_sel != "Todas":
-                query += " AND departamento_pestana = %s"
+                query += " AND i.departamento_pestana = %s"
                 params.append(area_sel)
             if estatus_sel != "Todos":
-                query += " AND estatus ILIKE %s"
+                query += " AND i.estatus ILIKE %s"
                 params.append(f"{estatus_sel}%")
             if busqueda:
-                query += " AND (ip ILIKE %s OR usuario ILIKE %s OR mac ILIKE %s OR marca ILIKE %s OR serie ILIKE %s)"
+                query += """
+                    AND (i.ip ILIKE %s OR i.usuario ILIKE %s OR i.mac ILIKE %s
+                         OR i.marca ILIKE %s OR i.serie ILIKE %s
+                         OR u.nombre ILIKE %s OR u.apellido_paterno ILIKE %s)
+                """
                 t = f"%{busqueda}%"
-                params.extend([t, t, t, t, t])
-            query += " ORDER BY departamento_pestana, ip"
+                params.extend([t, t, t, t, t, t, t])
+            query += " ORDER BY i.departamento_pestana, i.ip"
 
             cur2 = get_conn().cursor()
             cur2.execute(query, params)
-            cols = ["ip","usuario","tipo_equipo","institucional_o_personal",
+            cols = ["ip","id_usuario","usuario_nombre","tipo_equipo","institucional_o_personal",
                     "mac","marca","modelo","serie","estatus","departamento_pestana","observaciones"]
             df = pd.DataFrame(cur2.fetchall(), columns=cols)
             cur2.close()
@@ -1341,8 +1525,9 @@ elif menu == "🌐 Direccionamiento IP":
                 key="ip_data_editor",
                 column_config={
                     "ip":                      st.column_config.TextColumn("IP", disabled=True),
+                    "id_usuario":              None,
                     "departamento_pestana":    st.column_config.TextColumn("Area", disabled=True),
-                    "usuario":                 st.column_config.TextColumn("Usuario"),
+                    "usuario_nombre":          st.column_config.SelectboxColumn("Usuario", options=usuarios_ip_names),
                     "tipo_equipo":             st.column_config.SelectboxColumn("Tipo Equipo", options=TIPOS),
                     "institucional_o_personal":st.column_config.SelectboxColumn("Uso", options=USOS),
                     "mac":                     st.column_config.TextColumn("MAC"),
@@ -1354,35 +1539,49 @@ elif menu == "🌐 Direccionamiento IP":
                 },
             )
 
-            col_btn, col_exp, col_full = st.columns([1, 1, 2])
+            _RENAME_IPS = {
+                "ip": "IP", "usuario_nombre": "Usuario", "tipo_equipo": "Tipo Equipo",
+                "institucional_o_personal": "Uso", "mac": "MAC", "marca": "Marca",
+                "modelo": "Modelo", "serie": "Serie", "estatus": "Estatus",
+                "departamento_pestana": "Area", "observaciones": "Observaciones",
+            }
+
+            col_btn, col_exp, col_pdf_ip, col_full = st.columns([1, 1, 1, 1])
             with col_btn:
                 guardar = st.button("💾 Guardar cambios", type="primary", use_container_width=True)
             with col_exp:
                 if not df_edited.empty:
-                    _df_exp = df_edited.rename(columns={
-                        "ip": "IP", "usuario": "Usuario", "tipo_equipo": "Tipo Equipo",
-                        "institucional_o_personal": "Uso", "mac": "MAC", "marca": "Marca",
-                        "modelo": "Modelo", "serie": "Serie", "estatus": "Estatus",
-                        "departamento_pestana": "Area", "observaciones": "Observaciones",
-                    })
+                    _df_exp = df_edited.drop(columns=["id_usuario"], errors="ignore").rename(columns=_RENAME_IPS)
                     excel_data = generar_excel_formateado(_df_exp, "IPs")
-                    st.download_button("📥 Exportar filtro", data=excel_data.getvalue(),
+                    st.download_button("📥 Excel filtro", data=excel_data.getvalue(),
                                        file_name=f"ips_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                        use_container_width=True)
+            with col_pdf_ip:
+                if not df_edited.empty:
+                    try:
+                        _df_p = df_edited.drop(columns=["id_usuario"], errors="ignore").rename(columns=_RENAME_IPS)
+                        st.download_button("📄 PDF filtro", data=generar_pdf_generico(_df_p, "Direccionamiento IP").read(),
+                                           file_name=f"ips_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                           mime="application/pdf", use_container_width=True, key="ip_pdf")
+                    except Exception as e:
+                        st.error(f"Error PDF: {e}")
             with col_full:
                 try:
                     cur_all = get_conn().cursor()
                     cur_all.execute("""
-                        SELECT ip, usuario, tipo_equipo, institucional_o_personal,
-                               mac, marca, modelo, serie, estatus,
-                               departamento_pestana, observaciones
-                        FROM inventario_ips_completo
-                        ORDER BY departamento_pestana,
-                                 CASE WHEN estatus = 'Ocupada'      THEN 1
-                                      WHEN estatus = 'Libre'        THEN 2
+                        SELECT i.ip,
+                               COALESCE(u.nombre || ' ' || u.apellido_paterno, i.usuario) AS usuario_nombre,
+                               i.tipo_equipo, i.institucional_o_personal,
+                               i.mac, i.marca, i.modelo, i.serie, i.estatus,
+                               i.departamento_pestana, i.observaciones
+                        FROM inventario_ips_completo i
+                        LEFT JOIN usuarios u ON i.id_usuario = u.id_usuario
+                        ORDER BY i.departamento_pestana,
+                                 CASE WHEN i.estatus = 'Ocupada'      THEN 1
+                                      WHEN i.estatus = 'Libre'        THEN 2
                                       ELSE 3 END,
-                                 ip
+                                 i.ip
                     """)
                     rows_all = cur_all.fetchall()
                     cur_all.close()
@@ -1393,7 +1592,7 @@ elif menu == "🌐 Direccionamiento IP":
                         from openpyxl.utils import get_column_letter
 
                         COLS_DISPLAY = {
-                            "ip": "IP", "usuario": "Usuario", "tipo_equipo": "Tipo Equipo",
+                            "ip": "IP", "usuario_nombre": "Usuario", "tipo_equipo": "Tipo Equipo",
                             "institucional_o_personal": "Uso", "mac": "MAC",
                             "marca": "Marca", "modelo": "Modelo", "serie": "Serie",
                             "estatus": "Estatus", "departamento_pestana": "Area",
@@ -1482,20 +1681,25 @@ elif menu == "🌐 Direccionamiento IP":
                         if estatus.lower() == 'libre':
                             cur3.execute("""
                                 UPDATE inventario_ips_completo
-                                SET usuario=NULL, tipo_equipo=NULL, institucional_o_personal=NULL,
+                                SET usuario=NULL, id_usuario=NULL,
+                                    tipo_equipo=NULL, institucional_o_personal=NULL,
                                     mac=NULL, marca=NULL, modelo=NULL, serie=NULL,
                                     estatus='Libre', observaciones=NULL
                                 WHERE ip=%s
                             """, (row['ip'],))
                         else:
+                            nombre_sel  = limpiar(row.get('usuario_nombre'))
+                            id_u_sel    = usuarios_ip_map.get(nombre_sel) if nombre_sel else None
                             cur3.execute("""
                                 UPDATE inventario_ips_completo
-                                SET usuario=%s, tipo_equipo=%s, institucional_o_personal=%s,
+                                SET usuario=%s, id_usuario=%s,
+                                    tipo_equipo=%s, institucional_o_personal=%s,
                                     mac=%s, marca=%s, modelo=%s, serie=%s,
                                     estatus=%s, observaciones=%s
                                 WHERE ip=%s
                             """, (
-                                limpiar(row.get('usuario')),
+                                nombre_sel,
+                                id_u_sel,
                                 limpiar(row.get('tipo_equipo')),
                                 limpiar(row.get('institucional_o_personal')),
                                 limpiar(row.get('mac')),

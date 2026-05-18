@@ -152,6 +152,26 @@ def cargar():
     conn.commit()
     print(f"OK: {len(df_final)} filas insertadas en 'inventario_ips_completo'.")
     cur.close()
+
+    # Vincular id_usuario por coincidencia de apellido_paterno
+    cur_fk = conn.cursor()
+    cur_fk.execute("""
+        UPDATE inventario_ips_completo i
+        SET id_usuario = (
+            SELECT u.id_usuario
+            FROM usuarios u
+            WHERE i.usuario ILIKE '%%' || u.apellido_paterno || '%%'
+            ORDER BY LENGTH(u.apellido_paterno) DESC
+            LIMIT 1
+        )
+        WHERE i.usuario IS NOT NULL
+          AND ip = ANY(%s)
+    """, (ips,))
+    linked = cur_fk.rowcount
+    conn.commit()
+    cur_fk.close()
+    print(f"IPs vinculadas a usuario registrado: {linked} de {len(df_final)}")
+
     conn.close()
 
 if __name__ == '__main__':
