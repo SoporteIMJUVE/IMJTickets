@@ -449,7 +449,7 @@ elif menu == "👤 Usuarios":
                             SELECT u.nombre || ' ' || u.apellido_paterno AS "Usuario",
                                    i.marca AS "Marca", i.modelo AS "Modelo", i.serie AS "Serie",
                                    COALESCE(i.ip_address::text,'') AS "IP", i.firmware AS "Firmware"
-                            FROM impresoras i JOIN usuarios u ON i.id_usuario = u.id_usuario
+                            FROM impresoras i LEFT JOIN usuarios u ON i.id_usuario = u.id_usuario
                             WHERE u.id_usuario = ANY(%s) ORDER BY u.apellido_paterno
                         """, (id_usuarios,))
                         df_h4 = pd.DataFrame(cur_inf.fetchall(),
@@ -465,8 +465,7 @@ elif menu == "👤 Usuarios":
                                    i.estatus AS "Estatus", i.departamento_pestana AS "Area"
                             FROM inventario_ips_completo i
                             JOIN usuarios u ON (
-                                i.id_usuario = u.id_usuario
-                                OR (i.id_usuario IS NULL AND i.usuario ILIKE '%%' || u.apellido_paterno || '%%')
+                                i.usuario ILIKE '%%' || u.apellido_paterno || '%%'
                             )
                             WHERE u.id_usuario = ANY(%s) AND i.estatus != 'Libre'
                             ORDER BY i.ip
