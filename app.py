@@ -1527,7 +1527,7 @@ elif menu == "🌐 Direccionamiento IP":
                     "ip":                      st.column_config.TextColumn("IP", disabled=True),
                     "id_usuario":              None,
                     "departamento_pestana":    st.column_config.TextColumn("Area", disabled=True),
-                    "usuario_nombre":          st.column_config.SelectboxColumn("Usuario", options=usuarios_ip_names),
+                    "usuario_nombre":          st.column_config.TextColumn("Usuario"),
                     "tipo_equipo":             st.column_config.SelectboxColumn("Tipo Equipo", options=TIPOS),
                     "institucional_o_personal":st.column_config.SelectboxColumn("Uso", options=USOS),
                     "mac":                     st.column_config.TextColumn("MAC"),
