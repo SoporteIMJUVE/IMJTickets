@@ -5,9 +5,11 @@
 __pycache__/
 *.pyc
 
-# Carpetas de configuración de VS Code y Streamlit
-.streamlit/
+# Carpetas de configuración de VS Code
 .vscode/
+
+# Secretos de Streamlit (credenciales) — el config.toml si se sube
+.streamlit/secrets.toml
 
 # Opcional - archivos Excel y CSV
 # *.xlsx
