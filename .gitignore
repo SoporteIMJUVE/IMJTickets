@@ -1,5 +1,7 @@
 # Archivo de configuración local y credenciales
 .env
+iniciodeSesion.txt
+app_local_backup.py
 
 # Archivos basura de Python
 __pycache__/
