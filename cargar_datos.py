@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import os
 os.environ["LANG"]   = "en_US"
 os.environ["LC_ALL"] = "en_US"
@@ -8,16 +8,16 @@ import pandas as pd
 import sys
 import locale
 
-locale.setlocale(locale.LC_ALL, "C")
+locale.setlocale(locale.LC_ALL, 'C')
 
-if sys.stdout.encoding != "utf-8":
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 DB_CONFIG = {
     "host":     "localhost",
-    "database": "sistemitas",      # ← minúsculas
+    "database": "Sistemitas",
     "user":     "postgres",
-    "password": "Dan040904",       # ← contraseña correcta
+    "password": "Pistache07",
     "options":  "-c client_encoding=UTF8"
 }
 
@@ -30,27 +30,6 @@ HOJAS = [
 def limpiar(valor):
     s = str(valor).strip()
     return "" if s.lower() == "nan" else s
-
-def construir_mapa_usuarios(cursor):
-    cursor.execute("SELECT id_usuario, nombre, apellido_paterno, apellido_materno FROM usuarios")
-    rows = cursor.fetchall()
-    mapa = {}
-    for id_u, nombre, ap_pat, ap_mat in rows:
-        clave1 = f"{nombre} {ap_pat}".strip().lower()
-        mapa[clave1] = id_u
-        if ap_mat:
-            clave2 = f"{nombre} {ap_pat} {ap_mat}".strip().lower()
-            mapa[clave2] = id_u
-    return mapa
-
-def buscar_id_usuario(nombre_completo, mapa_usuarios):
-    nombre_lower = nombre_completo.strip().lower()
-    if nombre_lower in mapa_usuarios:
-        return mapa_usuarios[nombre_lower]
-    for clave, id_u in mapa_usuarios.items():
-        if clave in nombre_lower or nombre_lower in clave:
-            return id_u
-    return None
 
 def cargar_datos():
     conn   = None
@@ -85,10 +64,6 @@ def cargar_datos():
         print(f"FALLO en conexion BD: {e}")
         return
 
-    print("\nPaso 3: Cargando usuarios de la BD...")
-    mapa_usuarios = construir_mapa_usuarios(cursor)
-    print(f"  OK - {len(mapa_usuarios)} usuarios cargados")
-
     query = """
     INSERT INTO computo (id_usuario, nombre_equipo, serie, monitor_serie, mac_address)
     VALUES (%s, %s, %s, %s, %s)
@@ -100,9 +75,8 @@ def cargar_datos():
         mac_address   = EXCLUDED.mac_address;
     """
 
-    total_insertados  = 0
-    total_errores     = 0
-    total_sin_usuario = 0
+    total_insertados = 0
+    total_errores    = 0
 
     try:
         for hoja in HOJAS:
@@ -111,20 +85,13 @@ def cargar_datos():
 
             for idx, fila in df.iterrows():
                 try:
-                    nombre_completo = limpiar(fila.iloc[3])
-                    nombre_equipo   = limpiar(fila.iloc[2])
-                    serie           = limpiar(fila.iloc[8])
-                    monitor_serie   = limpiar(fila.iloc[12])
-                    mac_address     = limpiar(fila.iloc[15])
+                    id_usuario    = limpiar(fila.iloc[3])
+                    nombre_equipo = limpiar(fila.iloc[2])
+                    serie         = limpiar(fila.iloc[8])
+                    monitor_serie = limpiar(fila.iloc[12])
+                    mac_address   = limpiar(fila.iloc[15])
 
-                    if not nombre_completo or nombre_completo.lower() in ("nan", "nombre de usuario", "perfil"):
-                        continue
-
-                    id_usuario = buscar_id_usuario(nombre_completo, mapa_usuarios)
-
-                    if id_usuario is None:
-                        total_sin_usuario += 1
-                        print(f"  [?] Sin usuario en BD: '{nombre_completo}'")
+                    if not id_usuario or id_usuario.lower() in ("nan", "nombre de usuario", "perfil"):
                         continue
 
                     cursor.execute(query, (id_usuario, nombre_equipo, serie, monitor_serie, mac_address))
@@ -139,12 +106,12 @@ def cargar_datos():
         conn.commit()
         print(f"\n>>> PROCESO FINALIZADO <<<")
         print(f"    Insertados/actualizados : {total_insertados}")
-        print(f"    Sin usuario en BD       : {total_sin_usuario}")
-        print(f"    Errores                 : {total_errores}")
+        print(f"    Filas omitidas          : {total_errores}")
 
     except Exception as e:
         conn.rollback()
-        print(f"\nERROR GENERAL: {e}")
+        mensaje = str(e).encode('utf-8', 'replace').decode('utf-8')
+        print(f"\nERROR GENERAL: {mensaje}")
 
     finally:
         if cursor: cursor.close()
