@@ -1496,13 +1496,11 @@ elif menu == "🌐 Direccionamiento IP":
 
             query = """
                 SELECT i.ip,
-                    i.id_usuario,
-                    COALESCE(u.nombre || ' ' || u.apellido_paterno, i.usuario) AS usuario_nombre,
+                    i.usuario AS usuario_nombre,
                     i.tipo_equipo, i.institucional_o_personal,
                     i.mac, i.marca, i.modelo, i.serie, i.estatus,
                     i.departamento_pestana, i.observaciones
                 FROM inventario_ips_completo i
-                LEFT JOIN usuarios u ON i.id_usuario = u.id_usuario
                 WHERE 1=1
             """
             params = []
@@ -1524,7 +1522,7 @@ elif menu == "🌐 Direccionamiento IP":
 
             cur2 = get_conn().cursor()
             cur2.execute(query, params)
-            cols = ["ip","id_usuario","usuario_nombre","tipo_equipo","institucional_o_personal",
+            cols = ["ip","usuario_nombre","tipo_equipo","institucional_o_personal",
                     "mac","marca","modelo","serie","estatus","departamento_pestana","observaciones"]
             df = pd.DataFrame(cur2.fetchall(), columns=cols)
             cur2.close()
@@ -1543,7 +1541,6 @@ elif menu == "🌐 Direccionamiento IP":
                 key="ip_data_editor",
                 column_config={
                     "ip":                      st.column_config.TextColumn("IP", disabled=True),
-                    "id_usuario":              None,
                     "departamento_pestana":    st.column_config.TextColumn("Area", disabled=True),
                     "usuario_nombre":          st.column_config.SelectboxColumn("Usuario", options=usuarios_ip_names),
                     "tipo_equipo":             st.column_config.SelectboxColumn("Tipo Equipo", options=TIPOS),
@@ -1589,12 +1586,11 @@ elif menu == "🌐 Direccionamiento IP":
                     cur_all = get_conn().cursor()
                     cur_all.execute("""
                         SELECT i.ip,
-                            COALESCE(u.nombre || ' ' || u.apellido_paterno, i.usuario) AS usuario_nombre,
+                            i.usuario AS usuario_nombre,
                             i.tipo_equipo, i.institucional_o_personal,
                             i.mac, i.marca, i.modelo, i.serie, i.estatus,
                             i.departamento_pestana, i.observaciones
                         FROM inventario_ips_completo i
-                        LEFT JOIN usuarios u ON i.id_usuario = u.id_usuario
                         ORDER BY i.departamento_pestana,
                             CASE WHEN i.estatus = 'Ocupada'      THEN 1
                                     WHEN i.estatus = 'Libre'        THEN 2
@@ -1699,7 +1695,7 @@ elif menu == "🌐 Direccionamiento IP":
                         if estatus.lower() == 'libre':
                             cur3.execute("""
                                 UPDATE inventario_ips_completo
-                                SET usuario=NULL, id_usuario=NULL,
+                                SET usuario=NULL,
                                     tipo_equipo=NULL, institucional_o_personal=NULL,
                                     mac=NULL, marca=NULL, modelo=NULL, serie=NULL,
                                     estatus='Libre', observaciones=NULL
@@ -1707,17 +1703,15 @@ elif menu == "🌐 Direccionamiento IP":
                             """, (row['ip'],))
                         else:
                             nombre_sel  = limpiar(row.get('usuario_nombre'))
-                            id_u_sel    = usuarios_ip_map.get(nombre_sel) if nombre_sel else None
                             cur3.execute("""
                                 UPDATE inventario_ips_completo
-                                SET usuario=%s, id_usuario=%s,
+                                SET usuario=%s,
                                     tipo_equipo=%s, institucional_o_personal=%s,
                                     mac=%s, marca=%s, modelo=%s, serie=%s,
                                     estatus=%s, observaciones=%s
                                 WHERE ip=%s
                             """, (
                                 nombre_sel,
-                                id_u_sel,
                                 limpiar(row.get('tipo_equipo')),
                                 limpiar(row.get('institucional_o_personal')),
                                 limpiar(row.get('mac')),
