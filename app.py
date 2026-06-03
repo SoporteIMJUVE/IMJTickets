@@ -154,9 +154,241 @@ def generar_pdf_generico(df, titulo, col_widths=None):
     return buffer
 
 
+def leer_inventario_datos_xlsx():
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "datos.xlsx")
+    frames = []
+
+    try:
+        df = pd.read_excel(ruta, sheet_name="laptop", header=None, skiprows=4)
+        df = df.dropna(how="all").reset_index(drop=True)
+        df = df[df.iloc[:, 3].notna() & (df.iloc[:, 3].astype(str).str.strip() != "")]
+        frames.append(pd.DataFrame({
+            "Tipo":        "Laptop",
+            "Inventario":  df.iloc[:, 2],
+            "Usuario":     df.iloc[:, 3].astype(str).str.strip(),
+            "Area":        df.iloc[:, 5],
+            "Marca":       df.iloc[:, 6],
+            "Modelo":      df.iloc[:, 7],
+            "Serie":       df.iloc[:, 8],
+            "IPv4 Actual": df.iloc[:, 14],
+            "MAC":         df.iloc[:, 15],
+            "Responsiva":  df.iloc[:, 16],
+        }))
+    except Exception:
+        pass
+
+    for hoja, skip in [("PC ESPECIALIZADAS", 3), ("PC AVANZADAS", 4)]:
+        try:
+            df = pd.read_excel(ruta, sheet_name=hoja, header=None, skiprows=skip)
+            df = df.dropna(how="all").reset_index(drop=True)
+            df = df[df.iloc[:, 3].notna() & (df.iloc[:, 3].astype(str).str.strip() != "")]
+            frames.append(pd.DataFrame({
+                "Tipo":        "PC " + hoja.split()[1].capitalize(),
+                "Inventario":  df.iloc[:, 2],
+                "Usuario":     df.iloc[:, 3].astype(str).str.strip(),
+                "Area":        df.iloc[:, 5],
+                "Marca":       df.iloc[:, 6],
+                "Modelo":      df.iloc[:, 7],
+                "Serie":       df.iloc[:, 8],
+                "IPv4 Actual": df.iloc[:, 18],
+                "MAC":         df.iloc[:, 19],
+                "Responsiva":  df.iloc[:, 20],
+            }))
+        except Exception:
+            pass
+
+    if not frames:
+        return pd.DataFrame(columns=["Tipo","Inventario","Usuario","Area","Marca","Modelo","Serie","IPv4 Actual","MAC","Responsiva"])
+
+    resultado = pd.concat(frames, ignore_index=True)
+    for col in resultado.columns:
+        resultado[col] = resultado[col].apply(
+            lambda v: "" if (v is None or (isinstance(v, float) and pd.isna(v))) else str(v).strip()
+        )
+    return resultado
+
+
+def generar_pdf_informe_completo(secciones):
+    """secciones: lista de (titulo_seccion, df)"""
+    from reportlab.lib.pagesizes import landscape, A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable, PageBreak
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+
+    AZUL       = colors.HexColor("#1A3C5E")
+    AZUL_CLARO = colors.HexColor("#EAF1FB")
+    NARANJA    = colors.HexColor("#E8A838")
+    GRIS_BORDE = colors.HexColor("#BFBFBF")
+    PAGE       = landscape(A4)
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=PAGE,
+        leftMargin=1.5*cm, rightMargin=1.5*cm,
+        topMargin=2*cm, bottomMargin=1.5*cm
+    )
+
+    s_main_titulo = ParagraphStyle("mt", fontSize=16, fontName="Helvetica-Bold",
+                                    textColor=AZUL, alignment=1, spaceAfter=3)
+    s_main_sub    = ParagraphStyle("ms", fontSize=9, fontName="Helvetica",
+                                    textColor=colors.HexColor("#555555"), alignment=1, spaceAfter=8)
+    s_sec_titulo  = ParagraphStyle("st", fontSize=11, fontName="Helvetica-Bold",
+                                    textColor=colors.white, spaceBefore=14, spaceAfter=4,
+                                    backColor=AZUL, leftIndent=-6, rightIndent=-6,
+                                    borderPadding=(4, 6, 4, 6))
+    s_head        = ParagraphStyle("th", fontSize=8, fontName="Helvetica-Bold",
+                                    textColor=colors.white, alignment=1)
+    s_cell        = ParagraphStyle("td", fontSize=7.5, fontName="Helvetica", leading=10)
+    s_total       = ParagraphStyle("tot", fontSize=8, fontName="Helvetica",
+                                    textColor=colors.HexColor("#555555"), spaceBefore=3, spaceAfter=8)
+
+    ANCHOS = {
+        "Tipo": 52, "Inventario": 48, "Usuario": 108, "Area": 118,
+        "Marca": 40, "Modelo": 68, "Serie": 68, "IPv4 Actual": 74,
+        "MAC": 82, "Responsiva": 54,
+        "Número General": 110, "Extension": 90,
+        "IP": 90, "Firmware": 70,
+    }
+
+    def tabla_seccion(df):
+        COLS = list(df.columns)
+        page_w = PAGE[0] - 3*cm
+        widths = [ANCHOS.get(c, 0) for c in COLS]
+        fijos = sum(w for w in widths if w > 0)
+        libres = sum(1 for w in widths if w == 0)
+        resto = max((page_w - fijos) / libres, 60) if libres else 0
+        col_widths = [w if w > 0 else resto for w in widths]
+        header = [Paragraph(c, s_head) for c in COLS]
+        data = [header]
+        for _, row in df.iterrows():
+            data.append([Paragraph(str(row.get(c, "") or ""), s_cell) for c in COLS])
+        t = Table(data, colWidths=col_widths, repeatRows=1)
+        t.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, 0),  AZUL),
+            ("TOPPADDING",    (0, 0), (-1, 0),  6),
+            ("BOTTOMPADDING", (0, 0), (-1, 0),  6),
+            ("ALIGN",         (0, 0), (-1, 0),  "CENTER"),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 1), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 5),
+            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.white, AZUL_CLARO]),
+            ("LINEBELOW",     (0, 0), (-1, 0),  1, AZUL),
+            ("GRID",          (0, 0), (-1, -1), 0.3, GRIS_BORDE),
+        ]))
+        return t
+
+    def pie(canvas, doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(colors.HexColor("#888888"))
+        canvas.drawRightString(PAGE[0] - 1.5*cm, 0.7*cm, f"Pág. {canvas.getPageNumber()}")
+        canvas.restoreState()
+
+    elements = [
+        Paragraph("Instituto de la Juventud del Estado de Guerrero — IMJUVE", s_main_titulo),
+        Paragraph(f"Informe Completo de Usuarios &nbsp;&nbsp;|&nbsp;&nbsp; {datetime.now().strftime('%d/%m/%Y  %H:%M')}", s_main_sub),
+        HRFlowable(width="100%", thickness=2, color=AZUL, spaceAfter=10),
+    ]
+
+    for i, (titulo_sec, df) in enumerate(secciones):
+        if df.empty:
+            continue
+        if i > 0:
+            elements.append(Spacer(1, 6))
+        elements.append(Paragraph(f"  {titulo_sec}", s_sec_titulo))
+        elements.append(tabla_seccion(df))
+        elements.append(Paragraph(f"Total: <b>{len(df)}</b> registros", s_total))
+
+    doc.build(elements, onFirstPage=pie, onLaterPages=pie)
+    buffer.seek(0)
+    return buffer
+
+
 def generar_pdf_usuarios(df):
-    col_widths = [30, 70, 90, 90, 80, 100, 130]
-    return generar_pdf_generico(df, "Inventario de Usuarios", col_widths)
+    from reportlab.lib.pagesizes import landscape, A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+
+    AZUL       = colors.HexColor("#1A3C5E")
+    AZUL_CLARO = colors.HexColor("#EAF1FB")
+    GRIS_BORDE = colors.HexColor("#BFBFBF")
+
+    buffer = BytesIO()
+    PAGE = landscape(A4)
+    doc = SimpleDocTemplate(
+        buffer, pagesize=PAGE,
+        leftMargin=1.5*cm, rightMargin=1.5*cm,
+        topMargin=2*cm, bottomMargin=1.5*cm
+    )
+
+    s_titulo = ParagraphStyle("titulo", fontSize=15, fontName="Helvetica-Bold",
+                               textColor=AZUL, spaceAfter=3, alignment=1)
+    s_sub    = ParagraphStyle("sub", fontSize=9, fontName="Helvetica",
+                               textColor=colors.HexColor("#555555"), spaceAfter=6, alignment=1)
+    s_total  = ParagraphStyle("total", fontSize=9, fontName="Helvetica",
+                               textColor=colors.HexColor("#333333"), spaceBefore=8)
+    s_head   = ParagraphStyle("th", fontSize=9, fontName="Helvetica-Bold",
+                               textColor=colors.white, alignment=1)
+    s_cell   = ParagraphStyle("td", fontSize=8, fontName="Helvetica", leading=11)
+
+    COLS = list(df.columns)
+    col_w_map = {
+        "Nombre(s)":    95,
+        "Ap. Paterno":  95,
+        "Ap. Materno":  90,
+        "Puesto":       115,
+        "Correo":       170,
+        "Departamento": 135,
+    }
+    page_w = PAGE[0] - 3*cm
+    col_widths = [col_w_map.get(c, page_w / len(COLS)) for c in COLS]
+
+    header_row = [Paragraph(c, s_head) for c in COLS]
+    data = [header_row]
+    for _, row in df.iterrows():
+        data.append([Paragraph(str(row.get(c, "") or ""), s_cell) for c in COLS])
+
+    tabla = Table(data, colWidths=col_widths, repeatRows=1)
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, 0),  AZUL),
+        ("TOPPADDING",    (0, 0), (-1, 0),  8),
+        ("BOTTOMPADDING", (0, 0), (-1, 0),  8),
+        ("ALIGN",         (0, 0), (-1, 0),  "CENTER"),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING",    (0, 1), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 5),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+        ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.white, AZUL_CLARO]),
+        ("LINEBELOW",     (0, 0), (-1, 0),  1.2, AZUL),
+        ("GRID",          (0, 0), (-1, -1), 0.3, GRIS_BORDE),
+        ("LINEBELOW",     (0, -1), (-1, -1), 1, AZUL),
+    ]))
+
+    def pie_pagina(canvas, doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(colors.HexColor("#888888"))
+        canvas.drawRightString(PAGE[0] - 1.5*cm, 0.7*cm, f"Pág. {canvas.getPageNumber()}")
+        canvas.restoreState()
+
+    elements = [
+        Paragraph("Instituto de la Juventud del Estado de Guerrero — IMJUVE", s_titulo),
+        Paragraph(f"Inventario de Usuarios &nbsp;&nbsp;|&nbsp;&nbsp; Generado: {datetime.now().strftime('%d/%m/%Y  %H:%M')}", s_sub),
+        HRFlowable(width="100%", thickness=2, color=AZUL, spaceAfter=10),
+        tabla,
+        Spacer(1, 8),
+        Paragraph(f"Total de usuarios: <b>{len(df)}</b>", s_total),
+    ]
+
+    doc.build(elements, onFirstPage=pie_pagina, onLaterPages=pie_pagina)
+    buffer.seek(0)
+    return buffer
 
 
 def generar_pdf_equipos_detalle(df, usuario_nombre=None):
@@ -410,7 +642,7 @@ elif menu == "👤 Usuarios":
                 "puesto": "Puesto", "correo": "Correo", "departamento": "Departamento",
             }
 
-            col_btn, col_inf, col_xls, col_pdf = st.columns([1, 1.4, 1, 1])
+            col_btn, col_inf, col_inf_pdf, col_xls, col_pdf = st.columns([1, 1.2, 1.2, 1, 1])
             with col_btn:
                 guardar = st.button("💾 Guardar cambios", type="primary", use_container_width=True, key="usr_guardar")
 
@@ -507,15 +739,15 @@ elif menu == "👤 Usuarios":
                                 vals = [str(h)] + [str(r[h]) if r[h] is not None and not (isinstance(r[h], float) and pd.isna(r[h])) else "" for _, r in df.iterrows()]
                                 ws.column_dimensions[gcl(ci)].width = min(max(len(v) for v in vals) + 4, 45)
 
+                        df_inventario = leer_inventario_datos_xlsx()
+
                         wb = Workbook(); wb.remove(wb.active)
-                        _hoja(wb, df_h1, "Usuarios")
-                        if not df_h2.empty: _hoja(wb, df_h2, "Equipos")
+                        if not df_inventario.empty: _hoja(wb, df_inventario, "Equipos")
                         if not df_h3.empty: _hoja(wb, df_h3, "Telefonos")
                         if not df_h4.empty: _hoja(wb, df_h4, "Impresoras")
-                        if not df_h5.empty: _hoja(wb, df_h5, "IPs Asignadas")
                         buf_inf = BytesIO(); wb.save(buf_inf); buf_inf.seek(0)
 
-                        hojas = 1 + (not df_h2.empty) + (not df_h3.empty) + (not df_h4.empty) + (not df_h5.empty)
+                        hojas = (not df_inventario.empty) + (not df_h3.empty) + (not df_h4.empty)
                         lbl = f"📊 Informe ({n_sel} sel.)" if n_sel else f"📊 Informe ({hojas} hojas)"
                         st.download_button(lbl, data=buf_inf.getvalue(),
                                            file_name=f"informe_usuarios_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
@@ -523,6 +755,68 @@ elif menu == "👤 Usuarios":
                                            use_container_width=True, key="usr_export_excel")
                     except Exception as e:
                         st.error(f"Error al generar informe: {e}")
+
+            with col_inf_pdf:
+                if not _df_inf_base.empty:
+                    try:
+                        id_usuarios_pdf = [int(r) for r in _df_inf_base["id_usuario"].tolist() if pd.notna(r)]
+                        cur_pdf = get_conn().cursor()
+                        df_p1 = _df_inf_base.drop(columns=["sel","id_usuario"], errors="ignore").rename(columns=_RENAME_USR)
+                        cur_pdf.execute("""
+                            SELECT u.nombre || ' ' || u.apellido_paterno AS "Usuario",
+                                   c.nombre_equipo AS "Equipo", c.marca AS "Marca",
+                                   c.modelo AS "Modelo", c.serie AS "Serie",
+                                   c.mac_address AS "MAC", c.estatus AS "Estatus"
+                            FROM computo c JOIN usuarios u ON c.id_usuario = u.id_usuario
+                            WHERE u.id_usuario = ANY(%s) ORDER BY u.apellido_paterno
+                        """, (id_usuarios_pdf,))
+                        df_p2 = pd.DataFrame(cur_pdf.fetchall(), columns=["Usuario","Equipo","Marca","Modelo","Serie","MAC","Estatus"])
+                        cur_pdf.execute("""
+                            SELECT u.nombre || ' ' || u.apellido_paterno AS "Usuario",
+                                   t.numero_general AS "Numero General", t.extension AS "Extension"
+                            FROM telefonos t JOIN usuarios u ON t.id_usuario = u.id_usuario
+                            WHERE u.id_usuario = ANY(%s) ORDER BY u.apellido_paterno
+                        """, (id_usuarios_pdf,))
+                        df_p3 = pd.DataFrame(cur_pdf.fetchall(), columns=["Usuario","Numero General","Extension"])
+                        cur_pdf.execute("""
+                            SELECT u.nombre || ' ' || u.apellido_paterno AS "Usuario",
+                                   i.marca AS "Marca", i.modelo AS "Modelo", i.serie AS "Serie",
+                                   COALESCE(i.ip_address::text,'') AS "IP", i.firmware AS "Firmware"
+                            FROM impresoras i JOIN usuarios u ON i.id_usuario = u.id_usuario
+                            WHERE u.id_usuario = ANY(%s) ORDER BY u.apellido_paterno
+                        """, (id_usuarios_pdf,))
+                        df_p4 = pd.DataFrame(cur_pdf.fetchall(), columns=["Usuario","Marca","Modelo","Serie","IP","Firmware"])
+                        cur_pdf.execute("""
+                            SELECT DISTINCT ON (i.ip)
+                                   u.nombre || ' ' || u.apellido_paterno AS "Usuario",
+                                   i.ip AS "IP", i.tipo_equipo AS "Tipo",
+                                   i.mac AS "MAC", i.marca AS "Marca",
+                                   i.estatus AS "Estatus", i.departamento_pestana AS "Area"
+                            FROM inventario_ips_completo i
+                            JOIN usuarios u ON (
+                                i.id_usuario = u.id_usuario
+                                OR (i.id_usuario IS NULL AND i.usuario ILIKE '%%' || u.apellido_paterno || '%%')
+                            )
+                            WHERE u.id_usuario = ANY(%s) AND i.estatus != 'Libre'
+                            ORDER BY i.ip
+                        """, (id_usuarios_pdf,))
+                        df_p5 = pd.DataFrame(cur_pdf.fetchall(), columns=["Usuario","IP","Tipo","MAC","Marca","Estatus","Area"])
+                        cur_pdf.close()
+
+                        df_inv_pdf = leer_inventario_datos_xlsx()
+                        secciones = [
+                            ("Equipos de Computo",   df_inv_pdf),
+                            ("Telefonos",            df_p3),
+                            ("Impresoras",           df_p4),
+                        ]
+                        pdf_inf_bytes = generar_pdf_informe_completo(secciones).read()
+                        lbl_inf_pdf = f"📄 Informe PDF ({n_sel} sel.)" if n_sel else "📄 Informe PDF"
+                        st.download_button(lbl_inf_pdf, data=pdf_inf_bytes,
+                                           file_name=f"informe_usuarios_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                           mime="application/pdf",
+                                           use_container_width=True, key="usr_informe_pdf")
+                    except Exception as e:
+                        st.error(f"Error PDF informe: {e}")
 
             with col_xls:
                 if not df_edited.empty:
