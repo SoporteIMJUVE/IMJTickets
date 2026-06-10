@@ -173,9 +173,241 @@ def generar_pdf_generico(df, titulo, col_widths=None):
     return buffer
 
 
+def leer_inventario_datos_xlsx():
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "datos.xlsx")
+    frames = []
+
+    try:
+        df = pd.read_excel(ruta, sheet_name="laptop", header=None, skiprows=4)
+        df = df.dropna(how="all").reset_index(drop=True)
+        df = df[df.iloc[:, 3].notna() & (df.iloc[:, 3].astype(str).str.strip() != "")]
+        frames.append(pd.DataFrame({
+            "Tipo":        "Laptop",
+            "Inventario":  df.iloc[:, 2],
+            "Usuario":     df.iloc[:, 3].astype(str).str.strip(),
+            "Area":        df.iloc[:, 5],
+            "Marca":       df.iloc[:, 6],
+            "Modelo":      df.iloc[:, 7],
+            "Serie":       df.iloc[:, 8],
+            "IPv4 Actual": df.iloc[:, 14],
+            "MAC":         df.iloc[:, 15],
+            "Responsiva":  df.iloc[:, 16],
+        }))
+    except Exception:
+        pass
+
+    for hoja, skip in [("PC ESPECIALIZADAS", 3), ("PC AVANZADAS", 4)]:
+        try:
+            df = pd.read_excel(ruta, sheet_name=hoja, header=None, skiprows=skip)
+            df = df.dropna(how="all").reset_index(drop=True)
+            df = df[df.iloc[:, 3].notna() & (df.iloc[:, 3].astype(str).str.strip() != "")]
+            frames.append(pd.DataFrame({
+                "Tipo":        "PC " + hoja.split()[1].capitalize(),
+                "Inventario":  df.iloc[:, 2],
+                "Usuario":     df.iloc[:, 3].astype(str).str.strip(),
+                "Area":        df.iloc[:, 5],
+                "Marca":       df.iloc[:, 6],
+                "Modelo":      df.iloc[:, 7],
+                "Serie":       df.iloc[:, 8],
+                "IPv4 Actual": df.iloc[:, 18],
+                "MAC":         df.iloc[:, 19],
+                "Responsiva":  df.iloc[:, 20],
+            }))
+        except Exception:
+            pass
+
+    if not frames:
+        return pd.DataFrame(columns=["Tipo","Inventario","Usuario","Area","Marca","Modelo","Serie","IPv4 Actual","MAC","Responsiva"])
+
+    resultado = pd.concat(frames, ignore_index=True)
+    for col in resultado.columns:
+        resultado[col] = resultado[col].apply(
+            lambda v: "" if (v is None or (isinstance(v, float) and pd.isna(v))) else str(v).strip()
+        )
+    return resultado
+
+
+def generar_pdf_informe_completo(secciones):
+    """secciones: lista de (titulo_seccion, df)"""
+    from reportlab.lib.pagesizes import landscape, A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable, PageBreak
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+
+    AZUL       = colors.HexColor("#1A3C5E")
+    AZUL_CLARO = colors.HexColor("#EAF1FB")
+    NARANJA    = colors.HexColor("#E8A838")
+    GRIS_BORDE = colors.HexColor("#BFBFBF")
+    PAGE       = landscape(A4)
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=PAGE,
+        leftMargin=1.5*cm, rightMargin=1.5*cm,
+        topMargin=2*cm, bottomMargin=1.5*cm
+    )
+
+    s_main_titulo = ParagraphStyle("mt", fontSize=16, fontName="Helvetica-Bold",
+                                    textColor=AZUL, alignment=1, spaceAfter=3)
+    s_main_sub    = ParagraphStyle("ms", fontSize=9, fontName="Helvetica",
+                                    textColor=colors.HexColor("#555555"), alignment=1, spaceAfter=8)
+    s_sec_titulo  = ParagraphStyle("st", fontSize=11, fontName="Helvetica-Bold",
+                                    textColor=colors.white, spaceBefore=14, spaceAfter=4,
+                                    backColor=AZUL, leftIndent=-6, rightIndent=-6,
+                                    borderPadding=(4, 6, 4, 6))
+    s_head        = ParagraphStyle("th", fontSize=8, fontName="Helvetica-Bold",
+                                    textColor=colors.white, alignment=1)
+    s_cell        = ParagraphStyle("td", fontSize=7.5, fontName="Helvetica", leading=10)
+    s_total       = ParagraphStyle("tot", fontSize=8, fontName="Helvetica",
+                                    textColor=colors.HexColor("#555555"), spaceBefore=3, spaceAfter=8)
+
+    ANCHOS = {
+        "Tipo": 52, "Inventario": 48, "Usuario": 108, "Area": 118,
+        "Marca": 40, "Modelo": 68, "Serie": 68, "IPv4 Actual": 74,
+        "MAC": 82, "Responsiva": 54,
+        "Número General": 110, "Extension": 90,
+        "IP": 90, "Firmware": 70,
+    }
+
+    def tabla_seccion(df):
+        COLS = list(df.columns)
+        page_w = PAGE[0] - 3*cm
+        widths = [ANCHOS.get(c, 0) for c in COLS]
+        fijos = sum(w for w in widths if w > 0)
+        libres = sum(1 for w in widths if w == 0)
+        resto = max((page_w - fijos) / libres, 60) if libres else 0
+        col_widths = [w if w > 0 else resto for w in widths]
+        header = [Paragraph(c, s_head) for c in COLS]
+        data = [header]
+        for _, row in df.iterrows():
+            data.append([Paragraph(str(row.get(c, "") or ""), s_cell) for c in COLS])
+        t = Table(data, colWidths=col_widths, repeatRows=1)
+        t.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, 0),  AZUL),
+            ("TOPPADDING",    (0, 0), (-1, 0),  6),
+            ("BOTTOMPADDING", (0, 0), (-1, 0),  6),
+            ("ALIGN",         (0, 0), (-1, 0),  "CENTER"),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 1), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 5),
+            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.white, AZUL_CLARO]),
+            ("LINEBELOW",     (0, 0), (-1, 0),  1, AZUL),
+            ("GRID",          (0, 0), (-1, -1), 0.3, GRIS_BORDE),
+        ]))
+        return t
+
+    def pie(canvas, doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(colors.HexColor("#888888"))
+        canvas.drawRightString(PAGE[0] - 1.5*cm, 0.7*cm, f"Pág. {canvas.getPageNumber()}")
+        canvas.restoreState()
+
+    elements = [
+        Paragraph("Instituto de la Juventud del Estado de Guerrero — IMJUVE", s_main_titulo),
+        Paragraph(f"Informe Completo de Usuarios &nbsp;&nbsp;|&nbsp;&nbsp; {datetime.now().strftime('%d/%m/%Y  %H:%M')}", s_main_sub),
+        HRFlowable(width="100%", thickness=2, color=AZUL, spaceAfter=10),
+    ]
+
+    for i, (titulo_sec, df) in enumerate(secciones):
+        if df.empty:
+            continue
+        if i > 0:
+            elements.append(Spacer(1, 6))
+        elements.append(Paragraph(f"  {titulo_sec}", s_sec_titulo))
+        elements.append(tabla_seccion(df))
+        elements.append(Paragraph(f"Total: <b>{len(df)}</b> registros", s_total))
+
+    doc.build(elements, onFirstPage=pie, onLaterPages=pie)
+    buffer.seek(0)
+    return buffer
+
+
 def generar_pdf_usuarios(df):
-    col_widths = [30, 70, 90, 90, 80, 100, 130]
-    return generar_pdf_generico(df, "Inventario de Usuarios", col_widths)
+    from reportlab.lib.pagesizes import landscape, A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+
+    AZUL       = colors.HexColor("#1A3C5E")
+    AZUL_CLARO = colors.HexColor("#EAF1FB")
+    GRIS_BORDE = colors.HexColor("#BFBFBF")
+
+    buffer = BytesIO()
+    PAGE = landscape(A4)
+    doc = SimpleDocTemplate(
+        buffer, pagesize=PAGE,
+        leftMargin=1.5*cm, rightMargin=1.5*cm,
+        topMargin=2*cm, bottomMargin=1.5*cm
+    )
+
+    s_titulo = ParagraphStyle("titulo", fontSize=15, fontName="Helvetica-Bold",
+                               textColor=AZUL, spaceAfter=3, alignment=1)
+    s_sub    = ParagraphStyle("sub", fontSize=9, fontName="Helvetica",
+                               textColor=colors.HexColor("#555555"), spaceAfter=6, alignment=1)
+    s_total  = ParagraphStyle("total", fontSize=9, fontName="Helvetica",
+                               textColor=colors.HexColor("#333333"), spaceBefore=8)
+    s_head   = ParagraphStyle("th", fontSize=9, fontName="Helvetica-Bold",
+                               textColor=colors.white, alignment=1)
+    s_cell   = ParagraphStyle("td", fontSize=8, fontName="Helvetica", leading=11)
+
+    COLS = list(df.columns)
+    col_w_map = {
+        "Nombre(s)":    95,
+        "Ap. Paterno":  95,
+        "Ap. Materno":  90,
+        "Puesto":       115,
+        "Correo":       170,
+        "Departamento": 135,
+    }
+    page_w = PAGE[0] - 3*cm
+    col_widths = [col_w_map.get(c, page_w / len(COLS)) for c in COLS]
+
+    header_row = [Paragraph(c, s_head) for c in COLS]
+    data = [header_row]
+    for _, row in df.iterrows():
+        data.append([Paragraph(str(row.get(c, "") or ""), s_cell) for c in COLS])
+
+    tabla = Table(data, colWidths=col_widths, repeatRows=1)
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, 0),  AZUL),
+        ("TOPPADDING",    (0, 0), (-1, 0),  8),
+        ("BOTTOMPADDING", (0, 0), (-1, 0),  8),
+        ("ALIGN",         (0, 0), (-1, 0),  "CENTER"),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING",    (0, 1), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 5),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+        ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.white, AZUL_CLARO]),
+        ("LINEBELOW",     (0, 0), (-1, 0),  1.2, AZUL),
+        ("GRID",          (0, 0), (-1, -1), 0.3, GRIS_BORDE),
+        ("LINEBELOW",     (0, -1), (-1, -1), 1, AZUL),
+    ]))
+
+    def pie_pagina(canvas, doc):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(colors.HexColor("#888888"))
+        canvas.drawRightString(PAGE[0] - 1.5*cm, 0.7*cm, f"Pág. {canvas.getPageNumber()}")
+        canvas.restoreState()
+
+    elements = [
+        Paragraph("Instituto de la Juventud del Estado de Guerrero — IMJUVE", s_titulo),
+        Paragraph(f"Inventario de Usuarios &nbsp;&nbsp;|&nbsp;&nbsp; Generado: {datetime.now().strftime('%d/%m/%Y  %H:%M')}", s_sub),
+        HRFlowable(width="100%", thickness=2, color=AZUL, spaceAfter=10),
+        tabla,
+        Spacer(1, 8),
+        Paragraph(f"Total de usuarios: <b>{len(df)}</b>", s_total),
+    ]
+
+    doc.build(elements, onFirstPage=pie_pagina, onLaterPages=pie_pagina)
+    buffer.seek(0)
+    return buffer
 
 
 def generar_pdf_equipos_detalle(df, usuario_nombre=None):
@@ -187,6 +419,216 @@ def generar_pdf_equipos_detalle(df, usuario_nombre=None):
 def generar_pdf_equipos_resumen(df):
     col_widths = [140, 160, 180, 50]
     return generar_pdf_generico(df, "Resumen de Equipos de Computo", col_widths)
+
+
+def generar_pdf_mantenimiento(r):
+    """Genera el reporte de mantenimiento con la misma estructura del formulario físico."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=1.5*cm, rightMargin=1.5*cm,
+                            topMargin=1.5*cm, bottomMargin=1.5*cm)
+    styles = getSampleStyleSheet()
+    azul   = colors.HexColor("#1A3C5E")
+    gris   = colors.HexColor("#D9D9D9")
+    blanco = colors.white
+
+    s_titulo = ParagraphStyle("titulo", fontSize=11, fontName="Helvetica-Bold",
+                               alignment=TA_CENTER, textColor=azul, spaceAfter=4)
+    s_sub    = ParagraphStyle("sub",    fontSize=8,  fontName="Helvetica-Bold",
+                               alignment=TA_CENTER, textColor=blanco)
+    s_label  = ParagraphStyle("label",  fontSize=7.5, fontName="Helvetica-Bold")
+    s_val    = ParagraphStyle("val",    fontSize=8,  fontName="Helvetica")
+    s_small  = ParagraphStyle("small",  fontSize=7,  fontName="Helvetica")
+
+    def P(txt, style=None): return Paragraph(str(txt or ""), style or s_val)
+    def B(txt): return Paragraph(str(txt or ""), s_label)
+    def chk(cond): return "[X]" if cond else "[  ]"
+
+    fecha_str = r.get("fecha_reporte", "")
+    if hasattr(fecha_str, "strftime"):
+        fecha_str = fecha_str.strftime("%d-%m-%Y")
+
+    def fmt_dt(v):
+        if v is None: return "_______________"
+        if hasattr(v, "strftime"): return v.strftime("%d/%m/%Y  %H:%M")
+        return str(v)
+
+    elements = []
+
+    # ── Título ───────────────────────────────────────────────────────────────
+    elements.append(Paragraph(
+        "REPORTE DE SERVICIO DE ATENCIÓN,<br/>MANTENIMIENTO PREVENTIVO Y CORRECTIVOS",
+        s_titulo
+    ))
+    elements.append(Spacer(1, 6))
+
+    W = 17.7 * cm   # ancho útil
+
+    # ── Bloque superior: datos del equipo + tipo de servicio ─────────────────
+    tipo_mant = r.get("tipo_mantenimiento", "Correctivo")
+    estado    = r.get("estado", "Abierto")
+
+    header_data = [
+        [
+            Table([
+                [B("FECHA:"), P(fecha_str), B("Folio:"), P(r.get("folio",""))],
+                [B("NOMBRE DEL USUARIO:"), P(r.get("nombre_usuario","")), "", ""],
+                [B("ÁREA:"), P(r.get("area","")), "", ""],
+                [B("UBICACIÓN DEL EQUIPO:"), P(r.get("ubicacion_equipo","")), "", ""],
+            ], colWidths=[3.5*cm, 5.5*cm, 2*cm, 2.5*cm],
+            style=TableStyle([
+                ("FONTSIZE",   (0,0), (-1,-1), 8),
+                ("VALIGN",     (0,0), (-1,-1), "MIDDLE"),
+                ("TOPPADDING", (0,0), (-1,-1), 3),
+                ("SPAN",       (1,1), (3,1)),
+                ("SPAN",       (1,2), (3,2)),
+                ("SPAN",       (1,3), (3,3)),
+            ])),
+            Table([
+                [Paragraph("SERVICIO DE ARRENDAMIENTO<br/>DE EQUIPO DE CÓMPUTO", s_sub)],
+                [Paragraph("CONTRATO NO. IMJ-ITP-018-2021-CM-006", s_small)],
+                [P(f"Mantenimiento Preventivo: {chk(tipo_mant=='Preventivo')}")],
+                [P(f"Mantenimiento Correctivo: {chk(tipo_mant=='Correctivo')}")],
+                [P(f"{chk(estado=='Abierto')} ABIERTO   {chk(estado=='Pendiente')} PENDIENTE   {chk(estado=='Cerrado')} CERRADO")],
+            ], colWidths=[4*cm],
+            style=TableStyle([
+                ("BACKGROUND",   (0,0), (0,0), azul),
+                ("BACKGROUND",   (0,1), (0,1), gris),
+                ("FONTSIZE",     (0,0), (-1,-1), 7.5),
+                ("ALIGN",        (0,0), (-1,-1), "CENTER"),
+                ("VALIGN",       (0,0), (-1,-1), "MIDDLE"),
+                ("TOPPADDING",   (0,0), (-1,-1), 3),
+                ("BOX",          (0,0), (-1,-1), 0.5, colors.grey),
+                ("INNERGRID",    (0,0), (-1,-1), 0.5, colors.grey),
+            ])),
+        ]
+    ]
+    t_header = Table(header_data, colWidths=[13.5*cm, 4.2*cm])
+    t_header.setStyle(TableStyle([
+        ("VALIGN", (0,0), (-1,-1), "TOP"),
+        ("TOPPADDING", (0,0), (-1,-1), 0),
+    ]))
+    elements.append(t_header)
+    elements.append(Spacer(1, 6))
+
+    # ── Tabla de equipo ───────────────────────────────────────────────────────
+    eq_data = [
+        [B("EQUIPO"), B("MARCA"), B("MODELO"), B("No. SERIE"), B("INVENTARIO")],
+        [
+            P(r.get("tipo_equipo","") + ("\n" + (r.get("nombre_equipo") or "")).strip()),
+            P(r.get("cpu_marca","")),
+            P(r.get("cpu_modelo","")),
+            P(r.get("cpu_serie","")),
+            P(r.get("num_inventario","")),
+        ]
+    ]
+    t_eq = Table(eq_data, colWidths=[3.5*cm, 2.8*cm, 4*cm, 4*cm, 2.5*cm])
+    t_eq.setStyle(TableStyle([
+        ("BACKGROUND",  (0,0), (-1,0), azul),
+        ("TEXTCOLOR",   (0,0), (-1,0), blanco),
+        ("FONTNAME",    (0,0), (-1,0), "Helvetica-Bold"),
+        ("FONTSIZE",    (0,0), (-1,-1), 8),
+        ("ALIGN",       (0,0), (-1,-1), "CENTER"),
+        ("VALIGN",      (0,0), (-1,-1), "MIDDLE"),
+        ("GRID",        (0,0), (-1,-1), 0.5, colors.grey),
+        ("TOPPADDING",  (0,0), (-1,-1), 4),
+        ("BOTTOMPADDING",(0,0), (-1,-1), 4),
+        ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.HexColor("#EAF1FB")]),
+    ]))
+    elements.append(t_eq)
+    elements.append(Spacer(1, 8))
+
+    # ── Observaciones ─────────────────────────────────────────────────────────
+    obs_data = [
+        [Paragraph("<b>OBSERVACIONES</b>", ParagraphStyle("obs_h", fontSize=8, fontName="Helvetica-Bold",
+                    textColor=blanco, alignment=TA_CENTER))],
+        [Table([
+            [[B("FALLA REPORTADA (EN SU CASO):"),
+              Spacer(1,2),
+              P(r.get("falla_reportada",""))]],
+        ], colWidths=[W - 1.2*cm],
+        style=TableStyle([("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),6)]))],
+        [Table([
+            [[B("ACCIONES REALIZADAS:"),
+              Spacer(1,2),
+              P(r.get("acciones_realizadas",""))]],
+        ], colWidths=[W - 1.2*cm],
+        style=TableStyle([("TOPPADDING",(0,0),(-1,-1),3),("BOTTOMPADDING",(0,0),(-1,-1),6)]))],
+        [P(f"¿El equipo quedó funcionando correctamente?   "
+           f"{chk(r.get('quedo_funcionando') is True)} Sí     "
+           f"{chk(r.get('quedo_funcionando') is False)} No")],
+    ]
+    t_obs = Table(obs_data, colWidths=[W])
+    t_obs.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (0,0), azul),
+        ("TEXTCOLOR",     (0,0), (0,0), blanco),
+        ("GRID",          (0,0), (-1,-1), 0.5, colors.grey),
+        ("TOPPADDING",    (0,0), (-1,-1), 3),
+        ("BOTTOMPADDING", (0,3), (-1,3), 5),
+        ("LEFTPADDING",   (0,0), (-1,-1), 6),
+    ]))
+    elements.append(t_obs)
+    elements.append(Spacer(1, 8))
+
+    # ── Fechas y evaluación ───────────────────────────────────────────────────
+    ev_s = str(r.get("eval_servicio","")) if r.get("eval_servicio") is not None else "___"
+    ev_t = str(r.get("eval_tecnico",""))  if r.get("eval_tecnico")  is not None else "___"
+    fechas_data = [
+        [B("FECHA Y HORA DE INICIO:"), P(fmt_dt(r.get("fecha_inicio"))),
+         B("FECHA Y HORA DE CONCLUSIÓN:"), P(fmt_dt(r.get("fecha_conclusion")))],
+        [Paragraph("<b>EVALUACIÓN</b> (0-10)", s_label), "",
+         B("Calidad del servicio:"), P(ev_s)],
+        [B("TÉCNICO:"), P(r.get("nombre_tecnico","")),
+         B("Calidad del técnico:"), P(ev_t)],
+        [B("OBSERVACIÓN DE CALIDAD:"), P(r.get("observaciones","")), "", ""],
+    ]
+    t_fechas = Table(fechas_data, colWidths=[4*cm, 4.5*cm, 4.5*cm, 4.5*cm])
+    t_fechas.setStyle(TableStyle([
+        ("GRID",          (0,0), (-1,-1), 0.5, colors.grey),
+        ("FONTSIZE",      (0,0), (-1,-1), 8),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+        ("TOPPADDING",    (0,0), (-1,-1), 4),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+        ("SPAN",          (0,1), (1,1)),
+        ("SPAN",          (0,3), (3,3)),
+        ("ROWBACKGROUNDS",(0,0), (-1,-1), [blanco, colors.HexColor("#EAF1FB")]),
+    ]))
+    elements.append(t_fechas)
+    elements.append(Spacer(1, 10))
+
+    # ── Firmas ────────────────────────────────────────────────────────────────
+    firma_data = [
+        [Paragraph("<b>CONFORMIDAD DEL SERVICIO</b>", s_sub),
+         Paragraph("<b>INGENIERO DE SERVICIO</b>", s_sub)],
+        [P(f"Nombre: {r.get('nombre_usuario','')}"),
+         P(f"Nombre: {r.get('nombre_tecnico','')}")],
+        [Spacer(1, 28), Spacer(1, 28)],
+        [P("Firma: _______________________________"),
+         P("Firma: _______________________________")],
+    ]
+    t_firma = Table(firma_data, colWidths=[W/2, W/2])
+    t_firma.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,0), azul),
+        ("TEXTCOLOR",     (0,0), (-1,0), blanco),
+        ("GRID",          (0,0), (-1,-1), 0.5, colors.grey),
+        ("ALIGN",         (0,0), (-1,-1), "CENTER"),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+        ("FONTSIZE",      (0,0), (-1,-1), 8),
+        ("TOPPADDING",    (0,0), (-1,-1), 4),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+    ]))
+    elements.append(t_firma)
+
+    doc.build(elements)
+    buf.seek(0)
+    return buf
 
 
 # ════════════════════════════════════════
@@ -208,6 +650,7 @@ menu = st.sidebar.selectbox("Selecciona un modulo", [
     "🏠 Inicio",
     "👤 Usuarios",
     "💻 Equipos de Computo",
+    "🔧 Mantenimiento",
     "🌐 Direccionamiento IP",
     "📱 Telefonos",
     "🖨️ Impresoras",
@@ -249,11 +692,13 @@ if menu == "🏠 Inicio":
                 resultados.append({"Tipo": r[0], "Descripcion": r[1], "Detalle": r[2], "Modulo": r[3]})
 
             cur.execute("""
-                SELECT 'Equipo' as tipo, nombre_equipo as descripcion,
-                    COALESCE(marca,'') || ' ' || COALESCE(modelo,'') || ' | Serie: ' || COALESCE(serie,'') as detalle,
-                    'Equipos de Computo' as modulo
-                FROM computo WHERE nombre_equipo ILIKE %s OR serie ILIKE %s OR mac_address ILIKE %s
-            """, (term, term, term))
+                SELECT 'Equipo' as tipo, COALESCE(nombre_equipo, cpu_modelo) as descripcion,
+                       tipo || ' | ' || COALESCE(cpu_marca,'') || ' ' || COALESCE(cpu_modelo,'') || ' | Serie: ' || COALESCE(cpu_serie,'') as detalle,
+                       'Equipos de Computo' as modulo
+                FROM inventario_equipos
+                WHERE nombre_equipo ILIKE %s OR cpu_serie ILIKE %s OR mac ILIKE %s
+                  OR nombre_usuario ILIKE %s OR num_inventario ILIKE %s
+            """, (term, term, term, term, term))
             for r in cur.fetchall():
                 resultados.append({"Tipo": r[0], "Descripcion": r[1], "Detalle": r[2], "Modulo": r[3]})
 
@@ -299,13 +744,13 @@ if menu == "🏠 Inicio":
 
             cur.execute("SELECT COUNT(*) FROM usuarios WHERE activo = true")
             total_usuarios = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM computo")
+            cur.execute("SELECT COUNT(*) FROM inventario_equipos")
             total_computo = cur.fetchone()[0]
             cur.execute("SELECT COUNT(*) FROM impresoras")
             total_impresoras = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM computo WHERE estatus = 'activo'")
+            cur.execute("SELECT COUNT(*) FILTER (WHERE tipo='Laptop') FROM inventario_equipos")
             equipos_activos = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM computo WHERE estatus IN ('dañado','en reparacion')")
+            cur.execute("SELECT COUNT(*) FILTER (WHERE tipo IN ('PC Avanzada','PC Especializada')) FROM inventario_equipos")
             equipos_danados = cur.fetchone()[0]
             cur.execute("SELECT COUNT(*) FROM inventario_ips_completo WHERE estatus ILIKE 'Libre%'")
             ips_libres = cur.fetchone()[0]
@@ -333,10 +778,8 @@ if menu == "🏠 Inicio":
 
             st.markdown("#### Equipos e IPs")
             col5, col6, col7, col8 = st.columns(4)
-            col5.metric("✅ Equipos activos",     equipos_activos)
-            col6.metric("⚠️ Dañados / Reparacion", equipos_danados,
-                        delta=f"+{equipos_danados}" if equipos_danados > 0 else None,
-                        delta_color="inverse")
+            col5.metric("💻 Laptops",        equipos_activos)
+            col6.metric("🖥️ PCs (Av + Esp)", equipos_danados)
             col7.metric("🟢 IPs libres",   ips_libres)
             col8.metric("🔴 IPs ocupadas", ips_ocupadas)
 
@@ -429,7 +872,7 @@ elif menu == "👤 Usuarios":
                 "puesto": "Puesto", "correo": "Correo", "departamento": "Departamento",
             }
 
-            col_btn, col_inf, col_xls, col_pdf = st.columns([1, 1.4, 1, 1])
+            col_btn, col_inf, col_inf_pdf, col_xls, col_pdf = st.columns([1, 1.2, 1.2, 1, 1])
             with col_btn:
                 guardar = st.button("💾 Guardar cambios", type="primary", use_container_width=True, key="usr_guardar")
 
@@ -447,14 +890,18 @@ elif menu == "👤 Usuarios":
 
                         cur_inf.execute("""
                             SELECT u.nombre || ' ' || u.apellido_paterno AS "Usuario",
-                                c.nombre_equipo AS "Equipo", c.marca AS "Marca",
-                                c.modelo AS "Modelo", c.serie AS "Serie",
-                                c.mac_address AS "MAC", c.estatus AS "Estatus"
-                            FROM computo c JOIN usuarios u ON c.id_usuario = u.id_usuario
-                            WHERE u.id_usuario = ANY(%s) ORDER BY u.apellido_paterno
+                                   e.tipo AS "Tipo", e.nombre_equipo AS "Equipo",
+                                   e.cpu_marca AS "Marca", e.cpu_modelo AS "Modelo",
+                                   e.cpu_serie AS "Serie", e.ipv4 AS "IPv4", e.mac AS "MAC"
+                            FROM inventario_equipos e
+                            JOIN usuarios u ON (
+                                e.id_usuario = u.id_usuario
+                                OR (e.id_usuario IS NULL AND e.nombre_usuario ILIKE '%%' || u.apellido_paterno || '%%')
+                            )
+                            WHERE u.id_usuario = ANY(%s) ORDER BY u.apellido_paterno, e.tipo
                         """, (id_usuarios,))
                         df_h2 = pd.DataFrame(cur_inf.fetchall(),
-                                            columns=["Usuario","Equipo","Marca","Modelo","Serie","MAC","Estatus"])
+                                             columns=["Usuario","Tipo","Equipo","Marca","Modelo","Serie","IPv4","MAC"])
 
                         cur_inf.execute("""
                             SELECT u.nombre || ' ' || u.apellido_paterno AS "Usuario",
@@ -525,15 +972,15 @@ elif menu == "👤 Usuarios":
                                 vals = [str(h)] + [str(r[h]) if r[h] is not None and not (isinstance(r[h], float) and pd.isna(r[h])) else "" for _, r in df.iterrows()]
                                 ws.column_dimensions[gcl(ci)].width = min(max(len(v) for v in vals) + 4, 45)
 
+                        df_inventario = leer_inventario_datos_xlsx()
+
                         wb = Workbook(); wb.remove(wb.active)
-                        _hoja(wb, df_h1, "Usuarios")
-                        if not df_h2.empty: _hoja(wb, df_h2, "Equipos")
+                        if not df_inventario.empty: _hoja(wb, df_inventario, "Equipos")
                         if not df_h3.empty: _hoja(wb, df_h3, "Telefonos")
                         if not df_h4.empty: _hoja(wb, df_h4, "Impresoras")
-                        if not df_h5.empty: _hoja(wb, df_h5, "IPs Asignadas")
                         buf_inf = BytesIO(); wb.save(buf_inf); buf_inf.seek(0)
 
-                        hojas = 1 + (not df_h2.empty) + (not df_h3.empty) + (not df_h4.empty) + (not df_h5.empty)
+                        hojas = (not df_inventario.empty) + (not df_h3.empty) + (not df_h4.empty)
                         lbl = f"📊 Informe ({n_sel} sel.)" if n_sel else f"📊 Informe ({hojas} hojas)"
                         st.download_button(lbl, data=buf_inf.getvalue(),
                                         file_name=f"informe_usuarios_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
@@ -541,6 +988,72 @@ elif menu == "👤 Usuarios":
                                         use_container_width=True, key="usr_export_excel")
                     except Exception as e:
                         st.error(f"Error al generar informe: {e}")
+
+            with col_inf_pdf:
+                if not _df_inf_base.empty:
+                    try:
+                        id_usuarios_pdf = [int(r) for r in _df_inf_base["id_usuario"].tolist() if pd.notna(r)]
+                        cur_pdf = get_conn().cursor()
+                        df_p1 = _df_inf_base.drop(columns=["sel","id_usuario"], errors="ignore").rename(columns=_RENAME_USR)
+                        cur_pdf.execute("""
+                            SELECT u.nombre || ' ' || u.apellido_paterno AS "Usuario",
+                                   e.tipo AS "Tipo", e.nombre_equipo AS "Equipo",
+                                   e.cpu_marca AS "Marca", e.cpu_modelo AS "Modelo",
+                                   e.cpu_serie AS "Serie", e.ipv4 AS "IPv4", e.mac AS "MAC"
+                            FROM inventario_equipos e
+                            JOIN usuarios u ON (
+                                e.id_usuario = u.id_usuario
+                                OR (e.id_usuario IS NULL AND e.nombre_usuario ILIKE '%%' || u.apellido_paterno || '%%')
+                            )
+                            WHERE u.id_usuario = ANY(%s) ORDER BY u.apellido_paterno, e.tipo
+                        """, (id_usuarios_pdf,))
+                        df_p2 = pd.DataFrame(cur_pdf.fetchall(), columns=["Usuario","Tipo","Equipo","Marca","Modelo","Serie","IPv4","MAC"])
+                        cur_pdf.execute("""
+                            SELECT u.nombre || ' ' || u.apellido_paterno AS "Usuario",
+                                   t.numero_general AS "Numero General", t.extension AS "Extension"
+                            FROM telefonos t JOIN usuarios u ON t.id_usuario = u.id_usuario
+                            WHERE u.id_usuario = ANY(%s) ORDER BY u.apellido_paterno
+                        """, (id_usuarios_pdf,))
+                        df_p3 = pd.DataFrame(cur_pdf.fetchall(), columns=["Usuario","Numero General","Extension"])
+                        cur_pdf.execute("""
+                            SELECT u.nombre || ' ' || u.apellido_paterno AS "Usuario",
+                                   i.marca AS "Marca", i.modelo AS "Modelo", i.serie AS "Serie",
+                                   COALESCE(i.ip_address::text,'') AS "IP", i.firmware AS "Firmware"
+                            FROM impresoras i JOIN usuarios u ON i.id_usuario = u.id_usuario
+                            WHERE u.id_usuario = ANY(%s) ORDER BY u.apellido_paterno
+                        """, (id_usuarios_pdf,))
+                        df_p4 = pd.DataFrame(cur_pdf.fetchall(), columns=["Usuario","Marca","Modelo","Serie","IP","Firmware"])
+                        cur_pdf.execute("""
+                            SELECT DISTINCT ON (i.ip)
+                                   u.nombre || ' ' || u.apellido_paterno AS "Usuario",
+                                   i.ip AS "IP", i.tipo_equipo AS "Tipo",
+                                   i.mac AS "MAC", i.marca AS "Marca",
+                                   i.estatus AS "Estatus", i.departamento_pestana AS "Area"
+                            FROM inventario_ips_completo i
+                            JOIN usuarios u ON (
+                                i.id_usuario = u.id_usuario
+                                OR (i.id_usuario IS NULL AND i.usuario ILIKE '%%' || u.apellido_paterno || '%%')
+                            )
+                            WHERE u.id_usuario = ANY(%s) AND i.estatus != 'Libre'
+                            ORDER BY i.ip
+                        """, (id_usuarios_pdf,))
+                        df_p5 = pd.DataFrame(cur_pdf.fetchall(), columns=["Usuario","IP","Tipo","MAC","Marca","Estatus","Area"])
+                        cur_pdf.close()
+
+                        df_inv_pdf = leer_inventario_datos_xlsx()
+                        secciones = [
+                            ("Equipos de Computo",   df_inv_pdf),
+                            ("Telefonos",            df_p3),
+                            ("Impresoras",           df_p4),
+                        ]
+                        pdf_inf_bytes = generar_pdf_informe_completo(secciones).read()
+                        lbl_inf_pdf = f"📄 Informe PDF ({n_sel} sel.)" if n_sel else "📄 Informe PDF"
+                        st.download_button(lbl_inf_pdf, data=pdf_inf_bytes,
+                                           file_name=f"informe_usuarios_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                           mime="application/pdf",
+                                           use_container_width=True, key="usr_informe_pdf")
+                    except Exception as e:
+                        st.error(f"Error PDF informe: {e}")
 
             with col_xls:
                 if not df_edited.empty:
@@ -693,270 +1206,737 @@ elif menu == "👤 Usuarios":
 # EQUIPOS DE COMPUTO
 # ════════════════════════════════════════
 elif menu == "💻 Equipos de Computo":
-    st.subheader("💻 Equipos de Computo")
-    tab1, tab2, tab3 = st.tabs(["Resumen", "Gestionar", "Agregar"])
+    st.subheader("💻 Equipos de Cómputo")
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📊 Resumen", "💻 Laptops", "🖥️ PC Avanzadas", "🖥️ PC Especializadas", "➕ Agregar"
+    ])
 
-    with tab1:
-        try:
-            conn = get_conn()
-            cur = conn.cursor()
-            if "expandido" not in st.session_state:
-                st.session_state.expandido = False
-
-            col_f1, col_f2, col_f3 = st.columns([1, 2, 0.4])
-            filtro   = col_f1.selectbox("Estatus", ["Todos", "activo", "dañado", "en reparacion"], key="eq_filtro")
-            busqueda = col_f2.text_input("Buscar usuario o equipo", placeholder="Ej: Adriana, Dell...", key="eq_busq")
-            with col_f3:
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("⛶", help="Expandir tabla", key="eq_expand_top"):
-                    st.session_state.expandido = not st.session_state.expandido
-                    st.rerun()
-
-            query_base = """
-                SELECT
-                    u.nombre || ' ' || u.apellido_paterno AS "Usuario",
-                    STRING_AGG(DISTINCT NULLIF(c.nombre_equipo, ''), ', ') AS "Equipos",
-                    STRING_AGG(DISTINCT NULLIF(c.serie, ''), ' / ') AS "Series",
-                    COUNT(c.id_computo) AS "Total"
-                FROM public.computo c
-                INNER JOIN public.usuarios u ON c.id_usuario = u.id_usuario
-            """
-            if filtro == "Todos":
-                cur.execute(query_base + " GROUP BY u.nombre, u.apellido_paterno ORDER BY \"Total\" DESC;")
-            else:
-                cur.execute(query_base + " WHERE c.estatus = %s GROUP BY u.nombre, u.apellido_paterno ORDER BY \"Total\" DESC;", (filtro,))
-
-            df = pd.DataFrame(cur.fetchall(), columns=["Usuario", "Equipos", "Series", "Total"])
-            cur.close()
-            if busqueda:
-                mask = df.apply(lambda col: col.astype(str).str.contains(busqueda, case=False, na=False)).any(axis=1)
-                df = df[mask].reset_index(drop=True)
-
-            altura = 700 if st.session_state.expandido else 420
-            seleccion = st.dataframe(df, use_container_width=True, hide_index=True,
-                                    height=altura, on_select="rerun", selection_mode="single-row")
-
-            df_detalles = None
-            usuario_sel = None
-
-            if seleccion.selection.rows:
-                indice = seleccion.selection.rows[0]
-                usuario_sel = df.iloc[indice]["Usuario"]
-                st.markdown("---")
-                st.subheader(f"📋 Equipos de: {usuario_sel}")
-                cur2 = get_conn().cursor()
-                cur2.execute("""
-                    SELECT c.nombre_equipo AS "Equipo", c.marca AS "Marca", c.modelo AS "Modelo",
-                        c.serie AS "Serie", c.mac_address AS "MAC", c.estatus AS "Estatus"
-                    FROM public.computo c
-                    JOIN public.usuarios u ON c.id_usuario = u.id_usuario
-                    WHERE (u.nombre || ' ' || u.apellido_paterno) = %s
-                """, (usuario_sel,))
-                df_detalles = pd.DataFrame(cur2.fetchall(), columns=["Equipo", "Marca", "Modelo", "Serie", "MAC", "Estatus"])
-                cur2.close()
-                st.table(df_detalles)
-
-            tb1, tb2, tb3_col, tb4, _ = st.columns([0.8, 0.8, 0.5, 0.5, 6])
-            with tb1:
-                try:
-                    if df_detalles is not None and not df_detalles.empty:
-                        pdf_bytes = generar_pdf_equipos_detalle(df_detalles, usuario_sel).read()
-                        nombre_archivo = f"equipos_{usuario_sel.replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
-                    else:
-                        pdf_bytes = generar_pdf_equipos_resumen(df).read()
-                        nombre_archivo = f"equipos_resumen_{datetime.now().strftime('%Y%m%d')}.pdf"
-                    st.download_button("📄 PDF", data=pdf_bytes, file_name=nombre_archivo, mime="application/pdf", use_container_width=True)
-                except Exception as e:
-                    st.button("📄 PDF", disabled=True)
-                    st.caption(f"Error PDF: {e}")
-            with tb2:
-                try:
-                    if df_detalles is not None and not df_detalles.empty:
-                        excel_buffer = generar_excel_formateado(df_detalles, "Equipos")
-                        nombre_archivo = f"equipos_{usuario_sel.replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.xlsx"
-                    else:
-                        excel_buffer = generar_excel_formateado(df, "Resumen")
-                        nombre_archivo = f"equipos_resumen_{datetime.now().strftime('%Y%m%d')}.xlsx"
-                    st.download_button("📊 Excel", data=excel_buffer.getvalue(), file_name=nombre_archivo,
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    use_container_width=True)
-                except Exception as e:
-                    st.button("📊 Excel", disabled=True)
-            with tb4:
-                if st.button("⛶", help="Pantalla completa", key="eq_expand_bot"):
-                    st.session_state.expandido = not st.session_state.expandido
-                    st.rerun()
-
-            if not seleccion.selection.rows:
-                st.caption(f"💡 Selecciona una fila para ver detalles. Total: {len(df)} usuarios.")
-        except Exception as e:
-            safe_rollback()
-            st.error(f"Error: {e}")
-
-    with tab2:
+    # ── helper compartido para los tabs de edición ───────────────────────────
+    def _eq_tab(tipo, key_prefix, col_cfg_extra, rename_map, pdf_titulo):
         try:
             cur = get_conn().cursor()
-            cur.execute("SELECT id_usuario, nombre || ' ' || apellido_paterno FROM usuarios ORDER BY apellido_paterno")
-            rows_u = cur.fetchall()
+            cur.execute(
+                "SELECT id_usuario, nombre || ' ' || apellido_paterno FROM usuarios ORDER BY apellido_paterno"
+            )
+            _rows_u = cur.fetchall()
+            _umap   = {r[1]: r[0] for r in _rows_u}
+            _unames = [""] + list(_umap.keys())
 
-            col_f1, col_f2 = st.columns([1, 2])
-            estatus_f = col_f1.selectbox("Estatus", ["Todos", "activo", "dañado", "en reparacion"], key="gest_eq_est")
-            busqueda_eq = col_f2.text_input("Buscar equipo o usuario", placeholder="Ej: Dell, Juan...", key="gest_eq_busq")
+            busqueda_eq = st.text_input(
+                "Buscar equipo, usuario, serie, MAC, área...",
+                placeholder="Ej: IMJ-01, Juan, OPTIPLEX...",
+                key=f"{key_prefix}_busq"
+            )
 
-            query = """
-                SELECT c.id_computo,
-                    COALESCE(u.nombre || ' ' || u.apellido_paterno, '') as usuario,
-                    c.nombre_equipo, c.marca, c.modelo, c.serie, c.mac_address, c.estatus
-                FROM computo c LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
-                WHERE 1=1
-            """
-            params = []
-            if estatus_f != "Todos":
-                query += " AND c.estatus = %s"
-                params.append(estatus_f)
-            query += " ORDER BY u.apellido_paterno, c.nombre_equipo"
-            cur.execute(query, params)
-            rows = cur.fetchall()
+            cur.execute(
+                "SELECT * FROM inventario_equipos WHERE tipo=%s ORDER BY consecutivo",
+                (tipo,)
+            )
+            colnames = [d[0] for d in cur.description]
+            df = pd.DataFrame(cur.fetchall(), columns=colnames)
             cur.close()
 
-            usuarios_map   = {r[1]: r[0] for r in rows_u}
-            usuarios_names = list(usuarios_map.keys())
-
-            df = pd.DataFrame(rows, columns=[
-                "id_computo", "usuario", "nombre_equipo", "marca", "modelo", "serie", "mac", "estatus"
-            ])
-
             if busqueda_eq:
-                mask = df.apply(lambda col: col.astype(str).str.contains(busqueda_eq, case=False, na=False)).any(axis=1)
+                mask = df.apply(
+                    lambda col: col.astype(str).str.contains(busqueda_eq, case=False, na=False)
+                ).any(axis=1)
                 df = df[mask].reset_index(drop=True)
 
-            st.caption(f"{len(df)} equipos — edita en la tabla y presiona **Guardar cambios**. Cambia Usuario para reasignar.")
+            # La columna usuario mostrada es el nombre_usuario del Excel, editable via selectbox
+            col_cfg = {
+                "id":             None,
+                "tipo":           None,
+                "id_usuario":     None,
+                "fecha_carga":    None,
+                "consecutivo":    st.column_config.NumberColumn("No.", disabled=True, width="small"),
+                "num_inventario": st.column_config.TextColumn("Inventario"),
+                "nombre_equipo":  st.column_config.TextColumn("Equipo"),
+                "nombre_usuario": st.column_config.SelectboxColumn("Usuario", options=_unames),
+                "perfil":         st.column_config.TextColumn("Perfil"),
+                "area":           st.column_config.TextColumn("Área"),
+                "cpu_marca":      st.column_config.TextColumn("Marca CPU"),
+                "cpu_modelo":     st.column_config.TextColumn("Modelo CPU"),
+                "cpu_serie":      st.column_config.TextColumn("Serie CPU"),
+                "ipv4":           st.column_config.TextColumn("IPv4"),
+                "mac":            st.column_config.TextColumn("MAC"),
+                "responsiva":     st.column_config.TextColumn("Responsiva"),
+                "observaciones":  st.column_config.TextColumn("Observaciones"),
+            }
+            col_cfg.update(col_cfg_extra)
 
+            st.caption(
+                f"{len(df)} equipos — edita en la tabla y presiona **Guardar cambios**."
+            )
             df_edited = st.data_editor(
                 df,
                 use_container_width=True,
                 hide_index=True,
                 num_rows="fixed",
-                key="eq_data_editor",
-                column_config={
-                    "id_computo":    None,
-                    "usuario":       st.column_config.SelectboxColumn("Usuario", options=usuarios_names, required=True),
-                    "nombre_equipo": st.column_config.TextColumn("Equipo"),
-                    "marca":         st.column_config.TextColumn("Marca"),
-                    "modelo":        st.column_config.TextColumn("Modelo"),
-                    "serie":         st.column_config.TextColumn("Serie"),
-                    "mac":           st.column_config.TextColumn("MAC"),
-                    "estatus":       st.column_config.SelectboxColumn("Estatus",
-                                        options=["activo", "dañado", "en reparacion"], required=True),
-                },
+                key=f"{key_prefix}_editor",
+                column_config=col_cfg,
             )
 
-            col_btn, col_exp, col_pdf = st.columns([1, 2, 1])
+            _HIDDEN = {"id", "tipo", "id_usuario", "fecha_carga"}
+            _df_exp = df_edited.drop(columns=list(_HIDDEN), errors="ignore").rename(columns=rename_map)
+
+            col_btn, col_xls, col_pdf = st.columns([1, 2, 1])
             with col_btn:
-                guardar_eq = st.button("💾 Guardar cambios", type="primary", use_container_width=True, key="eq_guardar")
-            with col_exp:
-                if not df_edited.empty:
-                    _df_exp = df_edited.drop(columns=["id_computo"], errors="ignore").rename(columns={
-                        "usuario": "Usuario", "nombre_equipo": "Equipo", "marca": "Marca",
-                        "modelo": "Modelo", "serie": "Serie", "mac": "MAC Address", "estatus": "Estatus",
-                    })
-                    excel_buf = generar_excel_formateado(_df_exp, "Equipos")
-                    st.download_button("📥 Exportar Excel", data=excel_buf.getvalue(),
-                                    file_name=f"equipos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    use_container_width=True, key="eq_export")
+                guardar = st.button(
+                    "💾 Guardar cambios", type="primary",
+                    use_container_width=True, key=f"{key_prefix}_guardar"
+                )
+            with col_xls:
+                if not _df_exp.empty:
+                    xls_buf = generar_excel_formateado(_df_exp, tipo[:31])
+                    st.download_button(
+                        "📥 Exportar Excel", data=xls_buf.getvalue(),
+                        file_name=f"{key_prefix}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True, key=f"{key_prefix}_xls"
+                    )
             with col_pdf:
-                if not df_edited.empty:
+                if not _df_exp.empty:
                     try:
-                        _df_p = df_edited.drop(columns=["id_computo"], errors="ignore").rename(columns={
-                            "usuario": "Usuario", "nombre_equipo": "Equipo", "marca": "Marca",
-                            "modelo": "Modelo", "serie": "Serie", "mac": "MAC", "estatus": "Estatus",
-                        })
-                        st.download_button("📄 PDF", data=generar_pdf_generico(_df_p, "Equipos de Computo").read(),
-                                        file_name=f"equipos_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                                        mime="application/pdf", use_container_width=True, key="eq_pdf")
+                        st.download_button(
+                            "📄 PDF", use_container_width=True,
+                            data=generar_pdf_generico(_df_exp, pdf_titulo).read(),
+                            file_name=f"{key_prefix}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                            mime="application/pdf", key=f"{key_prefix}_pdf"
+                        )
                     except Exception as e:
                         st.error(f"Error PDF: {e}")
 
-            if guardar_eq:
-                errores = []
-                for _, row in df_edited.iterrows():
-                    mac_val = str(row.get("mac", "") or "").strip()
-                    if mac_val and not validar_mac(mac_val):
-                        errores.append(f"MAC invalido: {mac_val}")
-                if errores:
-                    for err in errores:
-                        st.warning(err)
-                else:
-                    try:
-                        cur3 = get_conn().cursor()
-                        count = 0
-                        for _, row in df_edited.iterrows():
-                            id_usuario = usuarios_map.get(row.get("usuario"))
-                            cur3.execute("""
-                                UPDATE computo
-                                SET id_usuario=%s, nombre_equipo=%s, marca=%s,
-                                    modelo=%s, serie=%s, mac_address=%s, estatus=%s
-                                WHERE id_computo=%s
-                            """, (
-                                id_usuario,
-                                row.get("nombre_equipo") or None,
-                                row.get("marca") or None,
-                                row.get("modelo") or None,
-                                row.get("serie") or None,
-                                row.get("mac") or None,
-                                row.get("estatus"),
-                                int(row["id_computo"]),
-                            ))
-                            count += 1
-                        get_conn().commit()
-                        cur3.close()
-                        st.success(f"✅ {count} equipo(s) guardados correctamente.")
-                        st.rerun()
-                    except Exception as e:
-                        safe_rollback()
-                        st.error(f"Error al guardar: {e}")
+            if guardar:
+                try:
+                    cur3 = get_conn().cursor()
+                    count = 0
+                    for _, row in df_edited.iterrows():
+                        _nombre_u = (row.get("nombre_usuario") or "").strip() or None
+                        _id_u     = _umap.get(_nombre_u) if _nombre_u else None
+                        upd_cols  = [c for c in df.columns if c not in ("id", "tipo", "fecha_carga")]
+                        set_parts = ", ".join(f"{c}=%s" for c in upd_cols)
+                        vals = []
+                        for c in upd_cols:
+                            v = row.get(c)
+                            if c == "nombre_usuario":
+                                vals.append(_nombre_u)
+                            elif c == "id_usuario":
+                                vals.append(_id_u)
+                            else:
+                                vals.append(None if (v is None or (isinstance(v, float) and pd.isna(v)) or str(v).strip() in ('', 'nan', 'None')) else v)
+                        vals.append(int(row["id"]))
+                        cur3.execute(f"UPDATE inventario_equipos SET {set_parts} WHERE id=%s", vals)
+                        count += 1
+                    get_conn().commit()
+                    cur3.close()
+                    st.success(f"✅ {count} equipo(s) guardados.")
+                    st.rerun()
+                except Exception as e:
+                    safe_rollback()
+                    st.error(f"Error al guardar: {e}")
         except Exception as e:
             safe_rollback()
             st.error(f"Error: {e}")
 
-    with tab3:
+    # ── Tab 1: Resumen ────────────────────────────────────────────────────────
+    with tab1:
         try:
             cur = get_conn().cursor()
-            cur.execute("SELECT id_usuario, nombre, apellido_paterno FROM usuarios WHERE activo = true ORDER BY apellido_paterno")
-            usuarios = cur.fetchall()
+            cur.execute("""
+                SELECT tipo,
+                       COUNT(*) AS total,
+                       COUNT(*) FILTER (WHERE id_usuario IS NOT NULL)  AS vinculados,
+                       COUNT(*) FILTER (WHERE id_usuario IS NULL)      AS sin_usuario
+                FROM inventario_equipos
+                GROUP BY tipo ORDER BY tipo
+            """)
+            df_res = pd.DataFrame(cur.fetchall(), columns=["Tipo", "Total", "Vinculados", "Sin usuario"])
+
+            cur.execute("""
+                SELECT area, tipo, COUNT(*) AS total
+                FROM inventario_equipos
+                WHERE area IS NOT NULL
+                GROUP BY area, tipo
+                ORDER BY area, tipo
+            """)
+            df_area = pd.DataFrame(cur.fetchall(), columns=["Área", "Tipo", "Total"])
             cur.close()
-            opciones_usr = {f"{u[1]} {u[2]}": u[0] for u in usuarios}
-            with st.form("agregar_equipo"):
-                sel_usr    = st.selectbox("Asignar a usuario", list(opciones_usr.keys()))
-                col1, col2 = st.columns(2)
-                nombre_eq  = col1.text_input("Nombre del equipo")
-                marca      = col2.text_input("Marca")
-                col3, col4 = st.columns(2)
-                modelo = col3.text_input("Modelo")
-                serie  = col4.text_input("Serie")
-                col5, col6 = st.columns(2)
-                mac     = col5.text_input("MAC Address")
-                estatus = col6.selectbox("Estatus", ["activo", "dañado", "en reparacion"])
+
+            total_all = int(df_res["Total"].sum()) if not df_res.empty else 0
+            col_a, col_b, col_c, col_d = st.columns(4)
+            col_a.metric("Total equipos", total_all)
+            for _, rr in df_res.iterrows():
+                if rr["Tipo"] == "Laptop":
+                    col_b.metric("Laptops", int(rr["Total"]))
+                elif rr["Tipo"] == "PC Avanzada":
+                    col_c.metric("PC Avanzadas", int(rr["Total"]))
+                elif rr["Tipo"] == "PC Especializada":
+                    col_d.metric("PC Especializadas", int(rr["Total"]))
+
+            st.markdown("#### Distribución por tipo")
+            st.dataframe(df_res, use_container_width=True, hide_index=True)
+
+            st.markdown("#### Equipos por área y tipo")
+            if not df_area.empty:
+                _areas_opts  = sorted(df_area["Área"].dropna().unique().tolist())
+                _tipos_opts  = sorted(df_area["Tipo"].dropna().unique().tolist())
+
+                col_fa, col_ft = st.columns([2, 1])
+                _area_sel = col_fa.multiselect("Filtrar por área", _areas_opts,
+                                               placeholder="Todas las áreas", key="res_area_f")
+                _tipo_sel = col_ft.multiselect("Filtrar por tipo", _tipos_opts,
+                                               placeholder="Todos los tipos", key="res_tipo_f")
+
+                df_area_f = df_area.copy()
+                if _area_sel:
+                    df_area_f = df_area_f[df_area_f["Área"].isin(_area_sel)]
+                if _tipo_sel:
+                    df_area_f = df_area_f[df_area_f["Tipo"].isin(_tipo_sel)]
+
+                df_pivot = df_area_f.pivot_table(index="Área", columns="Tipo", values="Total", fill_value=0)
+                df_pivot["Total"] = df_pivot.sum(axis=1)
+                df_pivot = df_pivot.sort_values("Total", ascending=False).reset_index()
+                st.dataframe(df_pivot, use_container_width=True)
+                st.caption(f"Mostrando {int(df_area_f['Total'].sum())} equipos en {len(df_pivot)} área(s).")
+
+                # Obtener los registros detallados del filtro para descarga
+                cur_f = get_conn().cursor()
+                q_f = "SELECT * FROM inventario_equipos WHERE area IS NOT NULL"
+                p_f = []
+                if _area_sel:
+                    q_f += f" AND area = ANY(%s)"
+                    p_f.append(_area_sel)
+                if _tipo_sel:
+                    q_f += f" AND tipo = ANY(%s)"
+                    p_f.append(_tipo_sel)
+                q_f += " ORDER BY tipo, area, consecutivo"
+                cur_f.execute(q_f, p_f)
+                _cols_f = [d[0] for d in cur_f.description]
+                df_filtro = pd.DataFrame(cur_f.fetchall(), columns=_cols_f)
+                cur_f.close()
+                df_filtro = df_filtro.drop(columns=["id","id_usuario","fecha_carga"], errors="ignore")
+
+                col_xls_f, col_pdf_f, _ = st.columns([1, 1, 4])
+                with col_xls_f:
+                    if not df_filtro.empty:
+                        xls_f = generar_excel_formateado(df_filtro, "Equipos filtro")
+                        st.download_button(
+                            "📥 Excel del filtro", data=xls_f.getvalue(),
+                            file_name=f"equipos_filtro_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True, key="eq_res_xls_f"
+                        )
+                with col_pdf_f:
+                    if not df_filtro.empty:
+                        try:
+                            st.download_button(
+                                "📄 PDF del filtro", use_container_width=True,
+                                data=generar_pdf_generico(df_filtro, "Inventario Equipos — Filtro").read(),
+                                file_name=f"equipos_filtro_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                mime="application/pdf", key="eq_res_pdf_f"
+                            )
+                        except Exception as e:
+                            st.error(f"Error PDF: {e}")
+
+            col_xls_r, col_pdf_r, _ = st.columns([1, 1, 4])
+            with col_xls_r:
+                if not df_res.empty:
+                    try:
+                        from openpyxl import Workbook
+                        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+                        from openpyxl.utils import get_column_letter
+
+                        AZUL = "1A3C5E"; CELESTE = "EAF1FB"; BORDE_C = "BFBFBF"
+                        _borde = Border(
+                            left=Side(style="thin", color=BORDE_C), right=Side(style="thin", color=BORDE_C),
+                            top=Side(style="thin", color=BORDE_C),  bottom=Side(style="thin", color=BORDE_C),
+                        )
+                        wb_all = Workbook()
+                        wb_all.remove(wb_all.active)
+
+                        _COLS_OCULTAS = {"id", "tipo", "id_usuario", "fecha_carga"}
+                        for _tipo in ["Laptop", "PC Avanzada", "PC Especializada"]:
+                            cur_t = get_conn().cursor()
+                            cur_t.execute(
+                                "SELECT * FROM inventario_equipos WHERE tipo=%s ORDER BY consecutivo",
+                                (_tipo,)
+                            )
+                            _cols_t = [d[0] for d in cur_t.description]
+                            _rows_t = cur_t.fetchall()
+                            cur_t.close()
+                            _df_t = pd.DataFrame(_rows_t, columns=_cols_t)
+                            _df_t = _df_t.drop(columns=list(_COLS_OCULTAS), errors="ignore")
+
+                            _ws = wb_all.create_sheet(title=_tipo[:31])
+                            _hdrs = list(_df_t.columns)
+                            for ci, h in enumerate(_hdrs, 1):
+                                c = _ws.cell(row=1, column=ci, value=h)
+                                c.font = Font(bold=True, color="FFFFFF", size=10)
+                                c.fill = PatternFill("solid", fgColor=AZUL)
+                                c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                                c.border = _borde
+                            _ws.row_dimensions[1].height = 26
+                            _fill_alt = PatternFill("solid", fgColor=CELESTE)
+                            for ri, (_, row) in enumerate(_df_t.iterrows(), 2):
+                                for ci, h in enumerate(_hdrs, 1):
+                                    val = row[h]
+                                    if val is None or (isinstance(val, float) and pd.isna(val)): val = ""
+                                    c = _ws.cell(row=ri, column=ci, value=val)
+                                    c.font = Font(size=9); c.alignment = Alignment(vertical="center"); c.border = _borde
+                                    if ri % 2 == 0: c.fill = _fill_alt
+                            for ci, h in enumerate(_hdrs, 1):
+                                vals = [str(h)] + [
+                                    str(row[h]) if row[h] is not None and not (isinstance(row[h], float) and pd.isna(row[h])) else ""
+                                    for _, row in _df_t.iterrows()
+                                ]
+                                _ws.column_dimensions[get_column_letter(ci)].width = min(max(len(v) for v in vals) + 4, 40)
+                            _ws.freeze_panes = "A2"
+
+                        _buf_all = BytesIO(); wb_all.save(_buf_all); _buf_all.seek(0)
+                        st.download_button(
+                            "📥 Excel completo (3 hojas)", data=_buf_all.getvalue(),
+                            file_name=f"inventario_equipos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+                    except Exception as e:
+                        st.error(f"Error generando Excel: {e}")
+            with col_pdf_r:
+                if not df_res.empty:
+                    try:
+                        st.download_button(
+                            "📄 PDF resumen", use_container_width=True,
+                            data=generar_pdf_generico(df_res, "Resumen Equipos de Cómputo").read(),
+                            file_name=f"equipos_resumen_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                            mime="application/pdf", key="eq_res_pdf"
+                        )
+                    except Exception as e:
+                        st.error(f"Error PDF: {e}")
+        except Exception as e:
+            safe_rollback()
+            st.error(f"Error: {e}")
+
+    # ── Tab 2: Laptops ────────────────────────────────────────────────────────
+    with tab2:
+        _eq_tab(
+            tipo="Laptop",
+            key_prefix="lap",
+            col_cfg_extra={
+                "teclado_serie":  None,
+                "mouse_serie":    None,
+                "monitor_marca":  None,
+                "monitor_modelo": None,
+                "monitor_serie":  None,
+                "nobreak_marca":  None,
+                "nobreak_modelo": None,
+                "nobreak_serie":  None,
+                "ipv4_actual":    None,
+                "check_entrega":  None,
+                "cargador_serie": st.column_config.TextColumn("Serie Cargador"),
+                "docking_marca":  st.column_config.TextColumn("Marca Docking"),
+                "docking_modelo": st.column_config.TextColumn("Modelo Docking"),
+                "docking_serie":  st.column_config.TextColumn("Serie Docking"),
+                "candado":        st.column_config.TextColumn("Candado"),
+            },
+            rename_map={
+                "num_inventario": "Inventario", "nombre_equipo": "Equipo",
+                "nombre_usuario": "Usuario", "perfil": "Perfil", "area": "Área",
+                "cpu_marca": "Marca", "cpu_modelo": "Modelo", "cpu_serie": "Serie CPU",
+                "cargador_serie": "Serie Cargador",
+                "docking_marca": "Marca Docking", "docking_modelo": "Modelo Docking",
+                "docking_serie": "Serie Docking", "candado": "Candado",
+                "ipv4": "IPv4", "mac": "MAC", "responsiva": "Responsiva",
+                "observaciones": "Observaciones",
+            },
+            pdf_titulo="Inventario Laptops",
+        )
+
+    # ── Tab 3: PC Avanzadas ───────────────────────────────────────────────────
+    with tab3:
+        _eq_tab(
+            tipo="PC Avanzada",
+            key_prefix="pca",
+            col_cfg_extra={
+                "cargador_serie": None,
+                "docking_marca":  None,
+                "docking_modelo": None,
+                "docking_serie":  None,
+                "candado":        None,
+                "ipv4_actual":    None,
+                "check_entrega":  None,
+                "teclado_serie":  st.column_config.TextColumn("Serie Teclado"),
+                "mouse_serie":    st.column_config.TextColumn("Serie Mouse"),
+                "monitor_marca":  st.column_config.TextColumn("Marca Monitor"),
+                "monitor_modelo": st.column_config.TextColumn("Modelo Monitor"),
+                "monitor_serie":  st.column_config.TextColumn("Serie Monitor"),
+                "nobreak_marca":  st.column_config.TextColumn("Marca No-Break"),
+                "nobreak_modelo": st.column_config.TextColumn("Modelo No-Break"),
+                "nobreak_serie":  st.column_config.TextColumn("Serie No-Break"),
+            },
+            rename_map={
+                "num_inventario": "Inventario", "nombre_equipo": "Equipo",
+                "nombre_usuario": "Usuario", "perfil": "Perfil", "area": "Área",
+                "cpu_marca": "Marca CPU", "cpu_modelo": "Modelo CPU", "cpu_serie": "Serie CPU",
+                "teclado_serie": "Serie Teclado", "mouse_serie": "Serie Mouse",
+                "monitor_marca": "Marca Monitor", "monitor_modelo": "Modelo Monitor",
+                "monitor_serie": "Serie Monitor",
+                "nobreak_marca": "Marca No-Break", "nobreak_modelo": "Modelo No-Break",
+                "nobreak_serie": "Serie No-Break",
+                "ipv4": "IPv4", "mac": "MAC", "responsiva": "Responsiva",
+                "observaciones": "Observaciones",
+            },
+            pdf_titulo="Inventario PC Avanzadas",
+        )
+
+    # ── Tab 4: PC Especializadas ──────────────────────────────────────────────
+    with tab4:
+        _eq_tab(
+            tipo="PC Especializada",
+            key_prefix="pce",
+            col_cfg_extra={
+                "cargador_serie": None,
+                "docking_marca":  None,
+                "docking_modelo": None,
+                "docking_serie":  None,
+                "candado":        None,
+                "teclado_serie":  st.column_config.TextColumn("Serie Teclado"),
+                "mouse_serie":    st.column_config.TextColumn("Serie Mouse"),
+                "monitor_marca":  st.column_config.TextColumn("Marca Monitor"),
+                "monitor_modelo": st.column_config.TextColumn("Modelo Monitor"),
+                "monitor_serie":  st.column_config.TextColumn("Serie Monitor"),
+                "nobreak_marca":  st.column_config.TextColumn("Marca No-Break"),
+                "nobreak_modelo": st.column_config.TextColumn("Modelo No-Break"),
+                "nobreak_serie":  st.column_config.TextColumn("Serie No-Break"),
+                "ipv4_actual":    st.column_config.TextColumn("IPv4 Actual"),
+                "check_entrega":  st.column_config.TextColumn("Check"),
+            },
+            rename_map={
+                "num_inventario": "Inventario", "nombre_equipo": "Equipo",
+                "nombre_usuario": "Usuario", "perfil": "Perfil", "area": "Área",
+                "cpu_marca": "Marca CPU", "cpu_modelo": "Modelo CPU", "cpu_serie": "Serie CPU",
+                "teclado_serie": "Serie Teclado", "mouse_serie": "Serie Mouse",
+                "monitor_marca": "Marca Monitor", "monitor_modelo": "Modelo Monitor",
+                "monitor_serie": "Serie Monitor",
+                "nobreak_marca": "Marca No-Break", "nobreak_modelo": "Modelo No-Break",
+                "nobreak_serie": "Serie No-Break",
+                "ipv4": "IPv4", "ipv4_actual": "IPv4 Actual", "mac": "MAC",
+                "responsiva": "Responsiva", "check_entrega": "Check",
+                "observaciones": "Observaciones",
+            },
+            pdf_titulo="Inventario PC Especializadas",
+        )
+
+    # ── Tab 5: Agregar ────────────────────────────────────────────────────────
+    with tab5:
+        try:
+            cur = get_conn().cursor()
+            cur.execute("SELECT id_usuario, nombre || ' ' || apellido_paterno FROM usuarios WHERE activo=true ORDER BY apellido_paterno")
+            _rows_agr = cur.fetchall()
+            cur.close()
+            _umap_agr = {r[1]: r[0] for r in _rows_agr}
+
+            with st.form("agregar_equipo_nuevo"):
+                col_t1, col_t2 = st.columns(2)
+                tipo_nuevo = col_t1.selectbox("Tipo de equipo", ["Laptop", "PC Avanzada", "PC Especializada"])
+                sel_usr    = col_t2.selectbox("Asignar a usuario", [""] + list(_umap_agr.keys()))
+                col1, col2, col3 = st.columns(3)
+                num_inv   = col1.text_input("N° Inventario")
+                nombre_eq = col2.text_input("Nombre equipo (ej: IMJ-01)")
+                area_eq   = col3.text_input("Área / Departamento")
+                col4, col5, col6 = st.columns(3)
+                cpu_marca  = col4.text_input("Marca CPU")
+                cpu_modelo = col5.text_input("Modelo CPU")
+                cpu_serie  = col6.text_input("Serie CPU")
+                col7, col8 = st.columns(2)
+                ipv4_nuevo = col7.text_input("IPv4")
+                mac_nuevo  = col8.text_input("MAC Address")
+                obs_nuevo  = st.text_area("Observaciones", height=68)
+
                 if st.form_submit_button("✅ Agregar equipo"):
-                    errores = []
-                    if not nombre_eq or not marca:
-                        errores.append("Completa al menos Nombre del equipo y Marca.")
-                    if mac and not validar_mac(mac):
-                        errores.append("Formato de MAC no valido. Usa XX:XX:XX:XX:XX:XX")
-                    if errores:
-                        for err in errores:
-                            st.warning(err)
+                    if not cpu_marca:
+                        st.warning("Ingresa al menos la Marca del CPU.")
                     else:
+                        _id_u_agr = _umap_agr.get(sel_usr) if sel_usr else None
+                        _nom_u    = sel_usr if sel_usr else None
                         cur2 = get_conn().cursor()
                         cur2.execute("""
-                            INSERT INTO computo (id_usuario, nombre_equipo, marca, modelo, serie, mac_address, estatus)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        """, (opciones_usr[sel_usr], nombre_eq, marca, modelo, serie, mac, estatus))
+                            INSERT INTO inventario_equipos
+                                (tipo, num_inventario, nombre_equipo, nombre_usuario, area,
+                                 cpu_marca, cpu_modelo, cpu_serie, ipv4, mac, observaciones, id_usuario)
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        """, (tipo_nuevo, num_inv or None, nombre_eq or None, _nom_u, area_eq or None,
+                              cpu_marca, cpu_modelo or None, cpu_serie or None,
+                              ipv4_nuevo or None, mac_nuevo or None, obs_nuevo or None, _id_u_agr))
                         get_conn().commit()
                         cur2.close()
-                        st.success(f"✅ Equipo **{nombre_eq}** registrado y asignado a {sel_usr}.")
+                        st.success(f"✅ Equipo **{nombre_eq or cpu_modelo}** registrado correctamente.")
                         st.rerun()
+        except Exception as e:
+            safe_rollback()
+            st.error(f"Error: {e}")
+
+# ════════════════════════════════════════
+# MANTENIMIENTO
+# ════════════════════════════════════════
+elif menu == "🔧 Mantenimiento":
+    st.subheader("🔧 Mantenimiento Preventivo y Correctivo")
+    tab_hist, tab_nuevo = st.tabs(["📋 Historial de reportes", "➕ Nuevo reporte"])
+
+    # ── Historial ─────────────────────────────────────────────────────────────
+    with tab_hist:
+        try:
+            cur = get_conn().cursor()
+
+            col_h1, col_h2, col_h3 = st.columns([1, 1, 2])
+            estado_f = col_h1.selectbox("Estado", ["Todos", "Abierto", "Pendiente", "Cerrado"], key="mant_est_f")
+            tipo_f   = col_h2.selectbox("Tipo", ["Todos", "Preventivo", "Correctivo"], key="mant_tip_f")
+            busq_f   = col_h3.text_input("Buscar equipo, usuario, folio...", key="mant_busq_f")
+
+            q = """
+                SELECT id_reporte, folio, fecha_reporte, nombre_usuario, area,
+                       tipo_equipo, nombre_equipo, cpu_modelo, cpu_serie, num_inventario,
+                       tipo_mantenimiento, estado, falla_reportada, nombre_tecnico
+                FROM reportes_mantenimiento WHERE 1=1
+            """
+            p = []
+            if estado_f != "Todos":
+                q += " AND estado = %s"; p.append(estado_f)
+            if tipo_f != "Todos":
+                q += " AND tipo_mantenimiento = %s"; p.append(tipo_f)
+            if busq_f:
+                t = f"%{busq_f}%"
+                q += " AND (folio ILIKE %s OR nombre_usuario ILIKE %s OR cpu_modelo ILIKE %s OR nombre_equipo ILIKE %s)"
+                p.extend([t, t, t, t])
+            q += " ORDER BY fecha_reporte DESC, id_reporte DESC"
+            cur.execute(q, p)
+            rows_h = cur.fetchall()
+            cur.close()
+
+            df_hist = pd.DataFrame(rows_h, columns=[
+                "id","Folio","Fecha","Usuario","Área","Tipo Equipo","Equipo",
+                "Modelo","Serie","Inventario","Mantenimiento","Estado","Falla","Técnico"
+            ])
+
+            st.caption(f"{len(df_hist)} reportes encontrados")
+
+            sel_hist = st.dataframe(
+                df_hist.drop(columns=["id"]),
+                use_container_width=True, hide_index=True,
+                on_select="rerun", selection_mode="single-row", key="hist_sel"
+            )
+
+            if sel_hist.selection.rows and sel_hist.selection.rows[0] < len(df_hist):
+                idx = sel_hist.selection.rows[0]
+                id_rep = int(df_hist.iloc[idx]["id"])
+                cur2 = get_conn().cursor()
+                cur2.execute("SELECT * FROM reportes_mantenimiento WHERE id_reporte = %s", (id_rep,))
+                col_names = [d[0] for d in cur2.description]
+                row_rep = dict(zip(col_names, cur2.fetchone()))
+                cur2.close()
+
+                st.markdown("---")
+                c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+
+                with c1:
+                    try:
+                        pdf_bytes = generar_pdf_mantenimiento(row_rep).read()
+                        st.download_button(
+                            "📄 Descargar PDF del reporte",
+                            data=pdf_bytes,
+                            file_name=f"reporte_{row_rep.get('folio','mant')}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True, type="primary"
+                        )
+                    except Exception as e:
+                        st.error(f"Error PDF: {e}")
+
+                with c2:
+                    nuevo_estado = st.selectbox(
+                        "Cambiar estado", ["Abierto", "Pendiente", "Cerrado"],
+                        index=["Abierto","Pendiente","Cerrado"].index(row_rep.get("estado","Abierto")),
+                        key="hist_estado_cambio"
+                    )
+                    if st.button("💾 Actualizar estado", use_container_width=True):
+                        try:
+                            cur3 = get_conn().cursor()
+                            cur3.execute(
+                                "UPDATE reportes_mantenimiento SET estado=%s WHERE id_reporte=%s",
+                                (nuevo_estado, id_rep)
+                            )
+                            get_conn().commit(); cur3.close()
+                            st.success("Estado actualizado.")
+                            st.rerun()
+                        except Exception as e:
+                            safe_rollback(); st.error(f"Error: {e}")
+
+                with c3:
+                    if st.button("🗑️ Eliminar reporte", use_container_width=True):
+                        try:
+                            cur4 = get_conn().cursor()
+                            cur4.execute("DELETE FROM reportes_mantenimiento WHERE id_reporte=%s", (id_rep,))
+                            get_conn().commit(); cur4.close()
+                            st.success("Reporte eliminado.")
+                            st.rerun()
+                        except Exception as e:
+                            safe_rollback(); st.error(f"Error: {e}")
+
+                # Detalle expandido
+                with st.expander("Ver detalle completo del reporte", expanded=False):
+                    d1, d2 = st.columns(2)
+                    d1.markdown(f"**Folio:** {row_rep.get('folio','')}")
+                    d1.markdown(f"**Fecha:** {row_rep.get('fecha_reporte','')}")
+                    d1.markdown(f"**Usuario:** {row_rep.get('nombre_usuario','')}")
+                    d1.markdown(f"**Área:** {row_rep.get('area','')}")
+                    d1.markdown(f"**Equipo:** {row_rep.get('nombre_equipo','')} — {row_rep.get('cpu_modelo','')}")
+                    d1.markdown(f"**Serie:** {row_rep.get('cpu_serie','')}  |  **Inv.:** {row_rep.get('num_inventario','')}")
+                    d2.markdown(f"**Tipo:** {row_rep.get('tipo_mantenimiento','')}")
+                    d2.markdown(f"**Estado:** {row_rep.get('estado','')}")
+                    d2.markdown(f"**Técnico:** {row_rep.get('nombre_tecnico','')}")
+                    d2.markdown(f"**Inicio:** {row_rep.get('fecha_inicio','')}  |  **Conclusión:** {row_rep.get('fecha_conclusion','')}")
+                    d2.markdown(f"**Evaluación servicio:** {row_rep.get('eval_servicio','')}  |  **Técnico:** {row_rep.get('eval_tecnico','')}")
+                    st.markdown(f"**Falla reportada:** {row_rep.get('falla_reportada','')}")
+                    st.markdown(f"**Acciones realizadas:** {row_rep.get('acciones_realizadas','')}")
+                    quedo = row_rep.get("quedo_funcionando")
+                    st.markdown(f"**¿Quedó funcionando?** {'✅ Sí' if quedo else '❌ No' if quedo is False else '—'}")
+                    st.markdown(f"**Observaciones:** {row_rep.get('observaciones','')}")
+
+            # Botón Excel de historial completo
+            if not df_hist.empty:
+                xls_h = generar_excel_formateado(df_hist.drop(columns=["id"]), "Historial Mantenimiento")
+                st.download_button(
+                    "📥 Exportar historial a Excel", data=xls_h.getvalue(),
+                    file_name=f"historial_mantenimiento_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="mant_xls_hist"
+                )
+        except Exception as e:
+            safe_rollback()
+            st.error(f"Error: {e}")
+
+    # ── Nuevo reporte ─────────────────────────────────────────────────────────
+    with tab_nuevo:
+        try:
+            cur = get_conn().cursor()
+            cur.execute("SELECT id, tipo, nombre_equipo, cpu_marca, cpu_modelo, cpu_serie, num_inventario, nombre_usuario, area FROM inventario_equipos ORDER BY tipo, consecutivo")
+            rows_eq = cur.fetchall()
+            cur.close()
+
+            # Mapa: "Laptop | IMJ-68 — Latitude 3420" -> row dict
+            eq_opts = {"— Selecciona un equipo —": None}
+            for r in rows_eq:
+                label = f"{r[1]} | {r[2] or r[4]} — Serie: {r[5] or '?'}"
+                eq_opts[label] = {
+                    "id_equipo": r[0], "tipo_equipo": r[1], "nombre_equipo": r[2],
+                    "cpu_marca": r[3], "cpu_modelo": r[4], "cpu_serie": r[5],
+                    "num_inventario": r[6], "nombre_usuario": r[7], "area": r[8],
+                }
+
+            with st.form("nuevo_reporte_mant", clear_on_submit=True):
+                st.markdown("##### Datos del equipo")
+                eq_sel_label = st.selectbox("Selecciona el equipo", list(eq_opts.keys()))
+                eq_sel = eq_opts.get(eq_sel_label)
+
+                if eq_sel:
+                    c1, c2, c3 = st.columns(3)
+                    c1.info(f"**Usuario:** {eq_sel.get('nombre_usuario','—')}")
+                    c2.info(f"**Área:** {eq_sel.get('area','—')}")
+                    c3.info(f"**Modelo:** {eq_sel.get('cpu_modelo','—')} | Serie: {eq_sel.get('cpu_serie','—')}")
+
+                ubicacion = st.text_input("Ubicación física del equipo (ej: P1, Oficina 3)")
+
+                st.markdown("##### Servicio")
+                col_s1, col_s2 = st.columns(2)
+                tipo_mant = col_s1.selectbox("Tipo de mantenimiento", ["Correctivo", "Preventivo"])
+                estado_n  = col_s2.selectbox("Estado inicial", ["Abierto", "Pendiente", "Cerrado"])
+
+                falla = st.text_area("Falla reportada", placeholder="Describe el problema o motivo del servicio...", height=80)
+                acciones = st.text_area("Acciones realizadas", placeholder="Describe lo que se hizo...", height=80)
+                quedo_func = st.radio("¿El equipo quedó funcionando correctamente?", ["Sí", "No", "N/A"], horizontal=True)
+
+                st.markdown("##### Tiempos y técnico")
+                col_t1, col_t2, col_t3 = st.columns(3)
+                fecha_ini  = col_t1.date_input("Fecha inicio", value=datetime.now().date())
+                hora_ini   = col_t2.time_input("Hora inicio", value=datetime.now().time().replace(second=0, microsecond=0))
+                nombre_tec = col_t3.text_input("Nombre del técnico")
+
+                col_t4, col_t5, col_t6 = st.columns(3)
+                fecha_fin  = col_t4.date_input("Fecha conclusión", value=datetime.now().date())
+                hora_fin   = col_t5.time_input("Hora conclusión", value=datetime.now().time().replace(second=0, microsecond=0))
+                obs_n      = col_t6.text_input("Observaciones adicionales")
+
+                st.markdown("##### Evaluación del servicio (0–10)")
+                col_e1, col_e2, _ = st.columns([1, 1, 3])
+                eval_serv = col_e1.number_input("Calidad del servicio", 0, 10, step=1, key="eval_s")
+                eval_tec  = col_e2.number_input("Calidad del técnico",  0, 10, step=1, key="eval_t")
+
+                submitted = st.form_submit_button("✅ Guardar reporte", type="primary", use_container_width=False)
+
+            if submitted:
+                if eq_sel is None:
+                    st.warning("Selecciona un equipo primero.")
+                elif not falla and not acciones:
+                    st.warning("Ingresa al menos la falla reportada o las acciones realizadas.")
+                else:
+                    try:
+                        cur5 = get_conn().cursor()
+                        # Generar folio automático: MAN-YYYYMM-NNN
+                        cur5.execute("SELECT COUNT(*) FROM reportes_mantenimiento WHERE fecha_reporte >= date_trunc('month', CURRENT_DATE)")
+                        n_mes = cur5.fetchone()[0] + 1
+                        folio = f"MAN-{datetime.now().strftime('%Y%m')}-{n_mes:03d}"
+
+                        dt_ini = datetime.combine(fecha_ini, hora_ini)
+                        dt_fin = datetime.combine(fecha_fin, hora_fin)
+                        quedo_bool = True if quedo_func == "Sí" else (False if quedo_func == "No" else None)
+
+                        cur5.execute("""
+                            INSERT INTO reportes_mantenimiento (
+                                folio, fecha_reporte, id_equipo, tipo_equipo, nombre_equipo,
+                                cpu_marca, cpu_modelo, cpu_serie, num_inventario,
+                                nombre_usuario, area, ubicacion_equipo,
+                                tipo_mantenimiento, estado,
+                                falla_reportada, acciones_realizadas, quedo_funcionando,
+                                fecha_inicio, fecha_conclusion,
+                                eval_servicio, eval_tecnico,
+                                nombre_tecnico, observaciones
+                            ) VALUES (
+                                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+                            )
+                        """, (
+                            folio, datetime.now().date(),
+                            eq_sel["id_equipo"], eq_sel["tipo_equipo"], eq_sel["nombre_equipo"],
+                            eq_sel["cpu_marca"], eq_sel["cpu_modelo"], eq_sel["cpu_serie"], eq_sel["num_inventario"],
+                            eq_sel["nombre_usuario"], eq_sel["area"], ubicacion or None,
+                            tipo_mant, estado_n,
+                            falla or None, acciones or None, quedo_bool,
+                            dt_ini, dt_fin,
+                            int(eval_serv), int(eval_tec),
+                            nombre_tec or None, obs_n or None,
+                        ))
+                        get_conn().commit()
+
+                        # Obtener el reporte recién creado para generar el PDF
+                        cur5.execute("SELECT * FROM reportes_mantenimiento WHERE folio=%s", (folio,))
+                        col_names5 = [d[0] for d in cur5.description]
+                        row_nuevo = dict(zip(col_names5, cur5.fetchone()))
+                        cur5.close()
+
+                        st.success(f"✅ Reporte **{folio}** guardado correctamente.")
+                        try:
+                            pdf_nuevo = generar_pdf_mantenimiento(row_nuevo).read()
+                            st.download_button(
+                                "📄 Descargar PDF del reporte generado",
+                                data=pdf_nuevo,
+                                file_name=f"reporte_{folio}.pdf",
+                                mime="application/pdf",
+                                type="primary"
+                            )
+                        except Exception as ep:
+                            st.error(f"Reporte guardado pero error al generar PDF: {ep}")
+
+                    except Exception as e:
+                        safe_rollback()
+                        st.error(f"Error al guardar: {e}")
+
         except Exception as e:
             safe_rollback()
             st.error(f"Error: {e}")
