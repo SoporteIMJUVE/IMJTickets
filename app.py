@@ -421,6 +421,252 @@ def generar_pdf_equipos_resumen(df):
     return generar_pdf_generico(df, "Resumen de Equipos de Computo", col_widths)
 
 
+def generar_pdf_resguardo(e_o_lista):
+    """PDF de resguardo compacto (una página por equipo), ordenado y coloreado por área."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle, Paragraph,
+                                    Spacer, PageBreak, KeepInFrame)
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+
+    _base_dir  = os.path.dirname(os.path.abspath(__file__))
+    _logo_path = os.path.join(_base_dir, "LOGO.png")
+    _mell_path = os.path.join(_base_dir, "MELL_2.png")
+
+    equipos = [e_o_lista] if isinstance(e_o_lista, dict) else sorted(
+        list(e_o_lista),
+        key=lambda x: (x.get("area") or "", x.get("tipo") or "", x.get("nombre_usuario") or "")
+    )
+
+    PALETA = [
+        "#EAF4FB", "#EBF7EB", "#FEF6E7", "#F3EAFC", "#FFF9E6",
+        "#E8FAFA", "#FFE9F3", "#EEF2FE", "#F5FCE8", "#FFE9E9",
+        "#E8FBF3", "#FFF2E8",
+    ]
+    areas_sorted = sorted({e.get("area") or "" for e in equipos})
+    area_clr = {a: PALETA[i % len(PALETA)] for i, a in enumerate(areas_sorted)}
+
+    buf = BytesIO()
+    # topMargin reserva espacio para el LOGO y bottomMargin para el banner MELL (info IMJUVE)
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=1.5*cm, rightMargin=1.5*cm,
+                            topMargin=2.5*cm, bottomMargin=5.5*cm)
+
+    PAGE_W, PAGE_H = A4
+
+    def _membrete(canvas, _doc):
+        """Dibuja en cada página el logo IMJUVE (arriba) y el banner con la información institucional (abajo)."""
+        canvas.saveState()
+        if os.path.exists(_logo_path):
+            lw = 5.0 * cm
+            lh = lw * 250.0 / 996.0          # proporción original de LOGO.png
+            canvas.drawImage(_logo_path, 1.5*cm, PAGE_H - 0.6*cm - lh,
+                             width=lw, height=lh, preserveAspectRatio=True, mask='auto')
+        if os.path.exists(_mell_path):
+            mw = 11.5 * cm
+            mh = mw * 724.0 / 2172.0         # proporción original de MELL_2.png
+            canvas.drawImage(_mell_path, (PAGE_W - mw) / 2, 1.3*cm,
+                             width=mw, height=mh, preserveAspectRatio=True, mask='auto')
+        canvas.restoreState()
+
+    azul   = colors.HexColor("#1A3C5E")
+    blanco = colors.white
+    W      = 18.0 * cm
+    CW     = [3.2*cm, 5.8*cm, 3.2*cm, 5.8*cm]
+
+    s_titulo = ParagraphStyle("t",  fontSize=11, fontName="Helvetica-Bold",
+                               alignment=TA_CENTER, textColor=azul, spaceAfter=1)
+    s_sub    = ParagraphStyle("s",  fontSize=7,  fontName="Helvetica",
+                               alignment=TA_CENTER, textColor=colors.HexColor("#555555"), spaceAfter=2)
+    s_sec    = ParagraphStyle("sc", fontSize=8,  fontName="Helvetica-Bold",
+                               textColor=blanco, alignment=TA_CENTER)
+    s_lbl    = ParagraphStyle("lb", fontSize=7.5, fontName="Helvetica-Bold")
+    s_val    = ParagraphStyle("vl", fontSize=7.5, fontName="Helvetica")
+    s_fw     = ParagraphStyle("fw", fontSize=8,   fontName="Helvetica-Bold",
+                               textColor=blanco, alignment=TA_CENTER)
+    s_fc     = ParagraphStyle("fc", fontSize=7.5, fontName="Helvetica")
+    s_leg    = ParagraphStyle("lg", fontSize=7.5, fontName="Helvetica",
+                               alignment=TA_JUSTIFY, leading=10)
+
+    def V(t):
+        v = str(t).strip() if t is not None else ""
+        return Paragraph(v or "—", s_val)
+
+    def L(t): return Paragraph(str(t or ""), s_lbl)
+    fecha_str = datetime.now().strftime("%d-%m-%Y")
+
+    def sec_hdr(txt):
+        t = Table([[Paragraph(txt, s_sec)]], colWidths=[W])
+        t.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), azul),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        return t
+
+    def tabla2(filas, fill):
+        """Tabla compacta con 2 pares (lbl, val) por fila."""
+        data = [[L(l1), V(v1), L(l2), V(v2)] for l1, v1, l2, v2 in filas]
+        fc   = colors.HexColor(fill)
+        t    = Table(data, colWidths=CW)
+        t.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), fc),
+            ("GRID",          (0, 0), (-1, -1), 0.3, colors.HexColor("#C0C0C0")),
+            ("TOPPADDING",    (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 2),
+        ]))
+        return t
+
+    def bloque(e):
+        tipo = e.get("tipo", "Laptop")
+        clr  = area_clr.get(e.get("area") or "", "#F5F5F5")
+        fc   = colors.HexColor(clr)
+        out  = []
+
+        out.append(Paragraph("RESGUARDO DE EQUIPO DE CÓMPUTO", s_titulo))
+        out.append(Paragraph(
+            "Instituto Mexicano de la Juventud &nbsp;|&nbsp; "
+            f"Contrato No. IMJ-ITP-018-2021-CM-006 &nbsp;|&nbsp; Fecha: {fecha_str}", s_sub
+        ))
+        out.append(Spacer(1, 4))
+
+        # ── Responsable ────────────────────────────────────────────────────
+        out.append(sec_hdr("DATOS DEL RESPONSABLE"))
+        out.append(tabla2([
+            ("Nombre:",            e.get("nombre_usuario"),  "Área / Dirección:",  e.get("area")),
+            ("Perfil de usuario:", e.get("perfil"),          "",                   None),
+        ], clr))
+        out.append(Spacer(1, 4))
+
+        # ── Equipo principal ───────────────────────────────────────────────
+        out.append(sec_hdr("EQUIPO PRINCIPAL"))
+        out.append(tabla2([
+            ("Tipo de equipo:",  e.get("tipo"),      "Nombre del equipo:",  e.get("nombre_equipo")),
+            ("Marca:",           e.get("cpu_marca"), "Modelo:",             e.get("cpu_modelo")),
+            ("N° de serie:",     e.get("cpu_serie"), "MAC Address:",        e.get("mac")),
+        ], clr))
+        out.append(Spacer(1, 4))
+
+        # ── Accesorios ─────────────────────────────────────────────────────
+        out.append(sec_hdr("ACCESORIOS Y PERIFÉRICOS"))
+        if tipo == "Laptop":
+            acc = [
+                ("Serie cargador:",   e.get("cargador_serie"), "Docking — Marca:",   e.get("docking_marca")),
+                ("Docking — Modelo:", e.get("docking_modelo"), "Docking — Serie:",   e.get("docking_serie")),
+                ("Candado:",          e.get("candado"),         "",                   None),
+            ]
+        else:
+            acc = [
+                ("Teclado — Serie:",   e.get("teclado_serie"),  "Mouse — Serie:",       e.get("mouse_serie")),
+                ("Monitor — Marca:",   e.get("monitor_marca"),  "Monitor — Modelo:",    e.get("monitor_modelo")),
+                ("Monitor — Serie:",   e.get("monitor_serie"),  "No-Break — Marca:",    e.get("nobreak_marca")),
+                ("No-Break — Modelo:", e.get("nobreak_modelo"), "No-Break — Serie:",    e.get("nobreak_serie")),
+            ]
+            if tipo == "PC Especializada":
+                acc.append(("IPv4 Actual:", e.get("ipv4_actual"), "", None))
+        out.append(tabla2(acc, clr))
+
+        obs = e.get("observaciones")
+        if obs:
+            out.append(Spacer(1, 3))
+            out.append(sec_hdr("OBSERVACIONES"))
+            out.append(tabla2([("Observaciones:", obs, "", None)], clr))
+
+        out.append(Spacer(1, 6))
+
+        # ── Firmas ─────────────────────────────────────────────────────────
+        firma_data = [
+            [Paragraph("CONFORMIDAD DEL RESPONSABLE", s_fw),
+             Paragraph("SISTEMAS", s_fw)],
+            [Paragraph(f"Nombre: {e.get('nombre_usuario') or '___________________________'}", s_fc),
+             Paragraph("Nombre: Erick de Ángel Lara Hernández", s_fc)],
+            [Paragraph("Cargo: _______________________", s_fc),
+             Paragraph("Cargo: Subdirector de Sistemas", s_fc)],
+            [Spacer(1, 30), Spacer(1, 30)],
+            [Paragraph("Firma: _______________________", s_fc),
+             Paragraph("Firma: _______________________", s_fc)],
+        ]
+        t_f = Table(firma_data, colWidths=[W / 2, W / 2])
+        t_f.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1,  0), azul),
+            ("BACKGROUND",    (0, 1), (-1, -1), fc),
+            ("GRID",          (0, 0), (-1, -1), 0.4, colors.HexColor("#BBBBBB")),
+            ("ALIGN",         (0, 0), (-1,  0), "CENTER"),
+            ("ALIGN",         (0, 1), (-1, -1), "LEFT"),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 1), (-1, -1), 8),
+        ]))
+        out.append(t_f)
+
+        # ── Respaldo de información ────────────────────────────────────────
+        out.append(Spacer(1, 6))
+        out.append(sec_hdr("RESPALDO DE INFORMACIÓN"))
+        leyenda = ("Se hace constar que al responsable del equipo se le explicó el procedimiento "
+                   "para realizar el respaldo y resguardo de su información, quedando bajo su "
+                   "responsabilidad la ejecución periódica del mismo, lo cual manifiesta de "
+                   "conformidad mediante su firma.")
+        t_leg = Table([
+            [Paragraph(leyenda, s_leg)],
+            [Spacer(1, 22)],
+            [Paragraph(f"Nombre y firma de conformidad: "
+                       f"{e.get('nombre_usuario') or '___________________________'}"
+                       " — Firma: _______________________", s_fc)],
+        ], colWidths=[W])
+        t_leg.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), fc),
+            ("BOX",           (0, 0), (-1, -1), 0.4, colors.HexColor("#BBBBBB")),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+        ]))
+        out.append(t_leg)
+        return out
+
+    elements = []
+    for i, eq in enumerate(equipos):
+        if i > 0:
+            elements.append(PageBreak())
+        # KeepInFrame en modo 'shrink': si el contenido excede la página, se reduce
+        # para que cada equipo ocupe siempre una sola hoja.
+        elements.append(KeepInFrame(W, doc.height, bloque(eq), mode="shrink"))
+
+    doc.build(elements, onFirstPage=_membrete, onLaterPages=_membrete)
+    buf.seek(0)
+    return buf
+
+
+def generar_zip_resguardos_por_area(equipos):
+    """ZIP con un PDF por área; cada archivo contiene todos los resguardos de esa área."""
+    import zipfile
+    from collections import defaultdict
+
+    by_area = defaultdict(list)
+    for e in sorted(equipos,
+                    key=lambda x: (x.get("area") or "Sin área",
+                                   x.get("tipo") or "",
+                                   x.get("nombre_usuario") or "")):
+        by_area[e.get("area") or "Sin área"].append(e)
+
+    zip_buf = BytesIO()
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for area in sorted(by_area):
+            pdf_buf = generar_pdf_resguardo(by_area[area])
+            nombre_safe = "".join(
+                c for c in area if c.isalnum() or c in " _-"
+            )[:50].strip().replace(" ", "_")
+            zf.writestr(f"Resguardos_{nombre_safe}.pdf", pdf_buf.read())
+
+    zip_buf.seek(0)
+    return zip_buf
+
+
 def generar_pdf_mantenimiento(r):
     """Genera el reporte de mantenimiento con la misma estructura del formulario físico."""
     from reportlab.lib.pagesizes import A4
@@ -1207,8 +1453,8 @@ elif menu == "👤 Usuarios":
 # ════════════════════════════════════════
 elif menu == "💻 Equipos de Computo":
     st.subheader("💻 Equipos de Cómputo")
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📊 Resumen", "💻 Laptops", "🖥️ PC Avanzadas", "🖥️ PC Especializadas", "➕ Agregar"
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "📊 Resumen", "💻 Laptops", "🖥️ PC Avanzadas", "🖥️ PC Especializadas", "📄 Resguardo", "➕ Agregar"
     ])
 
     # ── helper compartido para los tabs de edición ───────────────────────────
@@ -1626,8 +1872,150 @@ elif menu == "💻 Equipos de Computo":
             pdf_titulo="Inventario PC Especializadas",
         )
 
-    # ── Tab 5: Agregar ────────────────────────────────────────────────────────
+    # ── Tab 5: Resguardo ──────────────────────────────────────────────────────
     with tab5:
+        try:
+            cur = get_conn().cursor()
+            cur.execute("""
+                SELECT id, tipo, nombre_equipo, cpu_marca, cpu_modelo, cpu_serie,
+                       num_inventario, nombre_usuario, area, ipv4
+                FROM inventario_equipos
+                ORDER BY area, tipo, nombre_usuario
+            """)
+            rows_rsg = cur.fetchall()
+            cur.close()
+
+            col_r1, col_r2, col_r3 = st.columns([1, 1, 2])
+            tipo_r = col_r1.selectbox("Tipo", ["Todos","Laptop","PC Avanzada","PC Especializada"], key="rsg_tipo")
+            area_r = col_r2.selectbox("Área", ["Todas"] + sorted({r[8] for r in rows_rsg if r[8]}), key="rsg_area")
+            busq_r = col_r3.text_input("Buscar por usuario, equipo o serie", key="rsg_busq")
+
+            df_rsg = pd.DataFrame(rows_rsg, columns=[
+                "id","Tipo","Equipo","Marca","Modelo","Serie","Inventario","Usuario","Área","IPv4"
+            ])
+            if tipo_r != "Todos":
+                df_rsg = df_rsg[df_rsg["Tipo"] == tipo_r]
+            if area_r != "Todas":
+                df_rsg = df_rsg[df_rsg["Área"] == area_r]
+            if busq_r:
+                mask = df_rsg.apply(lambda col: col.astype(str).str.contains(busq_r, case=False, na=False)).any(axis=1)
+                df_rsg = df_rsg[mask]
+            df_rsg = df_rsg.reset_index(drop=True)
+
+            # Botón "Seleccionar todos" vía session_state
+            col_cap, col_all = st.columns([4, 1])
+            col_cap.caption(f"{len(df_rsg)} equipos — selecciona uno o varios (Ctrl+clic) para generar resguardos.")
+            if col_all.button("☑ Seleccionar todos", use_container_width=True, key="rsg_sel_all"):
+                st.session_state["rsg_todos"] = True
+            if st.session_state.get("rsg_todos") and not busq_r and tipo_r == "Todos" and area_r == "Todas":
+                pass  # se usa abajo para seleccionar todos
+
+            # Color de fondo distinto por área
+            _PALETA_RSG = [
+                "#EAF4FB", "#EBF7EB", "#FEF6E7", "#F3EAFC", "#FFF9E6",
+                "#E8FAFA", "#FFE9F3", "#EEF2FE", "#F5FCE8", "#FFE9E9",
+                "#E8FBF3", "#FFF2E8",
+            ]
+            _areas_rsg = sorted({r[8] for r in rows_rsg if r[8]})
+            _aclr_rsg  = {a: _PALETA_RSG[i % len(_PALETA_RSG)] for i, a in enumerate(_areas_rsg)}
+
+            def _color_area_row(row):
+                c = _aclr_rsg.get(row.get("Área", ""), "")
+                return [f"background-color: {c}; color: #111111" if c else ""] * len(row)
+
+            _df_display = df_rsg.drop(columns=["id"])
+            _styled_rsg = _df_display.style.apply(_color_area_row, axis=1)
+
+            sel_rsg = st.dataframe(
+                _styled_rsg,
+                use_container_width=True, hide_index=True,
+                on_select="rerun", selection_mode="multi-row", key="rsg_sel"
+            )
+
+            # Determinar IDs seleccionados
+            if st.session_state.get("rsg_todos"):
+                indices_sel = list(range(len(df_rsg)))
+                st.session_state["rsg_todos"] = False   # resetear tras aplicar
+            else:
+                indices_sel = [i for i in sel_rsg.selection.rows if i < len(df_rsg)]
+
+            if indices_sel:
+                ids_sel = [int(df_rsg.iloc[i]["id"]) for i in indices_sel]
+                st.markdown("---")
+
+                # Cargar datos completos de todos los seleccionados
+                cur2 = get_conn().cursor()
+                cur2.execute(
+                    "SELECT * FROM inventario_equipos WHERE id = ANY(%s) ORDER BY area, tipo, nombre_usuario",
+                    (ids_sel,)
+                )
+                col_names = [d[0] for d in cur2.description]
+                equipos_sel = [dict(zip(col_names, row)) for row in cur2.fetchall()]
+                cur2.close()
+
+                n = len(equipos_sel)
+                fecha_hoy = datetime.now().strftime('%Y%m%d')
+                c1, c2, c3 = st.columns([1, 1, 2])
+
+                # ── PDF único (todos en orden por área) ─────────────────────
+                with c1:
+                    try:
+                        pdf_rsg = generar_pdf_resguardo(equipos_sel if n > 1 else equipos_sel[0]).read()
+                        nombre_arch = (
+                            f"resguardos_{fecha_hoy}.pdf" if n > 1
+                            else f"resguardo_{(equipos_sel[0].get('nombre_equipo') or 'equipo').replace(' ','_')}_{fecha_hoy}.pdf"
+                        )
+                        st.download_button(
+                            f"📄 PDF completo ({n} equipo{'s' if n > 1 else ''})",
+                            data=pdf_rsg,
+                            file_name=nombre_arch,
+                            mime="application/pdf",
+                            use_container_width=True, type="primary"
+                        )
+                    except Exception as ex:
+                        st.error(f"Error al generar PDF: {ex}")
+
+                # ── ZIP por área (solo cuando hay más de uno) ───────────────
+                with c2:
+                    if n > 1:
+                        try:
+                            zip_rsg = generar_zip_resguardos_por_area(equipos_sel).read()
+                            areas_n = len({e.get("area") for e in equipos_sel if e.get("area")})
+                            st.download_button(
+                                f"📦 ZIP por área ({areas_n} área{'s' if areas_n != 1 else ''})",
+                                data=zip_rsg,
+                                file_name=f"resguardos_por_area_{fecha_hoy}.zip",
+                                mime="application/zip",
+                                use_container_width=True,
+                            )
+                        except Exception as ex:
+                            st.error(f"Error al generar ZIP: {ex}")
+
+                # ── Resumen ─────────────────────────────────────────────────
+                with c3:
+                    if n == 1:
+                        e0 = equipos_sel[0]
+                        st.info(
+                            f"**{e0.get('tipo','')}** — {e0.get('nombre_equipo','')} &nbsp;|&nbsp; "
+                            f"**Usuario:** {e0.get('nombre_usuario','—')} &nbsp;|&nbsp; "
+                            f"**Área:** {e0.get('area','')} &nbsp;|&nbsp; "
+                            f"**Modelo:** {e0.get('cpu_modelo','')} &nbsp;|&nbsp; "
+                            f"**Serie:** {e0.get('cpu_serie','')}"
+                        )
+                    else:
+                        resumen = ", ".join(
+                            f"{e.get('nombre_equipo') or e.get('cpu_modelo','?')} ({e.get('nombre_usuario','—')})"
+                            for e in equipos_sel[:6]
+                        )
+                        if n > 6:
+                            resumen += f"... y {n-6} más"
+                        st.info(f"**{n} equipos seleccionados:** {resumen}")
+        except Exception as e:
+            safe_rollback()
+            st.error(f"Error: {e}")
+
+    # ── Tab 6: Agregar ────────────────────────────────────────────────────────
+    with tab6:
         try:
             cur = get_conn().cursor()
             cur.execute("SELECT id_usuario, nombre || ' ' || apellido_paterno FROM usuarios WHERE activo=true ORDER BY apellido_paterno")
