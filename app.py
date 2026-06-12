@@ -422,7 +422,7 @@ def generar_pdf_equipos_resumen(df):
 
 
 def generar_pdf_resguardo(e_o_lista):
-    """PDF de resguardo compacto (una página por equipo), ordenado y coloreado por área."""
+    """PDF de resguardo oficial (una página completa por equipo), ordenado por área."""
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
     from reportlab.lib.units import cm
@@ -430,65 +430,99 @@ def generar_pdf_resguardo(e_o_lista):
                                     Spacer, PageBreak, KeepInFrame)
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
 
     _base_dir  = os.path.dirname(os.path.abspath(__file__))
     _logo_path = os.path.join(_base_dir, "LOGO.png")
-    _mell_path = os.path.join(_base_dir, "MELL_2.png")
+
+    # Tipografía oficial: Noto Sans (con respaldo a Helvetica si faltan los TTF)
+    try:
+        if "NotoSans" not in pdfmetrics.getRegisteredFontNames():
+            _fonts = os.path.join(_base_dir, "fonts")
+            pdfmetrics.registerFont(TTFont("NotoSans",      os.path.join(_fonts, "NotoSans-Regular.ttf")))
+            pdfmetrics.registerFont(TTFont("NotoSans-Bold", os.path.join(_fonts, "NotoSans-Bold.ttf")))
+        F_REG, F_BOLD = "NotoSans", "NotoSans-Bold"
+    except Exception:
+        F_REG, F_BOLD = "Helvetica", "Helvetica-Bold"
 
     equipos = [e_o_lista] if isinstance(e_o_lista, dict) else sorted(
         list(e_o_lista),
         key=lambda x: (x.get("area") or "", x.get("tipo") or "", x.get("nombre_usuario") or "")
     )
 
-    PALETA = [
-        "#EAF4FB", "#EBF7EB", "#FEF6E7", "#F3EAFC", "#FFF9E6",
-        "#E8FAFA", "#FFE9F3", "#EEF2FE", "#F5FCE8", "#FFE9E9",
-        "#E8FBF3", "#FFF2E8",
-    ]
-    areas_sorted = sorted({e.get("area") or "" for e in equipos})
-    area_clr = {a: PALETA[i % len(PALETA)] for i, a in enumerate(areas_sorted)}
-
     buf = BytesIO()
-    # topMargin reserva espacio para el LOGO y bottomMargin para el banner MELL (info IMJUVE)
+    # topMargin reserva espacio para el membrete (logo + filete) y bottomMargin para el pie institucional
     doc = SimpleDocTemplate(buf, pagesize=A4,
                             leftMargin=1.5*cm, rightMargin=1.5*cm,
-                            topMargin=2.5*cm, bottomMargin=5.5*cm)
+                            topMargin=2.9*cm, bottomMargin=2.9*cm)
 
     PAGE_W, PAGE_H = A4
+    guinda = colors.HexColor("#691C32")      # color institucional gob.mx
+    oro    = colors.HexColor("#BC955C")
+    gris   = colors.HexColor("#555555")
 
     def _membrete(canvas, _doc):
-        """Dibuja en cada página el logo IMJUVE (arriba) y el banner con la información institucional (abajo)."""
+        """Membrete institucional: logo y filete arriba; pie con datos de contacto abajo."""
         canvas.saveState()
+        mx = 1.5 * cm                                    # margen lateral
+
+        # ── Encabezado ──────────────────────────────────────────────────────
         if os.path.exists(_logo_path):
-            lw = 5.0 * cm
-            lh = lw * 250.0 / 996.0          # proporción original de LOGO.png
-            canvas.drawImage(_logo_path, 1.5*cm, PAGE_H - 0.6*cm - lh,
+            lw = 4.6 * cm
+            lh = lw * 250.0 / 996.0                      # proporción original de LOGO.png
+            canvas.drawImage(_logo_path, mx, PAGE_H - 0.8*cm - lh,
                              width=lw, height=lh, preserveAspectRatio=True, mask='auto')
-        if os.path.exists(_mell_path):
-            mw = 11.5 * cm
-            mh = mw * 724.0 / 2172.0         # proporción original de MELL_2.png
-            canvas.drawImage(_mell_path, (PAGE_W - mw) / 2, 1.3*cm,
-                             width=mw, height=mh, preserveAspectRatio=True, mask='auto')
+        canvas.setFillColor(guinda)
+        canvas.setFont(F_BOLD, 10)
+        canvas.drawRightString(PAGE_W - mx, PAGE_H - 1.25*cm, "INSTITUTO MEXICANO DE LA JUVENTUD")
+        canvas.setFillColor(gris)
+        canvas.setFont(F_REG, 8.5)
+        canvas.drawRightString(PAGE_W - mx, PAGE_H - 1.65*cm, "Subdirección de Sistemas")
+
+        y_sup = PAGE_H - 2.35*cm                          # filete doble bajo el encabezado
+        canvas.setStrokeColor(guinda); canvas.setLineWidth(1.8)
+        canvas.line(mx, y_sup, PAGE_W - mx, y_sup)
+        canvas.setStrokeColor(oro); canvas.setLineWidth(0.7)
+        canvas.line(mx, y_sup - 0.12*cm, PAGE_W - mx, y_sup - 0.12*cm)
+
+        # ── Pie de página ────────────────────────────────────────────────────
+        y_pie = 2.35 * cm                                 # filete doble sobre el pie
+        canvas.setStrokeColor(oro); canvas.setLineWidth(0.7)
+        canvas.line(mx, y_pie + 0.12*cm, PAGE_W - mx, y_pie + 0.12*cm)
+        canvas.setStrokeColor(guinda); canvas.setLineWidth(1.8)
+        canvas.line(mx, y_pie, PAGE_W - mx, y_pie)
+
+        cx = PAGE_W / 2
+        canvas.setFillColor(gris)
+        canvas.setFont(F_REG, 8)
+        canvas.drawCentredString(cx, y_pie - 0.50*cm,
+            "Serapio Rendón 76, Col. San Rafael, C.P. 06470, Alcaldía Cuauhtémoc, CDMX.")
+        canvas.drawCentredString(cx, y_pie - 0.88*cm,
+            "Tel: (55) 1500 1300   ·   www.gob.mx/imjuve")
+        canvas.setFillColor(guinda)
+        canvas.setFont(F_BOLD, 8)
+        canvas.drawCentredString(cx, y_pie - 1.28*cm, "Subdirección de Sistemas")
         canvas.restoreState()
 
-    azul   = colors.HexColor("#1A3C5E")
+    azul   = guinda                                      # color de encabezados de sección
     blanco = colors.white
     W      = 18.0 * cm
-    CW     = [3.2*cm, 5.8*cm, 3.2*cm, 5.8*cm]
+    CW     = [4.0*cm, 5.0*cm, 4.0*cm, 5.0*cm]
 
-    s_titulo = ParagraphStyle("t",  fontSize=11, fontName="Helvetica-Bold",
-                               alignment=TA_CENTER, textColor=azul, spaceAfter=1)
-    s_sub    = ParagraphStyle("s",  fontSize=7,  fontName="Helvetica",
+    s_titulo = ParagraphStyle("t",  fontSize=14, fontName=F_BOLD,
+                               alignment=TA_CENTER, textColor=azul, spaceAfter=2)
+    s_sub    = ParagraphStyle("s",  fontSize=9,  fontName=F_REG,
                                alignment=TA_CENTER, textColor=colors.HexColor("#555555"), spaceAfter=2)
-    s_sec    = ParagraphStyle("sc", fontSize=8,  fontName="Helvetica-Bold",
+    s_sec    = ParagraphStyle("sc", fontSize=10, fontName=F_BOLD,
                                textColor=blanco, alignment=TA_CENTER)
-    s_lbl    = ParagraphStyle("lb", fontSize=7.5, fontName="Helvetica-Bold")
-    s_val    = ParagraphStyle("vl", fontSize=7.5, fontName="Helvetica")
-    s_fw     = ParagraphStyle("fw", fontSize=8,   fontName="Helvetica-Bold",
+    s_lbl    = ParagraphStyle("lb", fontSize=10, fontName=F_BOLD,  leading=13)
+    s_val    = ParagraphStyle("vl", fontSize=10, fontName=F_REG,   leading=13)
+    s_fw     = ParagraphStyle("fw", fontSize=10, fontName=F_BOLD,
                                textColor=blanco, alignment=TA_CENTER)
-    s_fc     = ParagraphStyle("fc", fontSize=7.5, fontName="Helvetica")
-    s_leg    = ParagraphStyle("lg", fontSize=7.5, fontName="Helvetica",
-                               alignment=TA_JUSTIFY, leading=10)
+    s_fc     = ParagraphStyle("fc", fontSize=9.5, fontName=F_REG,  leading=13)
+    s_leg    = ParagraphStyle("lg", fontSize=9.5, fontName=F_REG,
+                               alignment=TA_JUSTIFY, leading=14)
 
     def V(t):
         v = str(t).strip() if t is not None else ""
@@ -501,30 +535,28 @@ def generar_pdf_resguardo(e_o_lista):
         t = Table([[Paragraph(txt, s_sec)]], colWidths=[W])
         t.setStyle(TableStyle([
             ("BACKGROUND",    (0, 0), (-1, -1), azul),
-            ("TOPPADDING",    (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ]))
         return t
 
-    def tabla2(filas, fill):
-        """Tabla compacta con 2 pares (lbl, val) por fila."""
+    def tabla2(filas):
+        """Tabla con 2 pares (lbl, val) por fila; fondo blanco con rejilla gris."""
         data = [[L(l1), V(v1), L(l2), V(v2)] for l1, v1, l2, v2 in filas]
-        fc   = colors.HexColor(fill)
-        t    = Table(data, colWidths=CW)
+        t = Table(data, colWidths=CW)
         t.setStyle(TableStyle([
-            ("BACKGROUND",    (0, 0), (-1, -1), fc),
+            ("BACKGROUND",    (0, 0), (-1, -1), colors.white),
             ("GRID",          (0, 0), (-1, -1), 0.3, colors.HexColor("#C0C0C0")),
-            ("TOPPADDING",    (0, 0), (-1, -1), 2),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-            ("LEFTPADDING",   (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING",  (0, 0), (-1, -1), 2),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 4),
         ]))
         return t
 
     def bloque(e):
         tipo = e.get("tipo", "Laptop")
-        clr  = area_clr.get(e.get("area") or "", "#F5F5F5")
-        fc   = colors.HexColor(clr)
         out  = []
 
         out.append(Paragraph("RESGUARDO DE EQUIPO DE CÓMPUTO", s_titulo))
@@ -532,15 +564,15 @@ def generar_pdf_resguardo(e_o_lista):
             "Instituto Mexicano de la Juventud &nbsp;|&nbsp; "
             f"Contrato No. IMJ-ITP-018-2021-CM-006 &nbsp;|&nbsp; Fecha: {fecha_str}", s_sub
         ))
-        out.append(Spacer(1, 4))
+        out.append(Spacer(1, 10))
 
         # ── Responsable ────────────────────────────────────────────────────
         out.append(sec_hdr("DATOS DEL RESPONSABLE"))
         out.append(tabla2([
             ("Nombre:",            e.get("nombre_usuario"),  "Área / Dirección:",  e.get("area")),
             ("Perfil de usuario:", e.get("perfil"),          "",                   None),
-        ], clr))
-        out.append(Spacer(1, 4))
+        ]))
+        out.append(Spacer(1, 10))
 
         # ── Equipo principal ───────────────────────────────────────────────
         out.append(sec_hdr("EQUIPO PRINCIPAL"))
@@ -548,8 +580,8 @@ def generar_pdf_resguardo(e_o_lista):
             ("Tipo de equipo:",  e.get("tipo"),      "Nombre del equipo:",  e.get("nombre_equipo")),
             ("Marca:",           e.get("cpu_marca"), "Modelo:",             e.get("cpu_modelo")),
             ("N° de serie:",     e.get("cpu_serie"), "MAC Address:",        e.get("mac")),
-        ], clr))
-        out.append(Spacer(1, 4))
+        ]))
+        out.append(Spacer(1, 10))
 
         # ── Accesorios ─────────────────────────────────────────────────────
         out.append(sec_hdr("ACCESORIOS Y PERIFÉRICOS"))
@@ -568,15 +600,15 @@ def generar_pdf_resguardo(e_o_lista):
             ]
             if tipo == "PC Especializada":
                 acc.append(("IPv4 Actual:", e.get("ipv4_actual"), "", None))
-        out.append(tabla2(acc, clr))
+        out.append(tabla2(acc))
 
         obs = e.get("observaciones")
         if obs:
-            out.append(Spacer(1, 3))
+            out.append(Spacer(1, 10))
             out.append(sec_hdr("OBSERVACIONES"))
-            out.append(tabla2([("Observaciones:", obs, "", None)], clr))
+            out.append(tabla2([("Observaciones:", obs, "", None)]))
 
-        out.append(Spacer(1, 6))
+        out.append(Spacer(1, 14))
 
         # ── Firmas ─────────────────────────────────────────────────────────
         firma_data = [
@@ -584,28 +616,28 @@ def generar_pdf_resguardo(e_o_lista):
              Paragraph("SISTEMAS", s_fw)],
             [Paragraph(f"Nombre: {e.get('nombre_usuario') or '___________________________'}", s_fc),
              Paragraph("Nombre: Erick de Ángel Lara Hernández", s_fc)],
-            [Paragraph("Cargo: _______________________", s_fc),
+            [Paragraph("", s_fc),
              Paragraph("Cargo: Subdirector de Sistemas", s_fc)],
-            [Spacer(1, 30), Spacer(1, 30)],
+            [Spacer(1, 55), Spacer(1, 55)],
             [Paragraph("Firma: _______________________", s_fc),
              Paragraph("Firma: _______________________", s_fc)],
         ]
         t_f = Table(firma_data, colWidths=[W / 2, W / 2])
         t_f.setStyle(TableStyle([
             ("BACKGROUND",    (0, 0), (-1,  0), azul),
-            ("BACKGROUND",    (0, 1), (-1, -1), fc),
+            ("BACKGROUND",    (0, 1), (-1, -1), colors.white),
             ("GRID",          (0, 0), (-1, -1), 0.4, colors.HexColor("#BBBBBB")),
             ("ALIGN",         (0, 0), (-1,  0), "CENTER"),
             ("ALIGN",         (0, 1), (-1, -1), "LEFT"),
             ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING",    (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING",    (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
             ("LEFTPADDING",   (0, 1), (-1, -1), 8),
         ]))
         out.append(t_f)
 
         # ── Respaldo de información ────────────────────────────────────────
-        out.append(Spacer(1, 6))
+        out.append(Spacer(1, 14))
         out.append(sec_hdr("RESPALDO DE INFORMACIÓN"))
         leyenda = ("Se hace constar que al responsable del equipo se le explicó el procedimiento "
                    "para realizar el respaldo y resguardo de su información, quedando bajo su "
@@ -613,16 +645,16 @@ def generar_pdf_resguardo(e_o_lista):
                    "conformidad mediante su firma.")
         t_leg = Table([
             [Paragraph(leyenda, s_leg)],
-            [Spacer(1, 22)],
+            [Spacer(1, 40)],
             [Paragraph(f"Nombre y firma de conformidad: "
                        f"{e.get('nombre_usuario') or '___________________________'}"
                        " — Firma: _______________________", s_fc)],
         ], colWidths=[W])
         t_leg.setStyle(TableStyle([
-            ("BACKGROUND",    (0, 0), (-1, -1), fc),
+            ("BACKGROUND",    (0, 0), (-1, -1), colors.white),
             ("BOX",           (0, 0), (-1, -1), 0.4, colors.HexColor("#BBBBBB")),
-            ("TOPPADDING",    (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING",    (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
             ("LEFTPADDING",   (0, 0), (-1, -1), 8),
             ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
         ]))
