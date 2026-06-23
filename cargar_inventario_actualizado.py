@@ -19,7 +19,7 @@ DB_CONFIG = {
     "password": "Dievigom1311",
 }
 
-ARCHIVO = os.path.join(os.path.dirname(__file__), "inventario actualizado.xlsx")
+ARCHIVO = os.path.join(os.path.dirname(__file__), "inventario_modificado.xlsx")
 
 
 def limpiar(v):
