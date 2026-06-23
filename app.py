@@ -1706,6 +1706,85 @@ elif menu == "💻 Equipos de Computo":
             rows_rsg = cur.fetchall()
             cur.close()
 
+            # ── Resguardo individual ───────────────────────────────────────────
+            st.markdown("#### Resguardo individual")
+            _opciones_ind = {
+                f"{r[7] or '—'}  —  {r[2] or r[4] or '?'}  ({r[8] or 'Sin área'})": r[0]
+                for r in rows_rsg
+            }
+            _sel_ind = st.selectbox(
+                "Seleccionar equipo",
+                [""] + list(_opciones_ind.keys()),
+                key="rsg_ind_sel",
+            )
+
+            if _sel_ind:
+                _id_ind  = _opciones_ind[_sel_ind]
+                _cur_ind = get_conn().cursor()
+                _cur_ind.execute("SELECT * FROM inventario_equipos WHERE id = %s", (_id_ind,))
+                _col_ind = [d[0] for d in _cur_ind.description]
+                _eq_ind  = dict(zip(_col_ind, _cur_ind.fetchone()))
+                _cur_ind.close()
+
+                _tipo_ind = _eq_ind.get("tipo", "Laptop")
+                _K = f"_{_id_ind}"  # clave única por equipo para no mezclar ediciones
+
+                st.markdown("**Editar datos antes de generar el PDF** *(los cambios no se guardan en la base de datos)*")
+
+                _e = {}
+                col_a, col_b = st.columns(2)
+                _e["nombre_usuario"] = col_a.text_input("Responsable",    value=_eq_ind.get("nombre_usuario") or "", key=f"rsg_e_usr{_K}")
+                _e["area"]           = col_b.text_input("Área / Dirección", value=_eq_ind.get("area") or "",          key=f"rsg_e_area{_K}")
+                _e["perfil"]         = col_a.text_input("Perfil de usuario", value=_eq_ind.get("perfil") or "",       key=f"rsg_e_perf{_K}")
+                _e["nombre_equipo"]  = col_b.text_input("Nombre del equipo", value=_eq_ind.get("nombre_equipo") or "", key=f"rsg_e_eq{_K}")
+
+                col_c, col_d, col_e2 = st.columns(3)
+                _e["cpu_marca"]  = col_c.text_input("Marca CPU",  value=_eq_ind.get("cpu_marca") or "",  key=f"rsg_e_marca{_K}")
+                _e["cpu_modelo"] = col_d.text_input("Modelo CPU", value=_eq_ind.get("cpu_modelo") or "", key=f"rsg_e_modelo{_K}")
+                _e["cpu_serie"]  = col_e2.text_input("Serie CPU", value=_eq_ind.get("cpu_serie") or "",  key=f"rsg_e_serie{_K}")
+
+                col_f, col_g = st.columns(2)
+                _e["mac"] = col_f.text_input("MAC Address", value=_eq_ind.get("mac") or "", key=f"rsg_e_mac{_K}")
+
+                if _tipo_ind == "Laptop":
+                    _e["cargador_serie"] = col_g.text_input("Serie cargador", value=_eq_ind.get("cargador_serie") or "", key=f"rsg_e_carg{_K}")
+                    col_h, col_i, col_j = st.columns(3)
+                    _e["docking_marca"]  = col_h.text_input("Docking — Marca",  value=_eq_ind.get("docking_marca") or "",  key=f"rsg_e_dm{_K}")
+                    _e["docking_modelo"] = col_i.text_input("Docking — Modelo", value=_eq_ind.get("docking_modelo") or "", key=f"rsg_e_dmod{_K}")
+                    _e["docking_serie"]  = col_j.text_input("Docking — Serie",  value=_eq_ind.get("docking_serie") or "",  key=f"rsg_e_ds{_K}")
+                    _e["candado"]        = st.text_input("Candado", value=_eq_ind.get("candado") or "", key=f"rsg_e_cand{_K}")
+                else:
+                    col_h, col_i = st.columns(2)
+                    _e["teclado_serie"] = col_h.text_input("Serie teclado", value=_eq_ind.get("teclado_serie") or "", key=f"rsg_e_tec{_K}")
+                    _e["mouse_serie"]   = col_i.text_input("Serie mouse",   value=_eq_ind.get("mouse_serie") or "",   key=f"rsg_e_mouse{_K}")
+                    col_j, col_k, col_l = st.columns(3)
+                    _e["monitor_marca"]  = col_j.text_input("Monitor — Marca",  value=_eq_ind.get("monitor_marca") or "",  key=f"rsg_e_monm{_K}")
+                    _e["monitor_modelo"] = col_k.text_input("Monitor — Modelo", value=_eq_ind.get("monitor_modelo") or "", key=f"rsg_e_monmod{_K}")
+                    _e["monitor_serie"]  = col_l.text_input("Monitor — Serie",  value=_eq_ind.get("monitor_serie") or "",  key=f"rsg_e_mons{_K}")
+                    col_m, col_n, col_o = st.columns(3)
+                    _e["nobreak_marca"]  = col_m.text_input("No-Break — Marca",  value=_eq_ind.get("nobreak_marca") or "",  key=f"rsg_e_nbm{_K}")
+                    _e["nobreak_modelo"] = col_n.text_input("No-Break — Modelo", value=_eq_ind.get("nobreak_modelo") or "", key=f"rsg_e_nbmod{_K}")
+                    _e["nobreak_serie"]  = col_o.text_input("No-Break — Serie",  value=_eq_ind.get("nobreak_serie") or "",  key=f"rsg_e_nbs{_K}")
+                    if _tipo_ind == "PC Especializada":
+                        _e["ipv4_actual"] = st.text_input("IPv4 Actual", value=_eq_ind.get("ipv4_actual") or "", key=f"rsg_e_ipv4{_K}")
+
+                _e["observaciones"] = st.text_area("Observaciones", value=_eq_ind.get("observaciones") or "", height=68, key=f"rsg_e_obs{_K}")
+
+                _eq_pdf = {**_eq_ind, **_e}
+                try:
+                    _pdf_ind = generar_pdf_resguardo(_eq_pdf).read()
+                    st.download_button(
+                        "📄 Descargar resguardo",
+                        data=_pdf_ind,
+                        file_name=f"resguardo_{(_eq_pdf.get('nombre_equipo') or 'equipo').replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                        mime="application/pdf",
+                        type="primary",
+                    )
+                except Exception as _ex_ind:
+                    st.error(f"Error al generar PDF: {_ex_ind}")
+
+            st.markdown("---")
+            st.markdown("#### Resguardos masivos")
             col_r1, col_r2, col_r3 = st.columns([1, 1, 2])
             tipo_r = col_r1.selectbox("Tipo", ["Todos","Laptop","PC Avanzada","PC Especializada"], key="rsg_tipo")
             area_r = col_r2.selectbox("Área", ["Todas"] + sorted({r[8] for r in rows_rsg if r[8]}), key="rsg_area")
