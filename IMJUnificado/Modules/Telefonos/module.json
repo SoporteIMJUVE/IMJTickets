@@ -1,0 +1,11 @@
+{
+    "name": "Telefonos",
+    "alias": "telefonos",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Telefonos\\Providers\\TelefonosServiceProvider"
+    ],
+    "files": []
+}

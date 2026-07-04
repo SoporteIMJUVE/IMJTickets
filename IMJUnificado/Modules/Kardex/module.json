@@ -1,0 +1,11 @@
+{
+    "name": "Kardex",
+    "alias": "kardex",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Kardex\\Providers\\KardexServiceProvider"
+    ],
+    "files": []
+}

@@ -1,0 +1,10 @@
+{
+    "Core": true,
+    "Tickets": true,
+    "CRM": true,
+    "Kardex": true,
+    "Network": true,
+    "Telefonos": true,
+    "Impresoras": true,
+    "Mantenimiento": true
+}

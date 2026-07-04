@@ -1,0 +1,5 @@
+<x-mantenimiento::layouts.master>
+    <h1>Hello World</h1>
+
+    <p>Module: {!! config('mantenimiento.name') !!}</p>
+</x-mantenimiento::layouts.master>
