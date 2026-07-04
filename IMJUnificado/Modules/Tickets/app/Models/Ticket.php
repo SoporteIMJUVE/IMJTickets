@@ -9,8 +9,8 @@ class Ticket extends Model
     const ESTADOS = [0 => 'Abierto', 1 => 'Atendiendo', 2 => 'Cerrado'];
 
     protected $fillable = [
-        'nombre', 'correo', 'area', 'tipo',
-        'descripcion', 'estado', 'comentarios',
+        'nombre', 'correo', 'ip', 'mac',
+        'area', 'tipo', 'descripcion', 'estado', 'comentarios',
         'atendido_at', 'atendido_by', 'cerrado_at', 'cerrado_by',
     ];
 

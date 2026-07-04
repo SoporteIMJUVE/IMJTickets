@@ -1,193 +1,234 @@
-# IMJUnificado — Sistema de TI IMJUVE
+# IMJUnificado
 
-Sistema institucional unificado de gestión de TI para el **Instituto Mexicano de la Juventud**.  
-Consolida el sistema de tickets de soporte (IMJTickets) y el inventario de equipos, red y personal (Base-de-Datos) en una sola plataforma modular.
+Sistema de administración de TI del Instituto Mexicano de la Juventud.  
+Unifica el módulo de tickets de soporte con el inventario de equipos, IPs, empleados e insumos en una sola plataforma.
 
 ---
 
-## Documentación
+## Para el becario que acaba de llegar
 
-| Sección | Descripción |
+Este sistema fue construido por becarios de TI. Si acabas de aterrizar y no sabes por dónde empezar, **lee esto primero y después sigue el orden de la tabla de contenidos**.
+
+No asumimos que sabes PHP, ni Laravel, ni qué es un "entorno". Si sabes programar en cualquier otro lenguaje (Python, JavaScript, Java) ya tienes el 70% del conocimiento que necesitas — el otro 30% son los conceptos específicos de este stack.
+
+---
+
+## Tabla de Contenidos
+
+| Documento | Cuándo leerlo |
 |---|---|
-| [Quickstart — levantar en 5 min](Doc/quickstart.md) | Instalación local desde cero, primer login |
-| [Stack tecnológico](Doc/stack.md) | Qué hace cada tecnología, por qué se eligió, dónde aprender |
-| [Arquitectura modular](Doc/arquitectura.md) | Cómo están organizados los módulos, cómo agregar uno nuevo |
-| [Base de datos](Doc/base-de-datos.md) | Tablas, esquema, seeders, cómo correr migraciones |
-| [Módulos del sistema](Doc/modulos.md) | Qué hace cada módulo, sus rutas, vistas y datos |
-| [Decisiones de diseño](Doc/decisiones.md) | Por qué se tomaron las decisiones de negocio y técnicas |
+| **Este README** | Primero — da el panorama general |
+| [Doc/quickstart.md](Doc/quickstart.md) | Cuando quieras levantar el proyecto |
+| [Doc/convenciones.md](Doc/convenciones.md) | Antes de escribir tu primera línea de código |
+| [Doc/stack.md](Doc/stack.md) | Cuando quieras entender qué tecnología hace qué |
+| [Doc/arquitectura.md](Doc/arquitectura.md) | Cuando necesites entender cómo está organizado el código |
+| [Doc/base-de-datos.md](Doc/base-de-datos.md) | Cuando necesites entender las tablas y sus relaciones |
+| [Doc/modulo-tickets.md](Doc/modulo-tickets.md) | Cuando vayas a tocar el módulo de tickets |
+| [Doc/modulo-crm.md](Doc/modulo-crm.md) | Cuando vayas a tocar el directorio de empleados |
+| [Doc/modulo-kardex.md](Doc/modulo-kardex.md) | Cuando vayas a tocar equipos o insumos |
+| [Doc/modulo-network.md](Doc/modulo-network.md) | Cuando vayas a tocar el módulo de IPs |
+| [Doc/decisiones.md](Doc/decisiones.md) | Para entender por qué el sistema funciona como funciona |
 
 ---
 
-## Contexto del proyecto
+## El problema que resuelve
 
-Este sistema nació de la necesidad de unificar dos herramientas separadas:
+Antes de este sistema existían dos herramientas separadas:
 
-| Sistema original | Stack | Estado |
+| Sistema anterior | Tecnología | Problema |
 |---|---|---|
-| **IMJTickets** | Laravel 12 + Livewire 3 + MySQL (XAMPP) | En producción en Windows Server |
-| **Sistema de Inventario** | Python + Streamlit + PostgreSQL | Uso interno, sin acceso multi-usuario |
+| IMJTickets | PHP + Laravel + MySQL | Solo manejaba tickets de soporte, sin inventario |
+| Sistema de Inventario | Python + Streamlit + PostgreSQL | Solo inventario, sin gestión de soporte |
 
-Ambos manejaban datos del mismo personal y equipo institucional, pero sin conexión entre sí. Un técnico tenía que abrir dos sistemas para ver si a un empleado le correspondía un ticket y qué equipo tenía asignado.
+Los técnicos tenían que revisar dos sistemas por separado para responder una pregunta tan simple como "¿qué equipo tiene este empleado y cuántos tickets abiertos tiene?".
 
-El equipo de desarrollo es **rotativo** (becarios y servicio social), por lo que la arquitectura prioriza la comprensibilidad y la capacidad de agregar módulos sin romper lo que ya funciona.
+IMJUnificado junta todo en un solo sistema con una sola base de datos.
 
 ---
 
-## Stack elegido
+## El stack — qué tecnología hace qué
 
-**Laravel 12 + Livewire 3 + MySQL + nwidart/laravel-modules**
+Si nunca has programado en PHP, esta tabla te da el equivalente en JavaScript para que te orientes:
 
-| Capa | Tecnología | Por qué |
+| Tecnología | Para qué sirve | Equivalente en JS |
 |---|---|---|
-| Backend | PHP 8.2 / Laravel 12 | Ya en producción en IMJTickets; ecosistema enorme; docs excelentes para nuevos devs |
-| UI reactiva | Livewire 3 + Blade | Interactividad sin necesidad de una SPA ni una API REST separada; un solo proceso |
-| CSS | Tailwind CSS v4 + DaisyUI | Ya configurado en IMJTickets; utilidades directas sin escribir CSS custom |
-| Modularidad | nwidart/laravel-modules | Cada módulo es una carpeta autónoma; agregar uno no toca los demás |
-| Base de datos | MySQL (local SQLite para dev) | Windows Server ya tiene XAMPP+MySQL; elimina la segunda DB (PostgreSQL) |
-| PDF | barryvdh/laravel-dompdf | Ya en IMJTickets; genera resguardos e informes institucionales |
-| Excel | Maatwebsite/Excel + PhpSpreadsheet | Importa los Excel de inventario; exporta reportes formateados |
-
-### Por qué NO otras opciones
-
-| Descartado | Razón |
-|---|---|
-| Mantener Python/Streamlit | No es multi-usuario en producción; dos runtimes = más RAM; sin SSO |
-| Next.js/React SPA + API | Complejidad innecesaria para becarios; CORS, tokens, estado en cliente |
-| Microservicios | Overkill: múltiples procesos, depuración difícil, overhead de red |
-| Django (Python) | Sin continuidad con el stack de producción actual |
+| **PHP** | El lenguaje del servidor — procesa peticiones, consulta la BD, genera el HTML | Node.js |
+| **Laravel** | El framework — te da estructura, rutas, autenticación, migraciones. Sin él tendrías que inventar todo desde cero | Express.js + muchos middlewares |
+| **Composer** | El manejador de paquetes de PHP | npm (para PHP) |
+| **Blade** | El motor de plantillas — los archivos `.blade.php` que generan el HTML | EJS, Jinja2 |
+| **Vite + Node.js** | Compila y optimiza el CSS y JavaScript del frontend | Webpack/Vite |
+| **Tailwind CSS** | Clases de CSS utilitarias para dar estilos directo en el HTML | Bootstrap (pero más flexible) |
+| **SQLite** | Base de datos local — un solo archivo, sin servidor | Igual (SQLite es universal) |
+| **MySQL** | Base de datos en producción (Windows Server) | Igual |
 
 ---
 
-## Arquitectura — Monolito Modular
+## Qué es un "entorno" (`.env`)
+
+Cuando el código dice `DB_HOST` o `APP_KEY`, esos valores vienen de un archivo llamado `.env` que vive en la raíz del proyecto y **no se sube al repositorio** (está en `.gitignore` por seguridad).
+
+El `.env` contiene configuración que cambia entre máquinas:
+- En tu laptop: base de datos SQLite local
+- En el servidor de producción: base de datos MySQL del servidor
+
+El `.env.example` es la plantilla — tiene todos los nombres de variables pero sin los valores reales. Cuando clonas el proyecto lo copias:
+
+```bash
+cp .env.example .env
+```
+
+Luego llenas los valores según tu entorno.
+
+---
+
+## Qué es una "migración"
+
+Una migración es un archivo PHP que describe la estructura de una tabla de la base de datos. En lugar de entrar a phpMyAdmin y crear la tabla manualmente, describes la estructura en código y la ejecutas:
+
+```bash
+php artisan migrate
+```
+
+Ventaja: todos en el equipo tienen la misma estructura de BD, y los cambios quedan en el historial de git.
+
+Si quieres ver cómo se ven las migraciones de este proyecto:
+```
+IMJUnificado/database/migrations/
+```
+
+---
+
+## Qué es un "seeder"
+
+Un seeder carga datos iniciales en la base de datos. En este proyecto los seeders leen los archivos Excel del inventario y los insertan en las tablas.
+
+```bash
+php artisan migrate:fresh --seed
+```
+
+Ese comando borra todas las tablas, las recrea y ejecuta todos los seeders. Al final tienes la BD lista con:
+- 19 empleados (leídos desde Excel)
+- 183 equipos de cómputo (leídos desde Excel)
+- 491 IPs registradas (leídas desde Excel)
+- 10 impresoras, 8 insumos, 1 usuario admin
+
+---
+
+## Cómo está organizado el código
 
 ```
 IMJUnificado/
-├── Modules/
-│   ├── Core/           ← auth, layout compartido, búsqueda global
-│   ├── Tickets/        ← gestión de tickets de soporte (Kanban + lista)
-│   ├── CRM/            ← directorio de empleados + panel lateral de activos
-│   ├── Kardex/         ← equipos, insumos, resguardos
-│   ├── Network/        ← IPs y rangos de red institucional
-│   ├── Telefonos/      ← extensiones telefónicas
-│   ├── Impresoras/     ← inventario de impresoras
-│   └── Mantenimiento/  ← reportes de mantenimiento (UI pendiente)
-├── app/                ← solo modelos base y auth (User)
-├── resources/views/    ← layout compartido (app.blade.php)
-└── database/
-    ├── migrations/     ← migraciones globales + las de cada módulo
-    └── seeders/        ← datos reales cargados de los Excel institucionales
+├── Modules/              ← cada módulo del sistema vive aquí
+│   ├── Core/             ← login, logout, dashboard, layout compartido
+│   ├── Tickets/          ← gestión de tickets de soporte
+│   ├── CRM/              ← directorio de empleados
+│   ├── Kardex/           ← inventario de equipos e insumos
+│   ├── Network/          ← IPs y direccionamiento de red
+│   ├── Telefonos/        ← extensiones telefónicas (placeholder)
+│   ├── Impresoras/       ← inventario de impresoras (placeholder)
+│   └── Mantenimiento/    ← reportes de mantenimiento (placeholder)
+│
+├── app/                  ← código base de Laravel (modelos compartidos)
+│   └── Models/User.php   ← el modelo del técnico/admin
+│
+├── database/
+│   ├── migrations/       ← estructura de las tablas
+│   └── seeders/          ← datos iniciales desde Excel
+│
+├── resources/views/      ← layout compartido y componentes globales
+│   └── components/
+│       └── layouts/
+│           └── app.blade.php  ← el sidebar + topbar que envuelve TODAS las vistas
+│
+├── routes/
+│   └── web.php           ← solo la ruta raíz "/" (redirige a login o dashboard)
+│
+├── public/               ← lo único que el navegador accede directamente
+│   └── build/            ← CSS y JS compilados por Vite
+│
+└── Doc/                  ← toda la documentación del proyecto
 ```
 
-> **Regla de oro para becarios:** cada módulo vive en su carpeta. Tiene sus propias rutas, controladores, vistas y migraciones. Un módulo no importa código de otro (solo usa la BD compartida). Si algo falla en un módulo, los demás siguen funcionando.
+Dentro de cada módulo la estructura es siempre la misma:
 
-Ver detalles en → [Arquitectura modular](Doc/arquitectura.md)
+```
+Modules/MiModulo/
+├── app/
+│   ├── Http/Controllers/MiModuloController.php   ← lógica
+│   └── Models/MiModelo.php                       ← datos
+├── database/
+│   ├── migrations/                               ← tablas del módulo
+│   └── seeders/                                  ← datos iniciales
+├── resources/views/
+│   ├── index.blade.php                           ← vista principal
+│   └── create.blade.php                          ← formulario
+└── routes/
+    └── web.php                                   ← rutas del módulo
+```
 
 ---
 
-## Instalación rápida
+## El flujo de una petición HTTP
 
-```bash
-cd IMJUnificado
-cp .env.example .env
-php artisan key:generate
-touch database/database.sqlite   # solo en dev local
-php artisan migrate:fresh --seed
-npm install && npm run build
-php artisan serve
+Cuando el navegador pide `GET /tickets`, esto pasa en orden:
+
+```mermaid
+flowchart LR
+    A[Navegador] -->|GET /tickets| B[Router]
+    B -->|¿Tiene sesión?| C{Middleware auth}
+    C -->|No| D[Redirect a /login]
+    C -->|Sí| E[TicketsController@index]
+    E -->|query| F[(Base de datos)]
+    F -->|datos| E
+    E -->|compact datos| G[index.blade.php]
+    G -->|HTML generado| A
 ```
 
-Login: `admin@imjuventud.gob.mx` / `admin123`
-
-Guía completa → [Quickstart](Doc/quickstart.md)
+Este diagrama aplica a **todos** los módulos. El router siempre consulta el middleware, el middleware decide si permite el paso, el controlador consulta la BD y pasa los datos a la vista, la vista genera el HTML.
 
 ---
 
-## Módulos implementados
+## Estado del proyecto
 
 | Módulo | Ruta | Estado |
 |---|---|---|
-| Dashboard | `/dashboard` | ✅ Con KPIs reales |
-| CRM — Empleados | `/crm` | ✅ Tabla + panel lateral |
-| Tickets | `/tickets` | ✅ Kanban + lista |
-| Kardex | `/kardex` | ✅ Equipos / Insumos / Resguardos |
-| Red e IPs | `/network` | ✅ Rangos + inventario filtrable |
-| Teléfonos | `/telefonos` | 🔧 Ruta stub |
-| Impresoras | `/impresoras` | 🔧 Ruta stub |
-| Mantenimiento | `/mantenimiento` | 🔧 Ruta stub |
-
-Ver detalles de cada módulo → [Módulos del sistema](Doc/modulos.md)
-
----
-
-## Base de datos — resumen
-
-12 tablas unificadas desde dos sistemas originales:
-
-| Tabla | Origen | Contenido |
-|---|---|---|
-| `users` | IMJTickets | Técnicos y administradores del sistema |
-| `empleados` | Inventario + IMJTickets | Personal institucional (directorio) |
-| `departamentos` | Inventario | Áreas/direcciones |
-| `telefonos` | Inventario | Extensiones por empleado |
-| `tickets` | IMJTickets | Solicitudes de soporte |
-| `areas` / `tipos` | IMJTickets | Catálogos de tickets |
-| `inventario_equipos` | Inventario | Laptops, PCs (183 equipos) |
-| `impresoras` | Inventario | 10 impresoras institucionales |
-| `insumos` / `suministros` | Inventario | Toners y consumibles |
-| `cat_rangos_ips` | Inventario | 11 rangos de red por área |
-| `inventario_ips_completo` | Inventario | 491 IPs registradas |
-
-Ver esquema completo → [Base de datos](Doc/base-de-datos.md)
+| Login / Logout | `/login` | ✅ Completo |
+| Dashboard | `/dashboard` | ✅ Completo |
+| Tickets — formulario público | `/tickets/create` | ✅ Completo |
+| Tickets — gestión interna | `/tickets` | 🔧 Vista lista — datos placeholder |
+| CRM (empleados) | `/crm` | 🔧 Vista lista — CRUD pendiente |
+| Kardex (equipos e insumos) | `/kardex` | 🔧 Vista lista — escritura pendiente |
+| Network (IPs) | `/network` | 🔧 Vista lista — edición pendiente |
+| Teléfonos | `/telefonos` | ⏳ Placeholder |
+| Impresoras | `/impresoras` | ⏳ Placeholder |
+| Mantenimiento | `/mantenimiento` | ⏳ Placeholder |
 
 ---
 
-## Características nuevas (vs. los sistemas originales)
+## Lo que viene — prioridades para el próximo becario
 
-Funcionalidades que no existían en ninguno de los dos proyectos anteriores:
+Por orden de impacto:
 
-- **Panel lateral de 400 px** al seleccionar un empleado: muestra equipo asignado, IP, extensión, historial de tickets
-- **Vista Kanban** para tickets (los sistemas originales solo tenían lista)
-- **Dashboard unificado** con KPIs de todos los módulos en una sola pantalla
-- **UI para catálogos** de Áreas y Tipos de incidente (antes eran botones muertos)
-- **Gestión de cuentas técnicas** (antes solo por `php artisan tinker`)
-- **Control de roles** real: `admin` / `tecnico` (la columna existía pero nunca se usaba)
-- **Datos semilla reales** cargados automáticamente de los Excel institucionales
+1. **Mover queries a controladores** — CRM, Kardex y Network tienen las consultas de BD en el archivo de rutas, lo que va contra las convenciones del proyecto. Ver [Doc/convenciones.md](Doc/convenciones.md).
 
----
+2. **Conectar Kanban de tickets con datos reales** — la vista de gestión de tickets muestra columnas vacías. Los tickets ya están en la BD, solo falta la query.
 
-## Diseño institucional
+3. **Panel lateral de CRM con datos reales** — los tabs "Recursos", "Historial" y "Tickets" del panel de empleados son placeholder. Necesitan AJAX o Livewire para cargar datos del empleado seleccionado.
 
-El sistema sigue el sistema de diseño **"Federal Asset Integrity"** definido en los wireframes:
+4. **Generar PDF de resguardo** — la funcionalidad existe en el sistema Python. Hay que portarla a `barryvdh/laravel-dompdf`.
 
-- **Color principal:** guinda `#621132`
-- **Acento:** oro `#D4C19C`
-- **Tipografía:** Inter (UI) + JetBrains Mono (datos técnicos)
-- **Sidebar:** 280 px, fondo claro `#fbf9f8`, borde dorado
-- **Panel lateral de detalle:** 400 px, desliza desde la derecha
+5. **CRUD de empleados** — alta, baja y edición de empleados en el módulo CRM.
+
+6. **Poblar `id_empleado` en IPs** — cruzar la tabla `inventario_ips_completo` con `empleados` para habilitar el panel de detalle en Network.
 
 ---
 
-## Historial del proyecto
+## Historial y créditos
 
-Este repositorio contiene la historia **completa** de ambos proyectos originales:
+Este sistema unifica dos proyectos con historiales de git distintos:
 
-- Los commits de los becarios del sistema de inventario (rama `Base-de-Datos`) están preservados con su autoría original mediante `git merge --allow-unrelated-histories`
-- El historial de IMJTickets (rama `main`) también está intacto
-- El trabajo de unificación está en la rama `developer`
+- **IMJTickets** (rama `main`): sistema original de tickets, en producción en Windows Server.
+- **Base-de-Datos** (carpeta `Base-de-Datos/`): sistema de inventario en Python/Streamlit, importado con `git merge --allow-unrelated-histories` para preservar los commits de los becarios originales.
+- **IMJUnificado** (carpeta `IMJUnificado/`, rama `developer`): este sistema — la unificación.
 
-```
-developer  ←  merge legado-base-datos  ←  historial Base-de-Datos
-    └──────────────────────────────────→  historial IMJTickets (main)
-```
-
----
-
-## Para el próximo becario o colaborador
-
-Si eres nuevo en este proyecto, el camino recomendado es:
-
-1. Lee [Quickstart](Doc/quickstart.md) para levantar el proyecto en tu máquina
-2. Lee [Stack tecnológico](Doc/stack.md) — especialmente si no conoces Laravel o Livewire
-3. Lee [Arquitectura modular](Doc/arquitectura.md) para entender dónde vive cada cosa
-4. Cuando debas agregar algo nuevo, crea un módulo nuevo — **nunca modifiques Core sin consultarlo**
-5. Si tienes dudas de por qué algo está como está, revisa [Decisiones de diseño](Doc/decisiones.md)
+Para ver el historial completo: `git log --oneline --all`

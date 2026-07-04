@@ -154,6 +154,7 @@
     </div>
 </main>
 
+<x-error-button />
 @livewireScripts
 </body>
 </html>

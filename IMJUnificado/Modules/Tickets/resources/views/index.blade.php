@@ -20,7 +20,7 @@
                     Lista
                 </button>
             </div>
-            <a href="#" class="px-4 py-2 bg-[#621132] text-white rounded flex items-center gap-2 hover:opacity-90 text-sm font-bold">
+            <a href="{{ route('tickets.create') }}" class="px-4 py-2 bg-[#621132] text-white rounded flex items-center gap-2 hover:opacity-90 text-sm font-bold">
                 <span class="material-symbols-outlined text-sm">add</span>
                 Nuevo Ticket
             </a>
