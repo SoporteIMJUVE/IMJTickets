@@ -12,7 +12,15 @@ class TicketsController extends Controller
 {
     public function index()
     {
-        return view('tickets::index');
+        $tickets = DB::table('tickets')->orderByDesc('created_at')->get();
+
+        $porEstado = [
+            0 => $tickets->where('estado', 0)->values(),
+            1 => $tickets->where('estado', 1)->values(),
+            2 => $tickets->where('estado', 2)->values(),
+        ];
+
+        return view('tickets::index', compact('tickets', 'porEstado'));
     }
 
     public function create(Request $request)

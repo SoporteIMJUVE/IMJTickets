@@ -104,7 +104,13 @@
                     @endphp
                     <tr class="hover:bg-[#D4C19C]/5 transition-colors cursor-pointer group user-row"
                         data-search="{{ strtolower($nombreCompleto . ' ' . ($emp->departamento_nombre ?? '')) }}"
-                        onclick="openUserPanel('{{ $emp->id_empleado }}')">
+                        data-nombre="{{ $nombreCompleto }}"
+                        data-correo="{{ $emp->correo ?? '' }}"
+                        data-depa="{{ $emp->departamento_nombre ?? '' }}"
+                        data-ext="{{ $emp->extension ?? '' }}"
+                        data-equipos="{{ $emp->total_equipos }}"
+                        data-iniciales="{{ $iniciales }}"
+                        onclick="openUserPanel(this)">
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-3">
                                 <div class="w-8 h-8 rounded-full bg-[#D4C19C] flex items-center justify-center text-[#621132] font-bold text-xs flex-shrink-0">
@@ -204,15 +210,15 @@
                 <div class="grid grid-cols-2 gap-4 bg-[#F3F4F6] p-4 rounded-lg">
                     <div>
                         <p class="text-[10px] text-[#544246] font-bold uppercase">Correo</p>
-                        <p class="text-sm font-semibold">—</p>
+                        <p class="text-sm font-semibold break-all" id="panel-correo">—</p>
                     </div>
                     <div>
                         <p class="text-[10px] text-[#544246] font-bold uppercase">Extensión</p>
-                        <p class="text-sm font-semibold">—</p>
+                        <p class="text-sm font-semibold" id="panel-ext">—</p>
                     </div>
                     <div class="col-span-2">
                         <p class="text-[10px] text-[#544246] font-bold uppercase">Departamento</p>
-                        <p class="text-sm font-semibold">—</p>
+                        <p class="text-sm font-semibold" id="panel-depa">—</p>
                     </div>
                 </div>
             </section>
@@ -259,19 +265,23 @@
             </section>
         </div>
 
-        {{-- Tab: Historial --}}
-        <div class="p-6 space-y-4 hidden" id="tab-historial">
-            <div class="text-center text-[#544246] py-12">
-                <span class="material-symbols-outlined text-4xl mb-2 block">history</span>
-                <p class="text-sm">No hay historial disponible</p>
+        {{-- Tab: Historial — todos los tickets del empleado --}}
+        <div class="p-6 hidden" id="tab-historial">
+            <div id="historial-content">
+                <div class="text-center text-[#544246] py-12">
+                    <span class="material-symbols-outlined text-4xl mb-2 block">history</span>
+                    <p class="text-sm">Sin historial de tickets</p>
+                </div>
             </div>
         </div>
 
-        {{-- Tab: Tickets --}}
-        <div class="p-6 space-y-4 hidden" id="tab-tickets">
-            <div class="text-center text-[#544246] py-12">
-                <span class="material-symbols-outlined text-4xl mb-2 block">confirmation_number</span>
-                <p class="text-sm">No hay tickets recientes</p>
+        {{-- Tab: Tickets — solo tickets activos (Abierto / Atendiendo) --}}
+        <div class="p-6 hidden" id="tab-tickets">
+            <div id="tickets-activos-content">
+                <div class="text-center text-[#544246] py-12">
+                    <span class="material-symbols-outlined text-4xl mb-2 block">confirmation_number</span>
+                    <p class="text-sm">Sin tickets activos</p>
+                </div>
             </div>
         </div>
     </div>
@@ -293,9 +303,80 @@
 <div class="fixed inset-0 bg-black/20 backdrop-blur-sm z-[55] hidden" id="panel-backdrop" onclick="closeUserPanel()"></div>
 
 <script>
-function openUserPanel(userId) {
+// Tickets de todos los empleados indexados por correo
+// Patrón inter-módulo: datos cargados desde el controlador con DB::table('tickets'),
+// sin importar nada del módulo Tickets.
+const ticketsPorCorreo = {!! json_encode($ticketsPorCorreo, JSON_HEX_TAG) !!};
+
+function openUserPanel(row) {
+    const nombre   = row.dataset.nombre;
+    const correo   = row.dataset.correo;
+    const depa     = row.dataset.depa;
+    const ext      = row.dataset.ext;
+    const equipos  = parseInt(row.dataset.equipos) || 0;
+    const iniciales = row.dataset.iniciales;
+
+    // Header del panel
+    document.getElementById('panel-avatar').innerText = iniciales;
+    document.getElementById('panel-name').innerText   = nombre;
+    document.getElementById('panel-area').innerText   = depa || '—';
+
+    // Tab Recursos — datos de contacto
+    document.getElementById('panel-correo').innerText = correo || '—';
+    document.getElementById('panel-ext').innerText    = ext ? 'ext. ' + ext : '—';
+    document.getElementById('panel-depa').innerText   = depa || '—';
+
+    // Tabs Historial y Tickets — datos cruzados con el módulo Tickets
+    const todos   = ticketsPorCorreo[correo] || [];
+    const activos = todos.filter(t => t.estado < 2);
+
+    document.getElementById('historial-content').innerHTML = todos.length
+        ? todos.map(renderTicketItem).join('')
+        : emptyState('history', 'Sin historial de tickets');
+
+    document.getElementById('tickets-activos-content').innerHTML = activos.length
+        ? activos.map(renderTicketItem).join('')
+        : emptyState('confirmation_number', 'Sin tickets activos');
+
+    // Volver al tab Recursos por defecto
+    switchPanelTab('recursos', document.querySelector('#user-panel .flex.border-b button'));
+
     document.getElementById('user-panel').classList.remove('closed');
     document.getElementById('panel-backdrop').classList.remove('hidden');
+}
+
+function renderTicketItem(t) {
+    const label = {0:'Abierto',1:'Atendiendo',2:'Cerrado'}[t.estado] ?? '—';
+    const style = {
+        0: 'background:#DBEAFE;color:#1E40AF',
+        1: 'background:#FEF3C7;color:#92400E',
+        2: 'background:#DCFCE7;color:#166534',
+    }[t.estado] ?? '';
+    const fecha = t.fecha
+        ? new Date(t.fecha).toLocaleDateString('es-MX', {day:'2-digit', month:'short', year:'numeric'})
+        : '';
+    return `<div class="border border-[#E5E7EB] rounded-lg p-4 mb-3 last:mb-0">
+        <div class="flex justify-between items-center mb-2">
+            <span style="color:#621132;background:#62113215;padding:2px 8px;border-radius:4px;font-family:monospace;font-size:10px;font-weight:700">#${t.id}</span>
+            <span style="${style};padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700">${label}</span>
+        </div>
+        <p style="font-size:13px;font-weight:700;color:#1b1c1c;margin-bottom:4px">${escHtml(t.tipo)}</p>
+        <p style="font-size:11px;color:#544246">${escHtml(t.descripcion)}</p>
+        <p style="font-size:10px;color:#544246;margin-top:6px;opacity:.7">${fecha}</p>
+    </div>`;
+}
+
+function emptyState(icon, msg) {
+    return `<div style="text-align:center;color:#544246;padding:48px 0">
+        <span class="material-symbols-outlined" style="font-size:36px;display:block;margin-bottom:8px">${icon}</span>
+        <p style="font-size:13px">${msg}</p>
+    </div>`;
+}
+
+function escHtml(s) {
+    return String(s ?? '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function closeUserPanel() {
@@ -314,11 +395,8 @@ function switchPanelTab(tab, btn) {
     btn.className = 'px-4 py-3 text-[#621132] font-bold border-b-2 border-[#621132] text-sm';
 }
 
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeUserPanel();
-});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeUserPanel(); });
 
-// Live search filter
 document.getElementById('crm-search').addEventListener('input', (e) => {
     const term = e.target.value.toLowerCase();
     document.querySelectorAll('#users-tbody tr').forEach(row => {
