@@ -191,6 +191,60 @@ php artisan serve --host=0.0.0.0 --port=8000
 
 ---
 
+## Flujo de trabajo con Git
+
+El proyecto usa tres niveles de ramas. **Nunca commitear directo a `main` ni a `developer`.**
+
+```
+main          ← producción, siempre estable y probada
+developer     ← integración, aquí se prueba antes de pasar a main
+feature/*     ← una rama por tarea, sale de developer y regresa a developer
+```
+
+### Paso a paso para un becario
+
+**1. Antes de empezar cualquier tarea, crear una rama desde `developer`:**
+
+```bash
+git checkout developer
+git pull origin developer
+git checkout -b feature/nombre-de-la-tarea
+```
+
+Ejemplos de nombres:
+```
+feature/kardex-excel-export
+feature/telefonos-crud
+feature/crm-panel-recursos
+fix/tickets-kanban-drag
+docs/manual-impresoras
+```
+
+**2. Trabajar y commitear en esa rama:**
+
+```bash
+git add archivo_modificado.php
+git commit -m "descripción clara de lo que hace el cambio"
+```
+
+**3. Cuando la tarea esté lista, abrir un Pull Request hacia `developer` en GitHub.**
+
+El encargado del proyecto revisa y aprueba el PR. Solo cuando está aprobado se hace merge.
+
+**4. De `developer` a `main` — solo cuando todo funciona:**
+
+Una vez que `developer` tiene funcionalidades probadas y estables, el encargado abre un PR de `developer` → `main`.
+
+### Reglas
+
+| Rama | Quién commitea | Cuándo |
+|---|---|---|
+| `feature/*` | Becarios | Durante el desarrollo |
+| `developer` | Solo por merge de PRs | Cuando una feature está lista |
+| `main` | Solo por merge de PRs | Cuando `developer` está probado |
+
+---
+
 ## Comandos del día a día
 
 ```bash
