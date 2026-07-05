@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Modules\Tickets\Models\Ticket;
 
 class TicketsController extends Controller
@@ -20,8 +21,85 @@ class TicketsController extends Controller
             2 => $tickets->where('estado', 2)->values(),
         ];
 
-        return view('tickets::index', compact('tickets', 'porEstado'));
+        $tecnicos = DB::table('users')->select('name', 'email')->get();
+        $areas    = DB::table('areas')->orderBy('nombre')->pluck('nombre');
+
+        $comentariosPorTicket = Schema::hasTable('ticket_comentarios')
+            ? DB::table('ticket_comentarios')->orderBy('created_at')->get()
+                ->groupBy('ticket_id')
+                ->map(fn($g) => $g->map(fn($c) => [
+                    'id'           => $c->id,
+                    'autor_nombre' => $c->autor_nombre,
+                    'autor_email'  => $c->autor_email,
+                    'texto'        => $c->texto,
+                    'created_at'   => $c->created_at,
+                ])->values()->all())
+                ->all()
+            : [];
+
+        return view('tickets::index', compact(
+            'tickets', 'porEstado', 'tecnicos', 'areas', 'comentariosPorTicket'
+        ));
     }
+
+    public function cambiarEstado(Request $request, int $id)
+    {
+        $validated = $request->validate(['estado' => 'required|integer|in:0,1,2']);
+        $estado    = $validated['estado'];
+
+        // Solo actualiza estado por ahora — atendido_at/cerrado_at pendientes de migración
+        DB::table('tickets')->where('id', $id)->update(['estado' => $estado]);
+
+        // Vestigio — habilitar cuando existan las columnas:
+        // $extra = [];
+        // if ($estado === 1) $extra = ['atendido_at' => now(), 'atendido_by' => Auth::user()->email];
+        // if ($estado === 2) $extra = ['cerrado_at'  => now(), 'cerrado_by'  => Auth::user()->email];
+        // DB::table('tickets')->where('id', $id)->update(array_merge(['estado' => $estado], $extra));
+
+        return response()->json(['ok' => true, 'estado' => $estado]);
+    }
+
+    public function comentar(Request $request, int $id)
+    {
+        $validated = $request->validate(['texto' => 'required|string|max:1000']);
+
+        $cId = DB::table('ticket_comentarios')->insertGetId([
+            'ticket_id'    => $id,
+            'autor_nombre' => Auth::user()->name,
+            'autor_email'  => Auth::user()->email,
+            'texto'        => $validated['texto'],
+            'created_at'   => now(),
+            'updated_at'   => now(),
+        ]);
+
+        return response()->json([
+            'ok'        => true,
+            'comentario' => DB::table('ticket_comentarios')->find($cId),
+        ]);
+    }
+
+    public function asignar(Request $request, int $id)
+    {
+        $request->validate(['tecnico_email' => 'required|email|exists:users,email']);
+
+        DB::table('tickets')->where('id', $id)->update([
+            'atendido_by' => $request->tecnico_email,
+        ]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function conteo()
+    {
+        return response()->json([
+            'total'    => DB::table('tickets')->count(),
+            'abiertos' => DB::table('tickets')->where('estado', 0)->count(),
+        ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Formulario público
+    // ─────────────────────────────────────────────────────────────
 
     public function create(Request $request)
     {
@@ -31,12 +109,9 @@ class TicketsController extends Controller
         $ip  = $this->clientIp($request);
         $mac = $this->macFromIp($ip);
 
-        // Si hay sesión activa, buscamos al empleado por su email
         $autofillCorreo = null;
         if (Auth::check()) {
-            $emp = DB::table('empleados')
-                ->where('correo', Auth::user()->email)
-                ->first();
+            $emp = DB::table('empleados')->where('correo', Auth::user()->email)->first();
             $autofillCorreo = $emp ? $emp->correo : Auth::user()->email;
         }
 
@@ -97,7 +172,9 @@ class TicketsController extends Controller
             ->with('success', '¡Ticket enviado! El equipo de soporte lo atenderá a la brevedad.');
     }
 
-    // ─── Helpers privados ───────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────
+    // Helpers privados
+    // ─────────────────────────────────────────────────────────────
 
     private function clientIp(Request $request): string
     {
@@ -108,14 +185,9 @@ class TicketsController extends Controller
 
     private function macFromIp(string $ip): ?string
     {
-        // ARP solo funciona si el cliente está en la misma red local que el servidor.
-        // En acceso remoto devolverá null — es el comportamiento esperado.
         $safe = escapeshellarg($ip);
+        $out  = @shell_exec("arp -n $safe 2>/dev/null");
 
-        // Linux / macOS
-        $out = @shell_exec("arp -n $safe 2>/dev/null");
-
-        // Windows (XAMPP en producción)
         if (!$out || !str_contains($out, ':')) {
             $out = @shell_exec("arp -a $safe 2>/dev/null");
         }
