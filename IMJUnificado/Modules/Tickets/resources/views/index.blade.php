@@ -105,10 +105,11 @@
                         $td = ['id'=>$t->id,'folio'=>$folio,'nombre'=>$t->nombre,'correo'=>$t->correo,'area'=>$t->area,'tipo'=>$t->tipo,'descripcion'=>$t->descripcion,'estado'=>$t->estado,'atendido_by'=>$t->atendido_by,'created_at'=>$t->created_at,'atendido_at'=>$t->atendido_at,'cerrado_at'=>$t->cerrado_at,'ip'=>$t->ip??null,'mac'=>$t->mac??null];
                     @endphp
                     <tr class="hover:bg-[#D4C19C]/5 transition-colors group cursor-pointer list-row"
+                        data-ticket-id="{{ $t->id }}"
                         data-area="{{ $t->area }}"
                         data-estado="{{ $t->estado }}"
                         data-fecha="{{ $t->created_at }}"
-                        data-ticket="{{ e(json_encode($td)) }}"
+                        data-ticket="{{ json_encode($td) }}"
                         onclick="openPanel(this)">
                         <td class="px-5 py-4 font-mono text-xs text-[#621132] font-bold">{{ $folio }}</td>
                         <td class="px-5 py-4">
@@ -123,7 +124,7 @@
                             <p class="text-xs text-[#544246] line-clamp-2">{{ $t->descripcion }}</p>
                         </td>
                         <td class="px-5 py-4">
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase" style="{{ $estadoConf['style'] }}">
+                            <span class="row-estado-badge px-2 py-0.5 rounded-full text-[10px] font-bold uppercase" style="{{ $estadoConf['style'] }}">
                                 {{ $estadoConf['label'] }}
                             </span>
                         </td>
@@ -194,7 +195,7 @@
                         $isCerrado = $col['estado'] === 2;
                     @endphp
                     <div class="ticket-card bg-white rounded-xl border border-[#E5E7EB] shadow-sm overflow-hidden hover:border-[#D4C19C] transition-all {{ $isCerrado ? 'opacity-75 grayscale' : '' }}"
-                         data-ticket="{{ e(json_encode($td)) }}"
+                         data-ticket="{{ json_encode($td) }}"
                          data-ticket-id="{{ $t->id }}"
                          data-area="{{ $t->area }}"
                          data-estado="{{ $t->estado }}"
@@ -496,13 +497,23 @@ function inicializarSortable() {
                 const nuevoEstado = parseInt(evt.to.dataset.estado);
                 if (isNaN(ticketId) || isNaN(nuevoEstado)) return;
                 evt.item.dataset.estado = nuevoEstado;
+                // Actualiza el JSON inline del card para que el panel refleje el nuevo estado
+                try {
+                    const raw = evt.item.getAttribute('data-ticket');
+                    if (raw) {
+                        const td = JSON.parse(raw);
+                        td.estado = nuevoEstado;
+                        evt.item.setAttribute('data-ticket', JSON.stringify(td));
+                    }
+                } catch (_) {}
                 const handle = evt.item.querySelector('.drag-handle');
                 if (handle) handle.style.background = (HANDLE_COLORS[nuevoEstado] ?? '#544246') + '15';
                 evt.item.classList.toggle('opacity-75', nuevoEstado === 2);
                 evt.item.classList.toggle('grayscale',  nuevoEstado === 2);
-                await fetchJson(`/tickets/${ticketId}/estado`, 'PATCH', { estado: nuevoEstado });
+                await fetchJson(`/tickets/${ticketId}/estado`, 'POST', { estado: nuevoEstado });
                 actualizarContadoresColumnas();
                 aplicarAutoHideCerrados();
+                checkNuevosTickets();
             }
         });
     });
@@ -635,7 +646,8 @@ document.addEventListener('DOMContentLoaded', () => {
     inicializarSortable();
     setInterval(actualizarTiempos,        60000);
     setInterval(aplicarAutoHideCerrados,  60000);
-    setInterval(checkNuevosTickets,       30000);
+    // Sin polling — el conteo se dispara al volver a la pestaña y tras cada acción
+    window.addEventListener('focus', checkNuevosTickets);
 
     // Responder Ticket
     document.getElementById('btn-responder')?.addEventListener('click', async () => {
@@ -663,7 +675,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', async () => {
             if (!currentTicketId) return;
             const nuevoEstado = parseInt(btn.dataset.estado);
-            const result = await fetchJson(`/tickets/${currentTicketId}/estado`, 'PATCH', { estado: nuevoEstado });
+            const result = await fetchJson(`/tickets/${currentTicketId}/estado`, 'POST', { estado: nuevoEstado });
             if (!result.ok) return;
 
             const ESTADOS = {
@@ -681,15 +693,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 b.style.outline    = activo ? '2px solid currentColor' : 'none';
             });
 
-            const card = document.querySelector(`[data-ticket-id="${currentTicketId}"]`);
+            // Actualiza card Kanban
+            const card = document.querySelector(`.ticket-card[data-ticket-id="${currentTicketId}"]`);
             if (card) {
                 const col = document.querySelector(`.kanban-col-body[data-estado="${nuevoEstado}"]`);
                 if (col) { col.prepend(card); card.dataset.estado = nuevoEstado; }
                 card.classList.toggle('opacity-75', nuevoEstado === 2);
                 card.classList.toggle('grayscale',  nuevoEstado === 2);
             }
+            // Actualiza badge en la fila de la tabla
+            const row = document.querySelector(`tr[data-ticket-id="${currentTicketId}"]`);
+            if (row) {
+                row.dataset.estado = nuevoEstado;
+                const rowBadge = row.querySelector('.row-estado-badge');
+                if (rowBadge) {
+                    rowBadge.textContent = ec.label;
+                    rowBadge.style.cssText = `background:${ec.bg};color:${ec.color}`;
+                }
+            }
             actualizarContadoresColumnas();
             if (nuevoEstado === 2) aplicarAutoHideCerrados();
+            checkNuevosTickets();
         });
     });
 

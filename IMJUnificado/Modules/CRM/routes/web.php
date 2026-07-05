@@ -1,7 +1,13 @@
 <?php
 use Illuminate\Support\Facades\Route;
+use Modules\CRM\Http\Controllers\CRMController;
 
 Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
+    Route::post('/empleados',               [CRMController::class, 'store'])->name('empleados.store');
+    Route::patch('/empleados/{id}',         [CRMController::class, 'update'])->name('empleados.update');
+    Route::delete('/empleados/{id}',        [CRMController::class, 'destroy'])->name('empleados.destroy');
+    Route::patch('/empleados/{id}/reactivar', [CRMController::class, 'reactivar'])->name('empleados.reactivar');
+
     Route::get('/', function () {
         $empleados = \DB::table('empleados')
             ->leftJoin('departamentos', 'empleados.id_departamento', '=', 'departamentos.id_departamento')
@@ -32,10 +38,13 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
                 ->all()
             : [];
 
+        $departamentos = \DB::table('departamentos')->orderBy('nombre')->get();
+
         return view('crm::index', [
             'empleados'         => $empleados,
+            'departamentos'     => $departamentos,
             'totalActivos'      => $empleados->where('activo', true)->count(),
-            'totalDeptos'       => \DB::table('departamentos')->count(),
+            'totalDeptos'       => $departamentos->count(),
             'totalEquipos'      => \DB::table('inventario_equipos')->count(),
             'totalBajas'        => $empleados->where('activo', false)->count(),
             'ticketsPorCorreo'  => $ticketsPorCorreo,

@@ -29,9 +29,17 @@ if [ ! -f database/database.sqlite ]; then
     touch database/database.sqlite
 fi
 
-# 4. Migraciones y datos semilla
-echo "▶ Corriendo migraciones y seeders..."
-php artisan migrate:fresh --seed --force
+# 4. Migraciones
+echo "▶ Corriendo migraciones..."
+php artisan migrate:fresh --force
+
+# 4b. Usuario admin y catálogos base
+echo "▶ Cargando usuario admin y catálogos..."
+php artisan db:seed --force
+
+# 4c. Importar datos desde respaldo (sistemitas.sql)
+echo "▶ Importando datos desde respaldo de sistemas legados..."
+php artisan app:boot --force
 
 # 5. Frontend
 echo "▶ Instalando dependencias Node.js..."

@@ -31,7 +31,8 @@ return new class extends Migration
             $table->date('fecha_solicitud')->useCurrent();
             $table->integer('cantidad_requerida')->nullable();
             $table->integer('cantidad_entregada')->nullable();
-            $table->string('estatus', 30)->default('pendiente');
+            $table->string('estatus', 60)->default('PENDIENTE DE ENTREGA');
+            $table->text('notas')->nullable();
             $table->timestamps();
         });
     }

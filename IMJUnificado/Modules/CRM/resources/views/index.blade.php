@@ -12,7 +12,7 @@
                 <span class="material-symbols-outlined text-sm">filter_list</span>
                 Filtrar
             </button>
-            <button class="px-4 py-2 bg-[#621132] text-white rounded flex items-center gap-2 hover:opacity-90 transition-opacity text-sm font-bold">
+            <button onclick="openNuevoModal()" class="px-4 py-2 bg-[#621132] text-white rounded flex items-center gap-2 hover:opacity-90 transition-opacity text-sm font-bold">
                 <span class="material-symbols-outlined text-sm">person_add</span>
                 Nuevo Usuario
             </button>
@@ -63,16 +63,23 @@
     <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm">
 
         {{-- Search bar --}}
-        <div class="px-6 py-4 border-b border-[#E5E7EB] flex items-center justify-between">
-            <div class="relative w-72">
+        <div class="px-6 py-4 border-b border-[#E5E7EB] flex items-center justify-between gap-4">
+            <div class="relative w-72 shrink-0">
                 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#544246] text-sm">search</span>
                 <input class="w-full bg-[#F3F4F6] border-none rounded-lg pl-9 pr-4 py-2 text-sm focus:ring-2 focus:ring-[#621132] outline-none"
-                       placeholder="Buscar por nombre o área..." type="text" id="crm-search">
+                       placeholder="Buscar nombre, puesto..." type="text" id="crm-search">
             </div>
-            <div class="flex items-center gap-2 text-sm text-[#544246]">
-                <span class="material-symbols-outlined text-sm">filter_alt</span>
-                <select class="bg-[#F3F4F6] border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#621132] outline-none">
-                    <option>Todos los departamentos</option>
+            <div class="flex items-center gap-3 text-sm text-[#544246]">
+                <select id="filter-depa" class="bg-[#F3F4F6] border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#621132] outline-none">
+                    <option value="">Todos los departamentos</option>
+                    @foreach($departamentos as $d)
+                    <option value="{{ strtolower($d->nombre) }}">{{ $d->nombre }}</option>
+                    @endforeach
+                </select>
+                <select id="filter-estado" class="bg-[#F3F4F6] border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#621132] outline-none">
+                    <option value="">Todos</option>
+                    <option value="1">Activos</option>
+                    <option value="0">Bajas</option>
                 </select>
             </div>
         </div>
@@ -103,10 +110,18 @@
                         ) . '@imjuve.gob.mx';
                     @endphp
                     <tr class="hover:bg-[#D4C19C]/5 transition-colors cursor-pointer group user-row"
-                        data-search="{{ strtolower($nombreCompleto . ' ' . ($emp->departamento_nombre ?? '')) }}"
+                        data-id="{{ $emp->id_empleado }}"
+                        data-activo="{{ $emp->activo ? '1' : '0' }}"
+                        data-search="{{ strtolower($nombreCompleto . ' ' . ($emp->puesto ?? '') . ' ' . ($emp->departamento_nombre ?? '')) }}"
                         data-nombre="{{ $nombreCompleto }}"
+                        data-nombre-raw="{{ $emp->nombre }}"
+                        data-ap="{{ $emp->apellido_paterno ?? '' }}"
+                        data-am="{{ $emp->apellido_materno ?? '' }}"
+                        data-puesto="{{ $emp->puesto ?? '' }}"
                         data-correo="{{ $emp->correo ?? '' }}"
-                        data-depa="{{ $emp->departamento_nombre ?? '' }}"
+                        data-depa="{{ strtolower($emp->departamento_nombre ?? '') }}"
+                        data-depa-label="{{ $emp->departamento_nombre ?? '' }}"
+                        data-depa-id="{{ $emp->id_departamento ?? '' }}"
                         data-ext="{{ $emp->extension ?? '' }}"
                         data-equipos="{{ $emp->total_equipos }}"
                         data-iniciales="{{ $iniciales }}"
@@ -162,7 +177,7 @@
 
         {{-- Pagination --}}
         <div class="px-6 py-4 border-t border-[#E5E7EB] flex justify-between items-center bg-[#fbf9f8]">
-            <p class="text-sm text-[#544246]">Mostrando datos de ejemplo</p>
+            <p class="text-sm text-[#544246]" id="tabla-conteo">{{ $empleados->count() }} registro(s)</p>
             <div class="flex gap-2">
                 <button class="w-8 h-8 flex items-center justify-center rounded border border-[#E5E7EB] hover:bg-[#F3F4F6]">
                     <span class="material-symbols-outlined text-sm">chevron_left</span>
@@ -183,7 +198,10 @@
     <div class="p-6 border-b border-[#E5E7EB] bg-[#fbf9f8] flex justify-between items-start">
         <div>
             <div class="w-16 h-16 rounded-full bg-[#D4C19C] flex items-center justify-center text-[#621132] font-bold text-xl mb-3" id="panel-avatar">US</div>
-            <h3 class="text-xl font-bold" id="panel-name">Usuario</h3>
+            <div class="flex items-center gap-2 mb-1">
+                <h3 class="text-xl font-bold" id="panel-name">Usuario</h3>
+                <span id="panel-estado-badge" class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"></span>
+            </div>
             <p class="text-sm text-[#544246]" id="panel-area">Área</p>
         </div>
         <button class="p-2 hover:bg-[#F3F4F6] rounded-full transition-colors" onclick="closeUserPanel()">
@@ -288,7 +306,7 @@
 
     {{-- Footer Actions --}}
     <div class="p-6 border-t border-[#E5E7EB] bg-[#fbf9f8] grid grid-cols-2 gap-3">
-        <button class="w-full py-3 bg-[#F3F4F6] text-[#621132] font-bold rounded-lg hover:bg-[#eae8e7] transition-colors flex items-center justify-center gap-2 text-sm">
+        <button onclick="openEditModal()" class="w-full py-3 bg-[#F3F4F6] text-[#621132] font-bold rounded-lg hover:bg-[#eae8e7] transition-colors flex items-center justify-center gap-2 text-sm">
             <span class="material-symbols-outlined text-sm">edit</span>
             Editar
         </button>
@@ -308,18 +326,38 @@
 // sin importar nada del módulo Tickets.
 const ticketsPorCorreo = {!! json_encode($ticketsPorCorreo, JSON_HEX_TAG) !!};
 
+let currentEmpleado = {};
+
 function openUserPanel(row) {
-    const nombre   = row.dataset.nombre;
-    const correo   = row.dataset.correo;
-    const depa     = row.dataset.depa;
-    const ext      = row.dataset.ext;
-    const equipos  = parseInt(row.dataset.equipos) || 0;
-    const iniciales = row.dataset.iniciales;
+    currentEmpleado = {
+        id:       row.dataset.id,
+        activo:   row.dataset.activo === '1',
+        nombre:   row.dataset.nombre,
+        nombreRaw: row.dataset.nombreRaw,
+        ap:       row.dataset.ap,
+        am:       row.dataset.am,
+        puesto:   row.dataset.puesto,
+        correo:   row.dataset.correo,
+        depa:     row.dataset.depaLabel,
+        depaId:   row.dataset.depaId,
+        ext:      row.dataset.ext,
+        iniciales: row.dataset.iniciales,
+    };
+
+    const { nombre, correo, depa, ext, iniciales, activo } = currentEmpleado;
 
     // Header del panel
     document.getElementById('panel-avatar').innerText = iniciales;
     document.getElementById('panel-name').innerText   = nombre;
     document.getElementById('panel-area').innerText   = depa || '—';
+    const badge = document.getElementById('panel-estado-badge');
+    if (activo) {
+        badge.textContent = 'Activo';
+        badge.style.cssText = 'background:#166534/10;background-color:rgba(22,101,52,.1);color:#166534';
+    } else {
+        badge.textContent = 'Baja';
+        badge.style.cssText = 'background-color:rgba(153,27,27,.1);color:#991B1B';
+    }
 
     // Tab Recursos — datos de contacto
     document.getElementById('panel-correo').innerText = correo || '—';
@@ -395,13 +433,512 @@ function switchPanelTab(tab, btn) {
     btn.className = 'px-4 py-3 text-[#621132] font-bold border-b-2 border-[#621132] text-sm';
 }
 
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeUserPanel(); });
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeUserPanel(); closeNuevoModal(); }
+});
 
-document.getElementById('crm-search').addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase();
-    document.querySelectorAll('#users-tbody tr').forEach(row => {
-        row.style.display = row.innerText.toLowerCase().includes(term) ? '' : 'none';
+function aplicarFiltros() {
+    const term   = document.getElementById('crm-search').value.toLowerCase();
+    const depa   = document.getElementById('filter-depa').value.toLowerCase();
+    const estado = document.getElementById('filter-estado').value;
+    let visibles = 0;
+
+    document.querySelectorAll('#users-tbody tr.user-row').forEach(row => {
+        const matchText   = !term   || row.dataset.search.includes(term);
+        const matchDepa   = !depa   || row.dataset.depa === depa;
+        const matchEstado = estado === '' || row.dataset.activo === estado;
+        const visible     = matchText && matchDepa && matchEstado;
+        row.style.display = visible ? '' : 'none';
+        if (visible) visibles++;
+    });
+
+    const c = document.getElementById('tabla-conteo');
+    if (c) c.textContent = visibles + ' registro(s)';
+}
+
+document.getElementById('crm-search').addEventListener('input', aplicarFiltros);
+document.getElementById('filter-depa').addEventListener('change', aplicarFiltros);
+document.getElementById('filter-estado').addEventListener('change', aplicarFiltros);
+
+// ─── Modal Editar Usuario ────────────────────────────────────────────────────
+function openEditModal() {
+    if (!currentEmpleado.id) return;
+    const e = currentEmpleado;
+
+    document.getElementById('edit-id').value     = e.id;
+    document.getElementById('edit-nombre').value = e.nombreRaw || '';
+    document.getElementById('edit-ap').value     = e.ap || '';
+    document.getElementById('edit-am').value     = e.am || '';
+    document.getElementById('edit-puesto').value = e.puesto || '';
+    document.getElementById('edit-correo').value = e.correo || '';
+
+    const sel = document.getElementById('edit-depa');
+    for (const opt of sel.options) opt.selected = opt.value === String(e.depaId);
+
+    const btnBaja = document.getElementById('btn-baja-toggle');
+    if (e.activo) {
+        btnBaja.textContent = 'Dar de Baja';
+        btnBaja.className   = 'w-full py-2.5 border border-[#991B1B] text-[#991B1B] font-bold rounded-lg hover:bg-red-50 transition-colors text-sm';
+    } else {
+        btnBaja.textContent = 'Reactivar Usuario';
+        btnBaja.className   = 'w-full py-2.5 border border-[#166534] text-[#166534] font-bold rounded-lg hover:bg-green-50 transition-colors text-sm';
+    }
+
+    document.getElementById('modal-edit').classList.remove('hidden');
+    document.getElementById('modal-edit').classList.add('flex');
+}
+function closeEditModal() {
+    document.getElementById('modal-edit').classList.add('hidden');
+    document.getElementById('modal-edit').classList.remove('flex');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const CSRF = '{{ csrf_token() }}';
+
+    document.getElementById('form-edit-usuario')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn  = document.getElementById('btn-guardar-edit');
+        const orig = btn.textContent;
+        btn.disabled = true; btn.textContent = 'Guardando…';
+
+        const id = document.getElementById('edit-id').value;
+        const payload = {
+            nombre:           document.getElementById('edit-nombre').value,
+            apellido_paterno: document.getElementById('edit-ap').value,
+            apellido_materno: document.getElementById('edit-am').value,
+            puesto:           document.getElementById('edit-puesto').value,
+            correo:           document.getElementById('edit-correo').value,
+            id_departamento:  document.getElementById('edit-depa').value || null,
+        };
+
+        try {
+            const r = await fetch(`/crm/empleados/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN':CSRF,
+                           'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await r.json();
+            if (r.ok && data.ok) { closeEditModal(); window.location.reload(); }
+            else {
+                const msgs = data.errors ? Object.values(data.errors).flat().join('\n') : (data.message || 'Error.');
+                alert(msgs);
+            }
+        } catch (err) { alert('Error de conexión.'); }
+        finally { btn.disabled = false; btn.textContent = orig; }
+    });
+
+    document.getElementById('btn-baja-toggle')?.addEventListener('click', async () => {
+        const id     = document.getElementById('edit-id').value;
+        const activo = currentEmpleado.activo;
+        const url    = activo ? `/crm/empleados/${id}` : `/crm/empleados/${id}/reactivar`;
+        const method = activo ? 'DELETE' : 'PATCH';
+        if (!confirm(activo ? '¿Confirmas dar de baja a este usuario?' : '¿Reactivar este usuario?')) return;
+
+        const r = await fetch(url, {
+            method, headers: { 'X-CSRF-TOKEN':CSRF, 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+        });
+        if ((await r.json()).ok) { closeEditModal(); window.location.reload(); }
     });
 });
+
+// ─── Modal Nuevo Usuario ────────────────────────────────────────────────────
+function openNuevoModal() {
+    document.getElementById('modal-nuevo').classList.remove('hidden');
+    document.getElementById('modal-nuevo').classList.add('flex');
+}
+function closeNuevoModal() {
+    document.getElementById('modal-nuevo').classList.add('hidden');
+    document.getElementById('modal-nuevo').classList.remove('flex');
+    document.getElementById('form-nuevo-usuario').reset();
+    document.getElementById('equipos-container').innerHTML = '';
+    equipoIdx = 0;
+}
+
+let equipoIdx = 0;
+
+function camposEquipo(idx, tipo) {
+    const f = (name, label, placeholder = '', extra = '') =>
+        `<div>
+            <label class="block text-xs font-bold text-[#544246] mb-1">${label}</label>
+            <input type="text" name="equipos[${idx}][${name}]" placeholder="${placeholder}" ${extra}
+                class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+        </div>`;
+
+    // Campos comunes a todos los tipos
+    let html = `
+        <div class="grid grid-cols-2 gap-3">
+            ${f('nombre_equipo', 'Nombre del equipo', 'IMJUVE-LAP-001')}
+            <div>
+                <label class="block text-xs font-bold text-[#544246] mb-1">Marca CPU</label>
+                <input type="text" name="equipos[${idx}][cpu_marca]" placeholder="Dell / HP / Lenovo"
+                    class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+            </div>
+            ${f('cpu_modelo', 'Modelo CPU', 'Latitude 5540')}
+            ${f('cpu_serie', 'No. Serie CPU')}
+            ${f('ipv4',      'IPv4 asignada', '10.10.0.100', 'class="font-mono w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]"').replace('class="w-full', 'style="display:none" class="w-full')}
+            ${f('mac',       'Dirección MAC',  'AA-BB-CC-DD-EE-FF', 'class="font-mono w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]"').replace('class="w-full', 'class="w-full')}`;
+
+    // Reconstruyo ipv4 y mac correctamente sin el hack de replace
+    html = `
+        <div class="grid grid-cols-2 gap-3">
+            ${f('nombre_equipo', 'Nombre del equipo', 'IMJUVE-LAP-001')}
+            ${f('cpu_marca',  'Marca CPU',    'Dell / HP / Lenovo')}
+            ${f('cpu_modelo', 'Modelo CPU',   'Latitude 5540')}
+            ${f('cpu_serie',  'No. Serie CPU')}
+            <div>
+                <label class="block text-xs font-bold text-[#544246] mb-1">IPv4 asignada</label>
+                <input type="text" name="equipos[${idx}][ipv4]" placeholder="10.10.0.100"
+                    class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#621132]">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-[#544246] mb-1">Dirección MAC</label>
+                <input type="text" name="equipos[${idx}][mac]" placeholder="AA-BB-CC-DD-EE-FF"
+                    class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#621132]">
+            </div>`;
+
+    if (tipo === 'Laptop') {
+        html += `
+            ${f('cargador_serie',  'No. Serie Cargador')}
+            ${f('docking_marca',   'Marca Docking')}
+            ${f('docking_modelo',  'Modelo Docking')}
+            ${f('docking_serie',   'No. Serie Docking')}
+            ${f('candado',         'No. Candado')}`;
+    }
+
+    if (tipo === 'PC Avanzada' || tipo === 'PC Especializada') {
+        html += `
+            ${f('teclado_serie',   'No. Serie Teclado')}
+            ${f('mouse_serie',     'No. Serie Mouse')}
+            ${f('monitor_marca',   'Marca Monitor')}
+            ${f('monitor_modelo',  'Modelo Monitor')}
+            ${f('monitor_serie',   'No. Serie Monitor')}
+            ${f('nobreak_marca',   'Marca No-Break')}
+            ${f('nobreak_modelo',  'Modelo No-Break')}`;
+    }
+
+    if (tipo === 'PC Especializada') {
+        html += `
+            ${f('nobreak_serie',   'No. Serie No-Break')}
+            <div>
+                <label class="block text-xs font-bold text-[#544246] mb-1">IPv4 actual (asignada en red)</label>
+                <input type="text" name="equipos[${idx}][ipv4_actual]" placeholder="10.10.0.101"
+                    class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#621132]">
+            </div>
+            ${f('check_entrega',   'No. Check / Entrega')}`;
+    }
+
+    html += `
+            <div class="col-span-2">
+                <label class="block text-xs font-bold text-[#544246] mb-1">Observaciones</label>
+                <input type="text" name="equipos[${idx}][observaciones]"
+                    class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+            </div>
+        </div>`;
+
+    return html;
+}
+
+function agregarEquipo() {
+    const idx = equipoIdx++;
+    const div = document.createElement('div');
+    div.className = 'equipo-item border border-[#E5E7EB] rounded-xl p-4 relative bg-[#fbf9f8]';
+    div.dataset.idx = idx;
+    div.innerHTML = `
+        <button type="button" onclick="this.closest('.equipo-item').remove()"
+            class="absolute top-2 right-2 text-[#544246] hover:text-red-600 transition-colors">
+            <span class="material-symbols-outlined text-lg">close</span>
+        </button>
+        <div class="mb-3">
+            <label class="block text-xs font-bold text-[#544246] mb-1">
+                Tipo de equipo <span class="text-red-500">*</span>
+            </label>
+            <select name="equipos[${idx}][tipo]" required
+                onchange="actualizarCamposEquipo(this)"
+                class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                <option value="">— Selecciona tipo —</option>
+                <option value="Laptop">Laptop</option>
+                <option value="PC Avanzada">PC Avanzada</option>
+                <option value="PC Especializada">PC Especializada</option>
+            </select>
+        </div>
+        <div class="campos-equipo text-sm text-[#544246] italic">
+            Selecciona un tipo para ver los campos correspondientes.
+        </div>`;
+    document.getElementById('equipos-container').appendChild(div);
+}
+
+function actualizarCamposEquipo(select) {
+    const tipo     = select.value;
+    const item     = select.closest('.equipo-item');
+    const idx      = item.dataset.idx;
+    const campos   = item.querySelector('.campos-equipo');
+    if (!tipo) {
+        campos.innerHTML = '<p class="text-sm text-[#544246] italic">Selecciona un tipo para ver los campos correspondientes.</p>';
+        return;
+    }
+    campos.innerHTML = camposEquipo(idx, tipo);
+}
+
+document.getElementById('form-nuevo-usuario')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn  = document.getElementById('btn-guardar-usuario');
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Guardando…';
+
+    const form = new FormData(e.target);
+    const body = Object.fromEntries(form);
+
+    // Armar array de equipos desde los campos dinámicos
+    const equipoEls = document.querySelectorAll('.equipo-item');
+    const equipos   = [];
+    equipoEls.forEach(el => {
+        const idx = el.dataset.idx;
+        const eq  = {};
+        el.querySelectorAll('[name]').forEach(inp => {
+            const key = inp.name.replace(`equipos[${idx}][`, '').replace(']', '');
+            eq[key] = inp.value;
+        });
+        if (eq.tipo) equipos.push(eq);
+    });
+
+    const payload = {};
+    for (const [k, v] of form.entries()) {
+        if (!k.startsWith('equipos[')) payload[k] = v;
+    }
+    if (equipos.length) payload.equipos = equipos;
+
+    try {
+        const r = await fetch('{{ route("crm.empleados.store") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+        const data = await r.json();
+        if (r.ok && data.ok) {
+            closeNuevoModal();
+            window.location.reload();
+        } else {
+            const msgs = data.errors
+                ? Object.values(data.errors).flat().join('\n')
+                : (data.message || 'Error al guardar.');
+            alert(msgs);
+        }
+    } catch (err) {
+        alert('Error de conexión. Intenta de nuevo.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = orig;
+    }
+});
 </script>
+
+{{-- ═══════════════════════════════════════════════════════════════════════ --}}
+{{-- MODAL: Nuevo Usuario                                                   --}}
+{{-- ═══════════════════════════════════════════════════════════════════════ --}}
+<div id="modal-nuevo" class="hidden fixed inset-0 z-[80] items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col">
+
+        {{-- Header --}}
+        <div class="flex items-center justify-between px-6 py-4 border-b border-[#E5E7EB] shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-[#621132]/10 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[#621132] text-lg">person_add</span>
+                </div>
+                <h3 class="font-bold text-[#1b1c1c]">Nuevo Usuario</h3>
+            </div>
+            <button onclick="closeNuevoModal()" class="p-1.5 hover:bg-[#F3F4F6] rounded-full transition-colors text-[#544246]">
+                <span class="material-symbols-outlined text-lg">close</span>
+            </button>
+        </div>
+
+        {{-- Form (scrollable) --}}
+        <form id="form-nuevo-usuario" class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+
+            {{-- Datos personales --}}
+            <section>
+                <p class="text-xs font-bold uppercase tracking-wider text-[#621132] mb-3">Datos personales</p>
+                <div class="grid grid-cols-3 gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs font-bold text-[#544246] mb-1">Nombre(s) <span class="text-red-500">*</span></label>
+                        <input type="text" name="nombre" required placeholder="Ana"
+                            class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-[#544246] mb-1">Apellido Paterno <span class="text-red-500">*</span></label>
+                        <input type="text" name="apellido_paterno" required placeholder="García"
+                            class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-[#544246] mb-1">Apellido Materno</label>
+                        <input type="text" name="apellido_materno" placeholder="López"
+                            class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-[#544246] mb-1">Puesto</label>
+                        <input type="text" name="puesto" placeholder="Analista de sistemas"
+                            class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-[#544246] mb-1">Correo institucional</label>
+                        <input type="email" name="correo" placeholder="ana.garcia@imjuve.gob.mx"
+                            class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="block text-xs font-bold text-[#544246] mb-1">Departamento</label>
+                    <select name="id_departamento"
+                        class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                        <option value="">— Sin asignar —</option>
+                        @foreach($departamentos as $d)
+                            <option value="{{ $d->id_departamento }}">{{ $d->nombre }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </section>
+
+            {{-- Teléfono (colapsable) --}}
+            <details class="border border-[#E5E7EB] rounded-xl overflow-hidden">
+                <summary class="flex items-center gap-2 px-4 py-3 cursor-pointer select-none font-bold text-sm text-[#1b1c1c] hover:bg-[#fbf9f8] transition-colors list-none">
+                    <span class="material-symbols-outlined text-[#544246] text-lg">phone</span>
+                    Teléfono
+                    <span class="text-xs font-normal text-[#544246] ml-1">(opcional)</span>
+                </summary>
+                <div class="px-4 pb-4 pt-1 grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-[#544246] mb-1">Número general</label>
+                        <input type="text" name="tel_numero" placeholder="55 5066 3300"
+                            class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-[#544246] mb-1">Extensión</label>
+                        <input type="number" name="tel_extension" placeholder="1234" min="1" max="9999"
+                            class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                    </div>
+                </div>
+            </details>
+
+            {{-- Equipos de cómputo (colapsable) --}}
+            <details class="border border-[#E5E7EB] rounded-xl overflow-hidden">
+                <summary class="flex items-center gap-2 px-4 py-3 cursor-pointer select-none font-bold text-sm text-[#1b1c1c] hover:bg-[#fbf9f8] transition-colors list-none">
+                    <span class="material-symbols-outlined text-[#544246] text-lg">computer</span>
+                    Equipos de cómputo
+                    <span class="text-xs font-normal text-[#544246] ml-1">(opcional, puede agregar varios)</span>
+                </summary>
+                <div class="px-4 pb-4 pt-1">
+                    <div id="equipos-container" class="space-y-3 mb-3"></div>
+                    <button type="button" onclick="agregarEquipo()"
+                        class="w-full py-2 border-2 border-dashed border-[#D4C19C] text-[#621132] rounded-lg text-sm font-bold hover:bg-[#D4C19C]/10 transition-colors flex items-center justify-center gap-1">
+                        <span class="material-symbols-outlined text-lg">add</span>
+                        Agregar equipo
+                    </button>
+                </div>
+            </details>
+
+        </form>
+
+        {{-- Footer --}}
+        <div class="flex gap-3 px-6 py-4 border-t border-[#E5E7EB] shrink-0">
+            <button type="button" onclick="closeNuevoModal()"
+                class="flex-1 py-2.5 border border-[#E5E7EB] text-[#544246] font-bold rounded-lg hover:bg-[#F3F4F6] transition-colors text-sm">
+                Cancelar
+            </button>
+            <button type="submit" form="form-nuevo-usuario" id="btn-guardar-usuario"
+                class="flex-1 py-2.5 bg-[#621132] text-white font-bold rounded-lg hover:opacity-90 transition-opacity text-sm">
+                Dar de Alta
+            </button>
+        </div>
+    </div>
+</div>
+
+{{-- ═══════════════════════════════════════════════════════════════════════ --}}
+{{-- MODAL: Editar Usuario                                                  --}}
+{{-- ═══════════════════════════════════════════════════════════════════════ --}}
+<div id="modal-edit" class="hidden fixed inset-0 z-[80] items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+
+        <div class="flex items-center justify-between px-6 py-4 border-b border-[#E5E7EB] shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-[#621132]/10 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[#621132] text-lg">manage_accounts</span>
+                </div>
+                <h3 class="font-bold text-[#1b1c1c]">Editar Usuario</h3>
+            </div>
+            <button onclick="closeEditModal()" class="p-1.5 hover:bg-[#F3F4F6] rounded-full transition-colors text-[#544246]">
+                <span class="material-symbols-outlined text-lg">close</span>
+            </button>
+        </div>
+
+        <form id="form-edit-usuario" class="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+            <input type="hidden" id="edit-id">
+
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-[#544246] mb-1">Nombre(s) <span class="text-red-500">*</span></label>
+                    <input type="text" id="edit-nombre" name="nombre" required
+                        class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-[#544246] mb-1">Ap. Paterno <span class="text-red-500">*</span></label>
+                    <input type="text" id="edit-ap" name="apellido_paterno" required
+                        class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-[#544246] mb-1">Ap. Materno</label>
+                    <input type="text" id="edit-am" name="apellido_materno"
+                        class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-[#544246] mb-1">Puesto</label>
+                    <input type="text" id="edit-puesto" name="puesto"
+                        class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-[#544246] mb-1">Correo institucional</label>
+                    <input type="email" id="edit-correo" name="correo"
+                        class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-[#544246] mb-1">Departamento</label>
+                <select id="edit-depa" name="id_departamento"
+                    class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
+                    <option value="">— Sin asignar —</option>
+                    @foreach($departamentos as $d)
+                    <option value="{{ $d->id_departamento }}">{{ $d->nombre }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            {{-- Separador estado --}}
+            <div class="border-t border-[#E5E7EB] pt-4">
+                <p class="text-xs font-bold uppercase tracking-wider text-[#544246] mb-2">Estado del usuario</p>
+                <button type="button" id="btn-baja-toggle" class="w-full py-2.5 border border-[#991B1B] text-[#991B1B] font-bold rounded-lg hover:bg-red-50 transition-colors text-sm">
+                    Dar de Baja
+                </button>
+            </div>
+        </form>
+
+        <div class="flex gap-3 px-6 py-4 border-t border-[#E5E7EB] shrink-0">
+            <button type="button" onclick="closeEditModal()"
+                class="flex-1 py-2.5 border border-[#E5E7EB] text-[#544246] font-bold rounded-lg hover:bg-[#F3F4F6] transition-colors text-sm">
+                Cancelar
+            </button>
+            <button type="submit" form="form-edit-usuario" id="btn-guardar-edit"
+                class="flex-1 py-2.5 bg-[#621132] text-white font-bold rounded-lg hover:opacity-90 transition-opacity text-sm">
+                Guardar cambios
+            </button>
+        </div>
+    </div>
+</div>
 </x-layouts.app>
