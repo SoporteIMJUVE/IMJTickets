@@ -7,7 +7,26 @@
       "Bash(git checkout *)",
       "Bash(git merge *)",
       "Bash(git push *)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "PowerShell(pip install -r \"c:\\\\Users\\\\diego\\\\OneDrive\\\\Escritorio\\\\IMJUVE\\\\Base-de-Datos\\\\requirements.txt\")",
+      "PowerShell(python --version)",
+      "PowerShell(python -m pip --version)",
+      "Bash(python3 -m pip --version)",
+      "Read(//c/Users/diego/anaconda3/**)",
+      "Read(//c/Users/diego/miniconda3/**)",
+      "Read(//c/ProgramData/Anaconda3/**)",
+      "Bash(/c/Users/diego/anaconda3/python.exe --version)",
+      "Bash(/c/Users/diego/anaconda3/python.exe -m pip --version)",
+      "Bash(/c/Users/diego/anaconda3/python.exe -m pip install -r \"c:/Users/diego/OneDrive/Escritorio/IMJUVE/Base-de-Datos/requirements.txt\")",
+      "Bash(git --version)",
+      "Read(//c/Users/diego/**)",
+      "Read(//c/Users/diego/Desktop/**)",
+      "Bash(export PGPASSWORD=\"Dievigom1311\")",
+      "Bash(\"/c/Program Files/PostgreSQL/18/bin/pg_restore.exe\" -h localhost -U postgres -d sistemitas --no-owner --no-acl -v \"Base_backup.sql\")",
+      "Bash(\"/c/Program Files/PostgreSQL/18/bin/psql.exe\" -h localhost -U postgres -d sistemitas -c \"\\\\dt\")",
+      "Bash(\"/c/Program Files/PostgreSQL/18/bin/psql.exe\" -h localhost -U postgres -d sistemitas -c \"SELECT 'usuarios' t, COUNT\\(*\\) FROM usuarios UNION ALL SELECT 'inventario_equipos', COUNT\\(*\\) FROM inventario_equipos UNION ALL SELECT 'inventario_ips_completo', COUNT\\(*\\) FROM inventario_ips_completo UNION ALL SELECT 'departamentos', COUNT\\(*\\) FROM departamentos UNION ALL SELECT 'telefonos', COUNT\\(*\\) FROM telefonos UNION ALL SELECT 'impresoras', COUNT\\(*\\) FROM impresoras UNION ALL SELECT 'insumos', COUNT\\(*\\) FROM insumos;\")",
+      "Bash(\"/c/Program Files/PostgreSQL/18/bin/psql.exe\" -h localhost -U postgres -d sistemitas -c \"\\\\d inventario_ips_completo\" -c \"\\\\d usuarios\")",
+      "PowerShell(& \"C:\\\\Users\\\\diego\\\\anaconda3\\\\python.exe\" -X utf8 \"C:\\\\Users\\\\diego\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-diego-OneDrive-Escritorio-IMJUVE-Base-de-Datos\\\\1f28b109-676f-49d9-8d36-df2bb0ccdaa3\\\\scratchpad\\\\importar_firmados.py\")"
     ]
   }
 }

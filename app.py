@@ -1315,6 +1315,9 @@ elif menu == "💻 Equipos de Computo":
                 "tipo":           None,
                 "id_usuario":     None,
                 "fecha_carga":    None,
+                "firmado":        None,
+                "fecha_firma":    None,
+                "pdf_firmado":    None,
                 "consecutivo":    st.column_config.NumberColumn("No.", disabled=True, width="small"),
                 "num_inventario": st.column_config.TextColumn("Inventario"),
                 "nombre_equipo":  st.column_config.TextColumn("Equipo"),
@@ -1343,7 +1346,7 @@ elif menu == "💻 Equipos de Computo":
                 column_config=col_cfg,
             )
 
-            _HIDDEN = {"id", "tipo", "id_usuario", "fecha_carga"}
+            _HIDDEN = {"id", "tipo", "id_usuario", "fecha_carga", "firmado", "fecha_firma", "pdf_firmado"}
             _df_exp = df_edited.drop(columns=list(_HIDDEN), errors="ignore").rename(columns=rename_map)
 
             col_btn, col_xls, col_pdf = st.columns([1, 2, 1])
@@ -1521,7 +1524,7 @@ elif menu == "💻 Equipos de Computo":
                         wb_all = Workbook()
                         wb_all.remove(wb_all.active)
 
-                        _COLS_OCULTAS = {"id", "tipo", "id_usuario", "fecha_carga"}
+                        _COLS_OCULTAS = {"id", "tipo", "id_usuario", "fecha_carga", "firmado", "fecha_firma", "pdf_firmado"}
                         for _tipo in ["Laptop", "PC Avanzada", "PC Especializada"]:
                             cur_t = get_conn().cursor()
                             cur_t.execute(
@@ -1699,11 +1702,14 @@ elif menu == "💻 Equipos de Computo":
             cur = get_conn().cursor()
             cur.execute("""
                 SELECT id, tipo, nombre_equipo, cpu_marca, cpu_modelo, cpu_serie,
-                       num_inventario, nombre_usuario, area, ipv4
+                       num_inventario, nombre_usuario, area, ipv4,
+                       firmado, fecha_firma
                 FROM inventario_equipos
                 ORDER BY area, tipo, nombre_usuario
             """)
             rows_rsg = cur.fetchall()
+            cur.execute("SELECT id_usuario, nombre || ' ' || apellido_paterno FROM usuarios ORDER BY apellido_paterno")
+            _umap_rsg = {r[1]: r[0] for r in cur.fetchall()}
             cur.close()
 
             # ── Resguardo individual ───────────────────────────────────────────
@@ -1729,7 +1735,7 @@ elif menu == "💻 Equipos de Computo":
                 _tipo_ind = _eq_ind.get("tipo", "Laptop")
                 _K = f"_{_id_ind}"  # clave única por equipo para no mezclar ediciones
 
-                st.markdown("**Editar datos antes de generar el PDF** *(los cambios no se guardan en la base de datos)*")
+                st.markdown("**Editar datos del resguardo** — guarda los cambios en la base de datos o úsalos solo para el PDF.")
 
                 _e = {}
                 col_a, col_b = st.columns(2)
@@ -1770,6 +1776,29 @@ elif menu == "💻 Equipos de Computo":
 
                 _e["observaciones"] = st.text_area("Observaciones", value=_eq_ind.get("observaciones") or "", height=68, key=f"rsg_e_obs{_K}")
 
+                if st.button("💾 Guardar cambios en la base de datos", key=f"rsg_guardar{_K}", type="primary"):
+                    try:
+                        _cur_upd = get_conn().cursor()
+                        _cols_upd = list(_e.keys())
+                        _set_sql  = ", ".join(f"{c}=%s" for c in _cols_upd)
+                        _vals_upd = []
+                        for c in _cols_upd:
+                            v = _e[c]
+                            _vals_upd.append(None if (v is None or str(v).strip() in ("", "nan", "None")) else v)
+                        _nombre_u_rsg = (_e.get("nombre_usuario") or "").strip() or None
+                        _id_u_rsg     = _umap_rsg.get(_nombre_u_rsg) if _nombre_u_rsg else None
+                        _cur_upd.execute(
+                            f"UPDATE inventario_equipos SET {_set_sql}, id_usuario=%s WHERE id=%s",
+                            _vals_upd + [_id_u_rsg, _id_ind]
+                        )
+                        get_conn().commit()
+                        _cur_upd.close()
+                        st.success("✅ Cambios guardados correctamente.")
+                        st.rerun()
+                    except Exception as _ex_upd:
+                        safe_rollback()
+                        st.error(f"Error al guardar: {_ex_upd}")
+
                 _eq_pdf = {**_eq_ind, **_e}
                 try:
                     _pdf_ind = generar_pdf_resguardo(_eq_pdf).read()
@@ -1783,28 +1812,176 @@ elif menu == "💻 Equipos de Computo":
                 except Exception as _ex_ind:
                     st.error(f"Error al generar PDF: {_ex_ind}")
 
+                # ── Resguardo firmado ──────────────────────────────────────────
+                st.markdown("---")
+                st.markdown("#### Resguardo firmado")
+                _firmado_actual = bool(_eq_ind.get("firmado"))
+                _fecha_actual   = _eq_ind.get("fecha_firma")
+
+                if _firmado_actual:
+                    st.success(f"✅ Este equipo tiene resguardo firmado — {_fecha_actual.strftime('%d/%m/%Y') if _fecha_actual else 'sin fecha registrada'}")
+                    _cur_pdf = get_conn().cursor()
+                    _cur_pdf.execute("SELECT pdf_firmado FROM inventario_equipos WHERE id = %s", (_id_ind,))
+                    _pdf_row = _cur_pdf.fetchone()
+                    _cur_pdf.close()
+                    if _pdf_row and _pdf_row[0]:
+                        import base64 as _b64
+                        _pdf_firmado_bytes = bytes(_pdf_row[0])
+                        st.download_button(
+                            "📥 Descargar resguardo firmado",
+                            data=_pdf_firmado_bytes,
+                            file_name=f"firmado_{(_eq_ind.get('nombre_usuario') or 'equipo').replace(' ', '_')}.pdf",
+                            mime="application/pdf",
+                        )
+                        _b64_ind = _b64.b64encode(_pdf_firmado_bytes).decode("utf-8")
+                        st.components.v1.html(
+                            f'<embed src="data:application/pdf;base64,{_b64_ind}" '
+                            f'type="application/pdf" width="100%" height="600px">',
+                            height=620, scrolling=True
+                        )
+                    col_rem1, col_rem2 = st.columns([1, 3])
+                    if col_rem1.button("🗑️ Quitar firma", key=f"rsg_quitar{_K}"):
+                        _cur_q = get_conn().cursor()
+                        _cur_q.execute("UPDATE inventario_equipos SET firmado=FALSE, fecha_firma=NULL, pdf_firmado=NULL WHERE id=%s", (_id_ind,))
+                        get_conn().commit()
+                        _cur_q.close()
+                        st.rerun()
+                else:
+                    st.warning("⬜ Sin resguardo firmado")
+
+                _archivo_firmado = st.file_uploader(
+                    "Subir PDF firmado para este equipo",
+                    type=["pdf"], key=f"rsg_upload{_K}"
+                )
+                if _archivo_firmado:
+                    _fecha_firma_inp = st.date_input("Fecha de firma", value=datetime.now().date(), key=f"rsg_fecha{_K}")
+                    if st.button("💾 Guardar PDF firmado", key=f"rsg_save_pdf{_K}", type="primary"):
+                        try:
+                            _cur_fp = get_conn().cursor()
+                            _cur_fp.execute(
+                                "UPDATE inventario_equipos SET firmado=TRUE, fecha_firma=%s, pdf_firmado=%s WHERE id=%s",
+                                (_fecha_firma_inp, _archivo_firmado.read(), _id_ind)
+                            )
+                            get_conn().commit()
+                            _cur_fp.close()
+                            st.success("✅ PDF firmado guardado correctamente.")
+                            st.rerun()
+                        except Exception as _ex_fp:
+                            safe_rollback()
+                            st.error(f"Error al guardar PDF: {_ex_fp}")
+
             st.markdown("---")
             st.markdown("#### Resguardos masivos")
-            col_r1, col_r2, col_r3 = st.columns([1, 1, 2])
-            tipo_r = col_r1.selectbox("Tipo", ["Todos","Laptop","PC Avanzada","PC Especializada"], key="rsg_tipo")
-            area_r = col_r2.selectbox("Área", ["Todas"] + sorted({r[8] for r in rows_rsg if r[8]}), key="rsg_area")
-            busq_r = col_r3.text_input("Buscar por usuario, equipo o serie", key="rsg_busq")
+            col_r1, col_r2, col_r3, col_r4 = st.columns([1, 1, 1, 2])
+            tipo_r   = col_r1.selectbox("Tipo", ["Todos","Laptop","PC Avanzada","PC Especializada"], key="rsg_tipo")
+            area_r   = col_r2.selectbox("Área", ["Todas"] + sorted({r[8] for r in rows_rsg if r[8]}), key="rsg_area")
+            firma_r  = col_r3.selectbox("Firma", ["Todos","✅ Firmados","⬜ Sin firmar"], key="rsg_firma")
+            busq_r   = col_r4.text_input("Buscar por usuario, equipo o serie", key="rsg_busq")
 
             df_rsg = pd.DataFrame(rows_rsg, columns=[
-                "id","Tipo","Equipo","Marca","Modelo","Serie","Inventario","Usuario","Área","IPv4"
+                "id","Tipo","Equipo","Marca","Modelo","Serie","Inventario","Usuario","Área","IPv4","firmado","fecha_firma"
             ])
+            df_rsg["Firmado"] = df_rsg["firmado"].apply(lambda v: "✅" if v else "⬜")
             if tipo_r != "Todos":
                 df_rsg = df_rsg[df_rsg["Tipo"] == tipo_r]
             if area_r != "Todas":
                 df_rsg = df_rsg[df_rsg["Área"] == area_r]
+            if firma_r == "✅ Firmados":
+                df_rsg = df_rsg[df_rsg["firmado"] == True]
+            elif firma_r == "⬜ Sin firmar":
+                df_rsg = df_rsg[df_rsg["firmado"] != True]
             if busq_r:
                 mask = df_rsg.apply(lambda col: col.astype(str).str.contains(busq_r, case=False, na=False)).any(axis=1)
                 df_rsg = df_rsg[mask]
             df_rsg = df_rsg.reset_index(drop=True)
 
+            _firmados_count   = int(df_rsg["firmado"].sum())
+            _sinfirma_count   = len(df_rsg) - _firmados_count
+
+            # ── Exportar Excel y ZIP de firmados ────────────────────────────
+            col_xls, col_zip = st.columns(2)
+            with col_xls:
+                try:
+                    from openpyxl import Workbook as _WB
+                    from openpyxl.styles import Font as _Fnt, PatternFill as _PF, Alignment as _Al, Border as _Brd, Side as _Sd
+                    from openpyxl.utils import get_column_letter as _gcl
+                    _AZUL = "1A3C5E"; _CEL = "EAF1FB"; _BRD = "BFBFBF"
+                    _brd = _Brd(left=_Sd(style="thin",color=_BRD), right=_Sd(style="thin",color=_BRD),
+                                top=_Sd(style="thin",color=_BRD), bottom=_Sd(style="thin",color=_BRD))
+                    _COLS_RSG = {"Tipo":"Tipo","Usuario":"Usuario","Área":"Área","Equipo":"Equipo",
+                                 "Marca":"Marca","Modelo":"Modelo","Serie":"Serie",
+                                 "Inventario":"Inventario","IPv4":"IPv4","Firmado":"Firmado"}
+                    _wb_rsg = _WB(); _wb_rsg.remove(_wb_rsg.active)
+                    _areas_xls = sorted({r[8] for r in rows_rsg if r[8]})
+                    _df_xls_all = pd.DataFrame(rows_rsg, columns=[
+                        "id","Tipo","Equipo","Marca","Modelo","Serie","Inventario","Usuario","Área","IPv4","firmado","fecha_firma"
+                    ])
+                    _df_xls_all["Firmado"] = _df_xls_all["firmado"].apply(lambda v: "Sí" if v else "No")
+                    for _area_xls in _areas_xls:
+                        _df_a = _df_xls_all[_df_xls_all["Área"] == _area_xls].copy()
+                        _ws_rsg = _wb_rsg.create_sheet(title=_area_xls[:31])
+                        for _ci, _hdr in enumerate(_COLS_RSG.values(), 1):
+                            _c = _ws_rsg.cell(row=1, column=_ci, value=_hdr)
+                            _c.font = _Fnt(bold=True, color="FFFFFF", size=10)
+                            _c.fill = _PF("solid", fgColor=_AZUL)
+                            _c.alignment = _Al(horizontal="center", vertical="center", wrap_text=True)
+                            _c.border = _brd
+                        _ws_rsg.row_dimensions[1].height = 26
+                        _ws_rsg.freeze_panes = "A2"
+                        for _ri, (_, _row_a) in enumerate(_df_a.iterrows(), 2):
+                            _fill_row = _PF("solid", fgColor="F0FFF0") if _row_a["firmado"] else _PF("solid", fgColor="FFFFFF")
+                            for _ci2, _key in enumerate(_COLS_RSG.keys(), 1):
+                                _val = _row_a.get(_key, "")
+                                if _val is None or (isinstance(_val, float) and pd.isna(_val)): _val = ""
+                                _c2 = _ws_rsg.cell(row=_ri, column=_ci2, value=str(_val) if _val != "" else "")
+                                _c2.font = _Fnt(size=9); _c2.border = _brd
+                                _c2.alignment = _Al(vertical="center"); _c2.fill = _fill_row
+                        for _ci3, _key in enumerate(_COLS_RSG.keys(), 1):
+                            _ws_rsg.column_dimensions[_gcl(_ci3)].width = min(
+                                max(len(str(_v)) if _v else 0 for _v in [_COLS_RSG[_key]] + _df_a[_key].tolist()) + 4, 40
+                            )
+                    _buf_xls = BytesIO(); _wb_rsg.save(_buf_xls); _buf_xls.seek(0)
+                    st.download_button(
+                        "📊 Excel resguardos por área",
+                        data=_buf_xls.getvalue(),
+                        file_name=f"resguardos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True,
+                    )
+                except Exception as _ex_xls:
+                    st.error(f"Error generando Excel: {_ex_xls}")
+            with col_zip:
+                try:
+                    import zipfile as _zfm
+                    _cur_zf = get_conn().cursor()
+                    _cur_zf.execute(
+                        "SELECT nombre_usuario, area, cpu_serie, pdf_firmado "
+                        "FROM inventario_equipos WHERE firmado=TRUE AND pdf_firmado IS NOT NULL"
+                    )
+                    _rows_zf = _cur_zf.fetchall(); _cur_zf.close()
+                    if _rows_zf:
+                        _zbuf = BytesIO()
+                        with _zfm.ZipFile(_zbuf, "w", _zfm.ZIP_DEFLATED) as _zhf:
+                            for _unom, _anom, _ser, _pdf in _rows_zf:
+                                _folder = (_anom or "Sin area").replace("/","_").replace("\\","_")[:40]
+                                _fname  = f"{(_unom or _ser or 'equipo').replace(' ','_')}.pdf"
+                                _zhf.writestr(f"{_folder}/{_fname}", bytes(_pdf))
+                        _zbuf.seek(0)
+                        st.download_button(
+                            f"📥 ZIP PDFs firmados ({len(_rows_zf)} equipos)",
+                            data=_zbuf.getvalue(),
+                            file_name=f"firmados_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
+                            mime="application/zip",
+                            use_container_width=True,
+                        )
+                    else:
+                        st.caption("⬜ Sin PDFs firmados guardados")
+                except Exception as _ex_zf:
+                    st.error(f"Error generando ZIP: {_ex_zf}")
+
             # Botón "Seleccionar todos" vía session_state
             col_cap, col_all = st.columns([4, 1])
-            col_cap.caption(f"{len(df_rsg)} equipos — selecciona uno o varios (Ctrl+clic) para generar resguardos.")
+            col_cap.caption(f"{len(df_rsg)} equipos — ✅ {_firmados_count} firmados · ⬜ {_sinfirma_count} sin firmar — haz clic en una fila para seleccionarla y acceder a sus PDF.")
             if col_all.button("☑ Seleccionar todos", use_container_width=True, key="rsg_sel_all"):
                 st.session_state["rsg_todos"] = True
             if st.session_state.get("rsg_todos") and not busq_r and tipo_r == "Todos" and area_r == "Todas":
@@ -1823,7 +2000,7 @@ elif menu == "💻 Equipos de Computo":
                 c = _aclr_rsg.get(row.get("Área", ""), "")
                 return [f"background-color: {c}; color: #111111" if c else ""] * len(row)
 
-            _df_display = df_rsg.drop(columns=["id"])
+            _df_display = df_rsg.drop(columns=["id", "firmado", "fecha_firma"])
             _styled_rsg = _df_display.style.apply(_color_area_row, axis=1)
 
             sel_rsg = st.dataframe(
@@ -1875,7 +2052,7 @@ elif menu == "💻 Equipos de Computo":
                     except Exception as ex:
                         st.error(f"Error al generar PDF: {ex}")
 
-                # ── ZIP por área (solo cuando hay más de uno) ───────────────
+                # ── ZIP por área + PDFs firmados seleccionados ──────────────
                 with c2:
                     if n > 1:
                         try:
@@ -1890,6 +2067,34 @@ elif menu == "💻 Equipos de Computo":
                             )
                         except Exception as ex:
                             st.error(f"Error al generar ZIP: {ex}")
+                    import zipfile as _zf
+                    _con_firma = [e for e in equipos_sel if e.get("pdf_firmado")]
+                    if _con_firma:
+                        if len(_con_firma) == 1:
+                            _ef = _con_firma[0]
+                            st.download_button(
+                                f"📥 PDF firmado — {_ef.get('nombre_usuario','equipo')}",
+                                data=bytes(_ef["pdf_firmado"]),
+                                file_name=f"firmado_{(_ef.get('nombre_usuario') or 'equipo').replace(' ','_')}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True,
+                            )
+                        else:
+                            _zip_buf = BytesIO()
+                            with _zf.ZipFile(_zip_buf, "w", _zf.ZIP_DEFLATED) as _zfh:
+                                for _ef in _con_firma:
+                                    _fn = f"firmado_{(_ef.get('nombre_usuario') or str(_ef['id'])).replace(' ','_')}.pdf"
+                                    _zfh.writestr(_fn, bytes(_ef["pdf_firmado"]))
+                            _zip_buf.seek(0)
+                            st.download_button(
+                                f"📥 ZIP firmados ({len(_con_firma)} de {n})",
+                                data=_zip_buf.read(),
+                                file_name=f"firmados_{fecha_hoy}.zip",
+                                mime="application/zip",
+                                use_container_width=True,
+                            )
+                    elif n == 1:
+                        st.caption("⬜ Sin PDF firmado")
 
                 # ── Resumen ─────────────────────────────────────────────────
                 with c3:
@@ -1910,6 +2115,122 @@ elif menu == "💻 Equipos de Computo":
                         if n > 6:
                             resumen += f"... y {n-6} más"
                         st.info(f"**{n} equipos seleccionados:** {resumen}")
+
+                # ── Editar equipo seleccionado ───────────────────────────────
+                if n == 1:
+                    with st.expander("✏️ Editar datos de este equipo", expanded=False):
+                        _eq_m   = equipos_sel[0]
+                        _id_m   = _eq_m["id"]
+                        _tipo_m = _eq_m.get("tipo", "Laptop")
+                        _Km     = f"_m{_id_m}"
+                        _em     = {}
+                        _col_ma, _col_mb = st.columns(2)
+                        _em["nombre_usuario"] = _col_ma.text_input("Responsable",     value=_eq_m.get("nombre_usuario") or "", key=f"em_usr{_Km}")
+                        _em["area"]           = _col_mb.text_input("Área",            value=_eq_m.get("area") or "",           key=f"em_area{_Km}")
+                        _em["perfil"]         = _col_ma.text_input("Perfil",          value=_eq_m.get("perfil") or "",         key=f"em_perf{_Km}")
+                        _em["nombre_equipo"]  = _col_mb.text_input("Nombre equipo",   value=_eq_m.get("nombre_equipo") or "",  key=f"em_eq{_Km}")
+                        _col_mc, _col_md, _col_me = st.columns(3)
+                        _em["cpu_marca"]  = _col_mc.text_input("Marca CPU",  value=_eq_m.get("cpu_marca") or "",  key=f"em_marca{_Km}")
+                        _em["cpu_modelo"] = _col_md.text_input("Modelo CPU", value=_eq_m.get("cpu_modelo") or "", key=f"em_modelo{_Km}")
+                        _em["cpu_serie"]  = _col_me.text_input("Serie CPU",  value=_eq_m.get("cpu_serie") or "",  key=f"em_serie{_Km}")
+                        _col_mf, _col_mg = st.columns(2)
+                        _em["mac"] = _col_mf.text_input("MAC", value=_eq_m.get("mac") or "", key=f"em_mac{_Km}")
+                        if _tipo_m == "Laptop":
+                            _em["cargador_serie"] = _col_mg.text_input("Serie cargador", value=_eq_m.get("cargador_serie") or "", key=f"em_carg{_Km}")
+                            _col_mh, _col_mi, _col_mj = st.columns(3)
+                            _em["docking_marca"]  = _col_mh.text_input("Docking Marca",  value=_eq_m.get("docking_marca") or "",  key=f"em_dm{_Km}")
+                            _em["docking_modelo"] = _col_mi.text_input("Docking Modelo", value=_eq_m.get("docking_modelo") or "", key=f"em_dmod{_Km}")
+                            _em["docking_serie"]  = _col_mj.text_input("Docking Serie",  value=_eq_m.get("docking_serie") or "",  key=f"em_ds{_Km}")
+                            _em["candado"] = st.text_input("Candado", value=_eq_m.get("candado") or "", key=f"em_cand{_Km}")
+                        else:
+                            _col_mh, _col_mi = st.columns(2)
+                            _em["teclado_serie"] = _col_mh.text_input("Serie teclado", value=_eq_m.get("teclado_serie") or "", key=f"em_tec{_Km}")
+                            _em["mouse_serie"]   = _col_mi.text_input("Serie mouse",   value=_eq_m.get("mouse_serie") or "",   key=f"em_mouse{_Km}")
+                            _col_mj, _col_mk, _col_ml = st.columns(3)
+                            _em["monitor_marca"]  = _col_mj.text_input("Monitor Marca",  value=_eq_m.get("monitor_marca") or "",  key=f"em_monm{_Km}")
+                            _em["monitor_modelo"] = _col_mk.text_input("Monitor Modelo", value=_eq_m.get("monitor_modelo") or "", key=f"em_monmod{_Km}")
+                            _em["monitor_serie"]  = _col_ml.text_input("Monitor Serie",  value=_eq_m.get("monitor_serie") or "",  key=f"em_mons{_Km}")
+                            _col_mm, _col_mn, _col_mo = st.columns(3)
+                            _em["nobreak_marca"]  = _col_mm.text_input("No-Break Marca",  value=_eq_m.get("nobreak_marca") or "",  key=f"em_nbm{_Km}")
+                            _em["nobreak_modelo"] = _col_mn.text_input("No-Break Modelo", value=_eq_m.get("nobreak_modelo") or "", key=f"em_nbmod{_Km}")
+                            _em["nobreak_serie"]  = _col_mo.text_input("No-Break Serie",  value=_eq_m.get("nobreak_serie") or "",  key=f"em_nbs{_Km}")
+                            if _tipo_m == "PC Especializada":
+                                _em["ipv4_actual"] = st.text_input("IPv4 Actual", value=_eq_m.get("ipv4_actual") or "", key=f"em_ipv4{_Km}")
+                        _em["observaciones"] = st.text_area("Observaciones", value=_eq_m.get("observaciones") or "", height=68, key=f"em_obs{_Km}")
+                        if st.button("💾 Guardar cambios", key=f"em_guardar{_Km}", type="primary"):
+                            try:
+                                _cur_mu  = get_conn().cursor()
+                                _cols_mu = list(_em.keys())
+                                _set_mu  = ", ".join(f"{c}=%s" for c in _cols_mu)
+                                _vals_mu = [None if (v is None or str(v).strip() in ("", "nan", "None")) else v for v in _em.values()]
+                                _nombre_u_m = (_em.get("nombre_usuario") or "").strip() or None
+                                _id_u_m     = _umap_rsg.get(_nombre_u_m) if _nombre_u_m else None
+                                _cur_mu.execute(
+                                    f"UPDATE inventario_equipos SET {_set_mu}, id_usuario=%s WHERE id=%s",
+                                    _vals_mu + [_id_u_m, _id_m]
+                                )
+                                get_conn().commit()
+                                _cur_mu.close()
+                                st.success("✅ Cambios guardados.")
+                                st.rerun()
+                            except Exception as _ex_mu:
+                                safe_rollback()
+                                st.error(f"Error: {_ex_mu}")
+
+                        # ── PDF firmado ─────────────────────────────────────────
+                        st.markdown("---")
+                        st.markdown("**Resguardo firmado**")
+                        _firmado_m = bool(_eq_m.get("firmado"))
+                        if _firmado_m and _eq_m.get("pdf_firmado"):
+                            import base64 as _b64m
+                            _pdf_m_bytes = bytes(_eq_m["pdf_firmado"])
+                            col_fm1, col_fm2 = st.columns(2)
+                            col_fm1.download_button(
+                                "📥 Descargar PDF firmado",
+                                data=_pdf_m_bytes,
+                                file_name=f"firmado_{(_eq_m.get('nombre_usuario') or 'equipo').replace(' ','_')}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True,
+                                key=f"em_dl_pdf{_Km}",
+                            )
+                            if col_fm2.button("🗑️ Quitar firma", key=f"em_quitar{_Km}"):
+                                _cur_qm = get_conn().cursor()
+                                _cur_qm.execute(
+                                    "UPDATE inventario_equipos SET firmado=FALSE, fecha_firma=NULL, pdf_firmado=NULL WHERE id=%s",
+                                    (_id_m,)
+                                )
+                                get_conn().commit()
+                                _cur_qm.close()
+                                st.rerun()
+                            _b64_m = _b64m.b64encode(_pdf_m_bytes).decode("utf-8")
+                            st.components.v1.html(
+                                f'<embed src="data:application/pdf;base64,{_b64_m}" '
+                                f'type="application/pdf" width="100%" height="600px">',
+                                height=620, scrolling=True
+                            )
+                        elif _firmado_m:
+                            st.warning("Marcado como firmado pero sin PDF almacenado.")
+                        else:
+                            st.caption("⬜ Sin resguardo firmado")
+                        _arch_m = st.file_uploader(
+                            "Subir PDF firmado (nuevo o reemplazar)",
+                            type=["pdf"], key=f"em_upload{_Km}"
+                        )
+                        if _arch_m:
+                            if st.button("💾 Guardar PDF firmado", key=f"em_save_pdf{_Km}", type="primary"):
+                                try:
+                                    _cur_fp2 = get_conn().cursor()
+                                    _cur_fp2.execute(
+                                        "UPDATE inventario_equipos SET firmado=TRUE, fecha_firma=CURRENT_DATE, pdf_firmado=%s WHERE id=%s",
+                                        (psycopg2.Binary(_arch_m.read()), _id_m)
+                                    )
+                                    get_conn().commit()
+                                    _cur_fp2.close()
+                                    st.success("✅ PDF firmado guardado.")
+                                    st.rerun()
+                                except Exception as _ex_fp2:
+                                    safe_rollback()
+                                    st.error(f"Error: {_ex_fp2}")
         except Exception as e:
             safe_rollback()
             st.error(f"Error: {e}")
@@ -2503,6 +2824,7 @@ elif menu == "🌐 Direccionamiento IP":
                     i.mac, i.marca, i.modelo, i.serie, i.estatus,
                     i.departamento_pestana, i.observaciones
                 FROM inventario_ips_completo i
+                LEFT JOIN usuarios u ON u.id_usuario = i.id_usuario
                 WHERE 1=1
             """
             params = []
