@@ -45,10 +45,10 @@
                 </label>
                 <input id="correo" name="correo" type="email"
                     value="{{ old('correo') }}"
-                    placeholder="nombre.apellido@imjuve.gob.mx"
+                    placeholder="nombre.apellido@imjuventud.gob.mx"
                     class="w-full rounded-lg px-4 py-3 text-sm border outline-none transition-colors
                            focus:ring-2 focus:ring-[#621132] focus:border-transparent
-                           {{ $errors->has('correo') ? 'border-red-400 bg-red-50' : 'border-[#E5E7EB] bg-[#F9F9F8]' }}">
+                           {{ $errors->has('correo') ? 'border-red-400 bg-red-50 text-on-surface' : 'border-border bg-white text-on-surface' }}">
                 @error('correo')
                 <p class="mt-1.5 text-xs text-red-600 flex items-center gap-1">
                     <span class="material-symbols-outlined" style="font-size:14px">error</span>
@@ -65,7 +65,7 @@
                 <select id="tipo" name="tipo"
                     class="w-full rounded-lg px-4 py-3 text-sm border outline-none transition-colors appearance-none
                            focus:ring-2 focus:ring-[#621132] focus:border-transparent
-                           {{ $errors->has('tipo') ? 'border-red-400 bg-red-50' : 'border-[#E5E7EB] bg-[#F9F9F8]' }}">
+                           {{ $errors->has('tipo') ? 'border-red-400 bg-red-50 text-on-surface text-on-surface' : 'border-border bg-white text-on-surface' }}">
                     <option value="" disabled {{ old('tipo') ? '' : 'selected' }}>Selecciona el tipo de incidente…</option>
                     @foreach($tipos as $t)
                     <option value="{{ $t }}" {{ old('tipo') === $t ? 'selected' : '' }}>{{ $t }}</option>
@@ -87,7 +87,7 @@
                 <select id="area" name="area"
                     class="w-full rounded-lg px-4 py-3 text-sm border outline-none transition-colors appearance-none
                            focus:ring-2 focus:ring-[#621132] focus:border-transparent
-                           {{ $errors->has('area') ? 'border-red-400 bg-red-50' : 'border-[#E5E7EB] bg-[#F9F9F8]' }}">
+                           {{ $errors->has('area') ? 'border-red-400 bg-red-50 text-on-surface' : 'border-border bg-white text-on-surface' }}">
                     <option value="" disabled {{ old('area') ? '' : 'selected' }}>Selecciona el área…</option>
                     @foreach($areas as $a)
                     <option value="{{ $a }}" {{ old('area') === $a ? 'selected' : '' }}>{{ $a }}</option>
@@ -110,7 +110,7 @@
                     placeholder="Describe brevemente el problema que estás experimentando…"
                     class="w-full rounded-lg px-4 py-3 text-sm border outline-none transition-colors resize-none
                            focus:ring-2 focus:ring-[#621132] focus:border-transparent
-                           {{ $errors->has('descripcion') ? 'border-red-400 bg-red-50' : 'border-[#E5E7EB] bg-[#F9F9F8]' }}">{{ old('descripcion') }}</textarea>
+                           {{ $errors->has('descripcion') ? 'border-red-400 bg-red-50 text-on-surface' : 'border-border bg-white text-on-surface' }}">{{ old('descripcion') }}</textarea>
                 @error('descripcion')
                 <p class="mt-1.5 text-xs text-red-600 flex items-center gap-1">
                     <span class="material-symbols-outlined" style="font-size:14px">error</span>
