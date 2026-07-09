@@ -63,7 +63,7 @@
     <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm">
 
         {{-- Encabezado con filtros --}}
-        <x-tabla-encabezado titulo="Directorio de Empleados" tab="crm">
+        <x-tabla-encabezado titulo="Directorio de Empleados" tab="crm" exportUrl="{{ route('crm.exportar') }}">
             <x-slot:filtros>
                 <div>
                     <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Buscar</label>

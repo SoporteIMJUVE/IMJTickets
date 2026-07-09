@@ -40,7 +40,7 @@
 
     {{-- Barra de filtros --}}
     <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm mb-6">
-        <x-tabla-encabezado titulo="Gestión de Tickets" tab="tickets">
+        <x-tabla-encabezado titulo="Gestión de Tickets" tab="tickets" exportUrl="{{ route('tickets.exportar') }}">
             <x-slot:acciones>
                 <span class="text-xs text-[#544246] mr-2">
                     Total: <span class="font-bold text-[#621132]" id="total-visible">{{ $tickets->count() }}</span> tickets

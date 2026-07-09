@@ -55,7 +55,7 @@
 
         {{-- Tabla Equipos --}}
         <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm">
-            <x-tabla-encabezado titulo="Inventario de Equipos" tab="equipos">
+            <x-tabla-encabezado titulo="Inventario de Equipos" tab="equipos" exportUrl="{{ route('kardex.exportar', 'equipos') }}">
                 <x-slot:filtros>
                     <div>
                         <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Tipo</label>
@@ -192,7 +192,7 @@
         </div>
 
         <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm">
-            <x-tabla-encabezado titulo="Inventario de Insumos" tab="insumos">
+            <x-tabla-encabezado titulo="Inventario de Insumos" tab="insumos" exportUrl="{{ route('kardex.exportar', 'insumos') }}">
                 <x-slot:filtros>
                     <div>
                         <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Buscar</label>

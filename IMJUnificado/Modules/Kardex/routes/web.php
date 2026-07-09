@@ -3,6 +3,16 @@ use Illuminate\Support\Facades\Route;
 use Modules\Kardex\Http\Controllers\KardexController;
 
 Route::middleware(['auth'])->prefix('kardex')->name('kardex.')->group(function () {
+    Route::get('/exportar/{tipo}', function (string $tipo, \Illuminate\Http\Request $request) {
+        $exporter = match ($tipo) {
+            'equipos'    => new \App\Exports\EquiposExporter(),
+            'insumos'    => new \App\Exports\InsumosExporter(),
+            'resguardos' => new \App\Exports\ResguardosExporter(),
+            default      => abort(404),
+        };
+        return $exporter->download($request->all());
+    })->name('exportar');
+
     Route::get('/', function () {
         $equipos = \DB::table('inventario_equipos')
             ->leftJoin('empleados', 'inventario_equipos.id_empleado', '=', 'empleados.id_empleado')

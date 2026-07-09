@@ -8,6 +8,10 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
     Route::delete('/empleados/{id}',        [CRMController::class, 'destroy'])->name('empleados.destroy');
     Route::patch('/empleados/{id}/reactivar', [CRMController::class, 'reactivar'])->name('empleados.reactivar');
 
+    Route::get('/exportar', function (\Illuminate\Http\Request $request) {
+        return (new \App\Exports\EmpleadosExporter())->download($request->all());
+    })->name('exportar');
+
     Route::get('/', function () {
         $empleados = \DB::table('empleados')
             ->leftJoin('departamentos', 'empleados.id_departamento', '=', 'departamentos.id_departamento')

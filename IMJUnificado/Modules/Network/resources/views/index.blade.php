@@ -110,7 +110,7 @@
     {{-- ---- VIEW: INVENTARIO IPs ---- --}}
     <div id="view-inventario" class="hidden">
         <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm mb-6">
-            <x-tabla-encabezado titulo="Inventario de IPs" tab="ips">
+            <x-tabla-encabezado titulo="Inventario de IPs" tab="ips" exportUrl="{{ route('network.exportar') }}">
                 <x-slot:filtros>
                     <div>
                         <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Estado</label>

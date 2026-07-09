@@ -2,6 +2,10 @@
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->prefix('network')->name('network.')->group(function () {
+    Route::get('/exportar', function (\Illuminate\Http\Request $request) {
+        return (new \App\Exports\IpsExporter())->download($request->all());
+    })->name('exportar');
+
     Route::get('/', function () {
         $rangos = \DB::table('cat_rangos_ips')->orderBy('area_nombre')->get();
         $ipsAll = \DB::table('inventario_ips_completo')->orderBy('departamento_pestana')->orderBy('ip')->get();
