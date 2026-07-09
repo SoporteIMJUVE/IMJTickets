@@ -62,27 +62,38 @@
     {{-- User Table --}}
     <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm">
 
-        {{-- Search bar --}}
-        <div class="px-6 py-4 border-b border-[#E5E7EB] flex items-center justify-between gap-4">
-            <div class="relative w-72 shrink-0">
-                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#544246] text-sm">search</span>
-                <input class="w-full bg-[#F3F4F6] border-none rounded-lg pl-9 pr-4 py-2 text-sm focus:ring-2 focus:ring-[#621132] outline-none"
-                       placeholder="Buscar nombre, puesto..." type="text" id="crm-search">
-            </div>
-            <div class="flex items-center gap-3 text-sm text-[#544246]">
-                <select id="filter-depa" class="bg-[#F3F4F6] border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#621132] outline-none">
-                    <option value="">Todos los departamentos</option>
-                    @foreach($departamentos as $d)
-                    <option value="{{ strtolower($d->nombre) }}">{{ $d->nombre }}</option>
-                    @endforeach
-                </select>
-                <select id="filter-estado" class="bg-[#F3F4F6] border-none rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#621132] outline-none">
-                    <option value="">Todos</option>
-                    <option value="1">Activos</option>
-                    <option value="0">Bajas</option>
-                </select>
-            </div>
-        </div>
+        {{-- Encabezado con filtros --}}
+        <x-tabla-encabezado titulo="Directorio de Empleados" tab="crm">
+            <x-slot:filtros>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Buscar</label>
+                    <div class="relative">
+                        <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[#544246] text-sm">search</span>
+                        <input class="pl-7 pr-3 py-1.5 text-sm border border-[#E5E7EB] rounded bg-white outline-none focus:ring-2 focus:ring-[#621132] w-52"
+                               placeholder="Nombre, puesto..." type="text" id="crm-search" oninput="aplicarFiltros()">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Departamento</label>
+                    <select id="filter-depa" onchange="aplicarFiltros()"
+                            class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                        <option value="">Todos</option>
+                        @foreach($departamentos as $d)
+                        <option value="{{ strtolower($d->nombre) }}">{{ $d->nombre }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Estado</label>
+                    <select id="filter-estado" onchange="aplicarFiltros()"
+                            class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                        <option value="">Todos</option>
+                        <option value="1">Activos</option>
+                        <option value="0">Bajas</option>
+                    </select>
+                </div>
+            </x-slot:filtros>
+        </x-tabla-encabezado>
 
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse" id="users-table">
@@ -504,9 +515,7 @@ function aplicarFiltros() {
     if (c) c.textContent = visibles + ' registro(s)';
 }
 
-document.getElementById('crm-search').addEventListener('input', aplicarFiltros);
-document.getElementById('filter-depa').addEventListener('change', aplicarFiltros);
-document.getElementById('filter-estado').addEventListener('change', aplicarFiltros);
+// Los filtros usan onchange/oninput inline desde el componente x-tabla-encabezado
 
 // ─── Modal Editar Usuario ────────────────────────────────────────────────────
 function openEditModal() {

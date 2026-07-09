@@ -36,13 +36,6 @@
         </div>
     </div>
 
-    {{-- Primary CTA --}}
-    <a href="{{ route('crm.index') }}"
-       class="mb-6 w-full py-3 px-4 bg-[#621132] text-white font-bold rounded flex items-center justify-center gap-2 hover:opacity-90 transition-opacity text-sm">
-        <span class="material-symbols-outlined text-sm">person_add</span>
-        Agregar Usuario
-    </a>
-
     {{-- Navigation --}}
     <nav class="flex-1 space-y-1">
         <a href="{{ route('dashboard') }}"

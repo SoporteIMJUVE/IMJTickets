@@ -55,53 +55,36 @@
 
         {{-- Tabla Equipos --}}
         <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm">
-            <div class="px-6 py-4 border-b border-[#E5E7EB] flex justify-between items-center">
-                <h3 class="font-bold text-lg">Inventario de Equipos</h3>
-                <div class="flex gap-2">
-                    <button onclick="toggleFiltros('equipos')"
-                            class="px-3 py-1.5 border border-[#E5E7EB] rounded text-sm font-bold flex items-center gap-2 hover:bg-[#F3F4F6]">
-                        <span class="material-symbols-outlined text-sm">filter_list</span> Filtrar
-                    </button>
-                    <button class="px-3 py-1.5 bg-[#621132] text-white rounded text-sm font-bold flex items-center gap-2 hover:opacity-90">
-                        <span class="material-symbols-outlined text-sm">download</span> Exportar
-                    </button>
-                </div>
-            </div>
-
-            {{-- Barra de filtros equipos --}}
-            <div id="filtros-equipos" class="hidden border-b border-[#E5E7EB] px-6 py-3 bg-[#F9FAFB] flex flex-wrap gap-3 items-end">
-                <div>
-                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Tipo</label>
-                    <select id="f-eq-tipo" onchange="filtrarEquipos()"
-                            class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
-                        <option value="">Todos</option>
-                        <option>Laptop</option>
-                        <option>PC Avanzada</option>
-                        <option>PC Especializada</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Estado</label>
-                    <select id="f-eq-estado" onchange="filtrarEquipos()"
-                            class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
-                        <option value="">Todos</option>
-                        <option>Almacén</option>
-                        <option>Asignado</option>
-                        <option>Mantenimiento</option>
-                        <option>Baja</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Área / Responsable</label>
-                    <input id="f-eq-texto" oninput="filtrarEquipos()" type="text" placeholder="Buscar..."
-                           class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132] w-52">
-                </div>
-                <button onclick="limpiarFiltros('equipos')"
-                        class="text-xs font-bold text-[#544246] hover:text-[#621132] px-2 py-1.5 rounded hover:bg-white transition-colors">
-                    Limpiar
-                </button>
-                <p class="ml-auto text-xs text-[#544246]" id="f-eq-count"></p>
-            </div>
+            <x-tabla-encabezado titulo="Inventario de Equipos" tab="equipos">
+                <x-slot:filtros>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Tipo</label>
+                        <select id="f-eq-tipo" onchange="filtrarEquipos()"
+                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                            <option value="">Todos</option>
+                            <option>Laptop</option>
+                            <option>PC Avanzada</option>
+                            <option>PC Especializada</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Estado</label>
+                        <select id="f-eq-estado" onchange="filtrarEquipos()"
+                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                            <option value="">Todos</option>
+                            <option>Almacén</option>
+                            <option>Asignado</option>
+                            <option>Mantenimiento</option>
+                            <option>Baja</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Área / Responsable</label>
+                        <input id="f-eq-texto" oninput="filtrarEquipos()" type="text" placeholder="Buscar..."
+                               class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132] w-52">
+                    </div>
+                </x-slot:filtros>
+            </x-tabla-encabezado>
 
             <div class="overflow-x-auto">
             <table class="w-full text-left">
@@ -209,41 +192,24 @@
         </div>
 
         <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm">
-            <div class="px-6 py-4 border-b border-[#E5E7EB] flex justify-between items-center">
-                <h3 class="font-bold text-lg">Inventario de Insumos</h3>
-                <div class="flex gap-2">
-                    <button onclick="toggleFiltros('insumos')"
-                            class="px-3 py-1.5 border border-[#E5E7EB] rounded text-sm font-bold flex items-center gap-2 hover:bg-[#F3F4F6]">
-                        <span class="material-symbols-outlined text-sm">filter_list</span> Filtrar
-                    </button>
-                    <button class="px-3 py-1.5 bg-[#621132] text-white rounded text-sm font-bold flex items-center gap-2 hover:opacity-90">
-                        <span class="material-symbols-outlined text-sm">download</span> Exportar
-                    </button>
-                </div>
-            </div>
-
-            {{-- Barra de filtros insumos --}}
-            <div id="filtros-insumos" class="hidden border-b border-[#E5E7EB] px-6 py-3 bg-[#F9FAFB] flex flex-wrap gap-3 items-end">
-                <div>
-                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Buscar</label>
-                    <input id="f-ins-texto" oninput="filtrarInsumos()" type="text" placeholder="Nombre o No. parte..."
-                           class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132] w-56">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Stock</label>
-                    <select id="f-ins-stock" onchange="filtrarInsumos()"
-                            class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
-                        <option value="">Todos</option>
-                        <option value="ok">OK</option>
-                        <option value="critico">Crítico</option>
-                    </select>
-                </div>
-                <button onclick="limpiarFiltros('insumos')"
-                        class="text-xs font-bold text-[#544246] hover:text-[#621132] px-2 py-1.5 rounded hover:bg-white transition-colors">
-                    Limpiar
-                </button>
-                <p class="ml-auto text-xs text-[#544246]" id="f-ins-count"></p>
-            </div>
+            <x-tabla-encabezado titulo="Inventario de Insumos" tab="insumos">
+                <x-slot:filtros>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Buscar</label>
+                        <input id="f-ins-texto" oninput="filtrarInsumos()" type="text" placeholder="Nombre o No. parte..."
+                               class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132] w-56">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Stock</label>
+                        <select id="f-ins-stock" onchange="filtrarInsumos()"
+                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                            <option value="">Todos</option>
+                            <option value="ok">OK</option>
+                            <option value="critico">Crítico</option>
+                        </select>
+                    </div>
+                </x-slot:filtros>
+            </x-tabla-encabezado>
 
             <div class="overflow-x-auto">
             <table class="w-full text-left">
@@ -288,51 +254,34 @@
     {{-- ---- TAB: RESGUARDOS ---- --}}
     <div id="tab-resguardos" class="hidden">
         <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm">
-            <div class="px-6 py-4 border-b border-[#E5E7EB] flex justify-between items-center">
-                <h3 class="font-bold text-lg">Documentos de Resguardo</h3>
-                <div class="flex gap-2">
-                    <button onclick="toggleFiltros('resguardos')"
-                            class="px-3 py-1.5 border border-[#E5E7EB] rounded text-sm font-bold flex items-center gap-2 hover:bg-[#F3F4F6]">
-                        <span class="material-symbols-outlined text-sm">filter_list</span> Filtrar
-                    </button>
-                    <button class="px-3 py-1.5 bg-[#621132] text-white rounded text-sm font-bold flex items-center gap-2 hover:opacity-90">
-                        <span class="material-symbols-outlined text-sm">download</span> Exportar
-                    </button>
-                </div>
-            </div>
-
-            {{-- Barra de filtros resguardos --}}
-            <div id="filtros-resguardos" class="hidden border-b border-[#E5E7EB] px-6 py-3 bg-[#F9FAFB] flex flex-wrap gap-3 items-end">
-                <div>
-                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Tipo</label>
-                    <select id="f-rsg-tipo" onchange="filtrarResguardos()"
-                            class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
-                        <option value="">Todos</option>
-                        <option>Laptop</option>
-                        <option>PC Avanzada</option>
-                        <option>PC Especializada</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">PDF</label>
-                    <select id="f-rsg-pdf" onchange="filtrarResguardos()"
-                            class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
-                        <option value="">Todos</option>
-                        <option value="si">Con PDF</option>
-                        <option value="no">Sin PDF</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Área / Responsable</label>
-                    <input id="f-rsg-texto" oninput="filtrarResguardos()" type="text" placeholder="Buscar..."
-                           class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132] w-52">
-                </div>
-                <button onclick="limpiarFiltros('resguardos')"
-                        class="text-xs font-bold text-[#544246] hover:text-[#621132] px-2 py-1.5 rounded hover:bg-white transition-colors">
-                    Limpiar
-                </button>
-                <p class="ml-auto text-xs text-[#544246]" id="f-rsg-count"></p>
-            </div>
+            <x-tabla-encabezado titulo="Documentos de Resguardo" tab="resguardos">
+                <x-slot:filtros>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Tipo</label>
+                        <select id="f-rsg-tipo" onchange="filtrarResguardos()"
+                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                            <option value="">Todos</option>
+                            <option>Laptop</option>
+                            <option>PC Avanzada</option>
+                            <option>PC Especializada</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">PDF</label>
+                        <select id="f-rsg-pdf" onchange="filtrarResguardos()"
+                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                            <option value="">Todos</option>
+                            <option value="si">Con PDF</option>
+                            <option value="no">Sin PDF</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Área / Responsable</label>
+                        <input id="f-rsg-texto" oninput="filtrarResguardos()" type="text" placeholder="Buscar..."
+                               class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132] w-52">
+                    </div>
+                </x-slot:filtros>
+            </x-tabla-encabezado>
 
             <div class="overflow-x-auto">
             <table class="w-full text-left">
@@ -464,28 +413,7 @@ function switchKardexTab(tab, btn) {
 }
 
 // ── Filtros ──────────────────────────────────────────────────────────
-function toggleFiltros(tab) {
-    const el = document.getElementById('filtros-' + tab);
-    el.classList.toggle('hidden');
-}
-
-function limpiarFiltros(tab) {
-    if (tab === 'equipos') {
-        document.getElementById('f-eq-tipo').value   = '';
-        document.getElementById('f-eq-estado').value = '';
-        document.getElementById('f-eq-texto').value  = '';
-        filtrarEquipos();
-    } else if (tab === 'insumos') {
-        document.getElementById('f-ins-texto').value = '';
-        document.getElementById('f-ins-stock').value = '';
-        filtrarInsumos();
-    } else {
-        document.getElementById('f-rsg-tipo').value  = '';
-        document.getElementById('f-rsg-pdf').value   = '';
-        document.getElementById('f-rsg-texto').value = '';
-        filtrarResguardos();
-    }
-}
+// toggleFiltros y limpiarFiltros vienen del componente x-tabla-encabezado
 
 function filtrarEquipos() {
     const tipo   = document.getElementById('f-eq-tipo').value;

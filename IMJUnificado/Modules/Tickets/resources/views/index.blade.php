@@ -39,40 +39,46 @@
     </div>
 
     {{-- Barra de filtros --}}
-    <div class="flex items-center gap-3 mb-6 flex-wrap">
-        <div class="flex items-center gap-2 bg-white border border-[#E5E7EB] px-3 py-1.5 rounded-lg hover:border-[#D4C19C] transition-colors">
-            <span class="material-symbols-outlined text-sm text-[#621132]">filter_alt</span>
-            <span class="text-xs font-bold uppercase tracking-wide text-[#544246]">Área:</span>
-            <select id="filtro-area" onchange="aplicarFiltros()" class="bg-transparent border-none text-xs font-medium p-0 focus:ring-0 outline-none">
-                <option value="">Todas</option>
-                @foreach($areas as $a)
-                <option value="{{ $a }}">{{ $a }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="flex items-center gap-2 bg-white border border-[#E5E7EB] px-3 py-1.5 rounded-lg hover:border-[#D4C19C] transition-colors">
-            <span class="material-symbols-outlined text-sm text-[#621132]">stars</span>
-            <span class="text-xs font-bold uppercase tracking-wide text-[#544246]">Estado:</span>
-            <select id="filtro-estado" onchange="aplicarFiltros()" class="bg-transparent border-none text-xs font-medium p-0 focus:ring-0 outline-none">
-                <option value="">Todos</option>
-                <option value="0">Abierto</option>
-                <option value="1">Atendiendo</option>
-                <option value="2">Cerrado</option>
-            </select>
-        </div>
-        <div class="flex items-center gap-2 bg-white border border-[#E5E7EB] px-3 py-1.5 rounded-lg hover:border-[#D4C19C] transition-colors">
-            <span class="material-symbols-outlined text-sm text-[#621132]">calendar_today</span>
-            <span class="text-xs font-bold uppercase tracking-wide text-[#544246]">Fecha:</span>
-            <select id="filtro-fecha" onchange="aplicarFiltros()" class="bg-transparent border-none text-xs font-medium p-0 focus:ring-0 outline-none">
-                <option value="">Todo</option>
-                <option value="1">Hoy</option>
-                <option value="7">Últimos 7 días</option>
-                <option value="30">Últimos 30 días</option>
-            </select>
-        </div>
-        <div class="ml-auto text-xs text-[#544246]">
-            Total: <span class="font-bold text-[#621132]" id="total-visible">{{ $tickets->count() }}</span> tickets
-        </div>
+    <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm mb-6">
+        <x-tabla-encabezado titulo="Gestión de Tickets" tab="tickets">
+            <x-slot:acciones>
+                <span class="text-xs text-[#544246] mr-2">
+                    Total: <span class="font-bold text-[#621132]" id="total-visible">{{ $tickets->count() }}</span> tickets
+                </span>
+            </x-slot:acciones>
+            <x-slot:filtros>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Área</label>
+                    <select id="filtro-area" onchange="aplicarFiltros()"
+                            class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                        <option value="">Todas</option>
+                        @foreach($areas as $a)
+                        <option value="{{ $a }}">{{ $a }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Estado</label>
+                    <select id="filtro-estado" onchange="aplicarFiltros()"
+                            class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                        <option value="">Todos</option>
+                        <option value="0">Abierto</option>
+                        <option value="1">Atendiendo</option>
+                        <option value="2">Cerrado</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Fecha</label>
+                    <select id="filtro-fecha" onchange="aplicarFiltros()"
+                            class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                        <option value="">Todo</option>
+                        <option value="1">Hoy</option>
+                        <option value="7">Últimos 7 días</option>
+                        <option value="30">Últimos 30 días</option>
+                    </select>
+                </div>
+            </x-slot:filtros>
+        </x-tabla-encabezado>
     </div>
 
     {{-- ══════════════════════════════════════════════

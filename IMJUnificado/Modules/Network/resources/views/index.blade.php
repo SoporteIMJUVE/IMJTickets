@@ -109,24 +109,31 @@
 
     {{-- ---- VIEW: INVENTARIO IPs ---- --}}
     <div id="view-inventario" class="hidden">
-        <div class="bg-white border border-[#E5E7EB] rounded-xl p-4 mb-6 flex justify-between items-center">
-            <div class="flex gap-4">
-                <select id="net-filter-estatus" onchange="filterIpTable()" class="text-xs font-bold border-[#E5E7EB] rounded-lg bg-[#fbf9f8] px-4 py-2 outline-none focus:ring-2 focus:ring-[#621132]">
-                    <option value="">Todos los estados</option>
-                    <option value="ocupada">Ocupada</option>
-                    <option value="libre">Libre</option>
-                    <option value="reservada">Reservada</option>
-                </select>
-                <select id="net-filter-area" onchange="filterIpTable()" class="text-xs font-bold border-[#E5E7EB] rounded-lg bg-[#fbf9f8] px-4 py-2 outline-none focus:ring-2 focus:ring-[#621132]">
-                    <option value="">Todas las áreas</option>
-                    @foreach($rangos as $r)
-                    <option value="{{ $r->siglas }}">{{ $r->siglas }} — {{ Str::limit($r->area_nombre, 40) }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <button class="bg-[#F3F4F6] text-[#544246] px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-[#eae8e7] transition-colors">
-                <span class="material-symbols-outlined text-sm">download</span> Exportar CSV
-            </button>
+        <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm mb-6">
+            <x-tabla-encabezado titulo="Inventario de IPs" tab="ips">
+                <x-slot:filtros>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Estado</label>
+                        <select id="net-filter-estatus" onchange="filterIpTable()"
+                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                            <option value="">Todos</option>
+                            <option value="ocupada">Ocupada</option>
+                            <option value="libre">Libre</option>
+                            <option value="reservada">Reservada</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Área</label>
+                        <select id="net-filter-area" onchange="filterIpTable()"
+                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                            <option value="">Todas</option>
+                            @foreach($rangos as $r)
+                            <option value="{{ strtolower($r->siglas) }}">{{ $r->siglas }} — {{ Str::limit($r->area_nombre, 40) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </x-slot:filtros>
+            </x-tabla-encabezado>
         </div>
 
         <div class="bg-white rounded-xl border border-[#E5E7EB] shadow-sm overflow-hidden">
