@@ -8,11 +8,6 @@
             <p class="text-[#544246] text-sm mt-1">Control de inventario técnico y asignación institucional de recursos.</p>
         </div>
         <div class="flex items-center gap-3">
-            <a href="{{ route('kardex.resguardo.subir') }}"
-               class="px-4 py-2 bg-[#621132] text-white text-sm font-bold rounded-lg hover:opacity-90 active:scale-95 transition-all flex items-center gap-2">
-                <span class="material-symbols-outlined text-sm">upload_file</span>
-                Registrar equipo
-            </a>
             <div class="flex gap-2 bg-[#efeded] rounded-lg p-1">
                 <button id="tab-btn-equipos" onclick="switchKardexTab('equipos', this)"
                         class="px-6 py-2 rounded-md text-sm font-bold transition-all bg-white text-[#621132] shadow-sm">
@@ -255,6 +250,13 @@
     <div id="tab-resguardos" class="hidden">
         <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm">
             <x-tabla-encabezado titulo="Documentos de Resguardo" tab="resguardos">
+                <x-slot:acciones>
+                    <a href="{{ route('kardex.resguardo.subir') }}"
+                       class="px-3 py-1.5 bg-[#621132] text-white rounded text-sm font-bold flex items-center gap-2 hover:opacity-90 transition-colors">
+                        <span class="material-symbols-outlined text-sm">upload_file</span>
+                        Registrar equipo
+                    </a>
+                </x-slot:acciones>
                 <x-slot:filtros>
                     <div>
                         <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Tipo</label>
