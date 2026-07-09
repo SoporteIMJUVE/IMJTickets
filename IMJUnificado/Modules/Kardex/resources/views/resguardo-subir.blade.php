@@ -49,7 +49,7 @@
                     <span class="material-symbols-outlined text-status-free mt-0.5" style="font-size:18px">info</span>
                     <div class="text-xs text-on-surface-variant space-y-1">
                         <p><span class="font-bold text-on-surface">✅ PDF tipado</span> — el sistema extrae los datos automáticamente.</p>
-                        <p><span class="font-bold text-on-surface">⚠️ PDF escaneado (imagen)</span> — no contiene texto real; el sistema no podrá leerlo. Solicita el PDF original al proveedor.</p>
+                        <p><span class="font-bold text-on-surface">🖼️ PDF escaneado (imagen)</span> — se acepta, pero tendrás que llenar los datos a mano. El archivo se guarda como respaldo.</p>
                     </div>
                 </div>
             </div>

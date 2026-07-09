@@ -242,42 +242,15 @@
             </section>
 
             <section>
-                <h4 class="text-[11px] font-bold uppercase tracking-wider text-[#544246] mb-4 flex items-center gap-2">
+                <h4 class="text-[11px] font-bold uppercase tracking-wider text-[#544246] mb-3 flex items-center gap-2">
                     <span class="material-symbols-outlined text-sm">computer</span>
-                    EQUIPO ASIGNADO
+                    EQUIPOS ASIGNADOS
+                    <span class="ml-auto font-mono text-[#621132]" id="panel-eq-count"></span>
                 </h4>
-                <div class="space-y-2">
-                    <div class="flex items-center gap-3 p-3 border border-[#E5E7EB] rounded-lg">
-                        <span class="material-symbols-outlined text-[#621132]">laptop</span>
-                        <div>
-                            <p class="text-sm font-bold">Laptop</p>
-                            <p class="text-[11px] text-[#544246]">No hay equipo asignado</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-3 p-3 border border-[#E5E7EB] rounded-lg">
-                        <span class="material-symbols-outlined text-[#544246]">print</span>
-                        <div>
-                            <p class="text-sm font-bold">Impresora</p>
-                            <p class="text-[11px] text-[#544246]">No asignada</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section>
-                <h4 class="text-[11px] font-bold uppercase tracking-wider text-[#544246] mb-4 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-sm">lan</span>
-                    RED
-                </h4>
-                <div class="bg-[#621132] text-white p-4 rounded-lg space-y-3">
-                    <div class="flex justify-between items-center">
-                        <span class="text-[10px] font-bold opacity-70 uppercase">IPv4</span>
-                        <span class="font-mono text-sm">—</span>
-                    </div>
-                    <div class="h-px bg-white/20"></div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-[10px] font-bold opacity-70 uppercase">MAC</span>
-                        <span class="font-mono text-sm">—</span>
+                <div id="panel-equipos-list">
+                    <div class="flex items-center justify-center py-8 text-[#544246] text-xs">
+                        <span class="material-symbols-outlined text-2xl animate-spin mr-2">progress_activity</span>
+                        Cargando…
                     </div>
                 </div>
             </section>
@@ -328,7 +301,7 @@ const ticketsPorCorreo = {!! json_encode($ticketsPorCorreo, JSON_HEX_TAG) !!};
 
 let currentEmpleado = {};
 
-function openUserPanel(row) {
+async function openUserPanel(row) {
     currentEmpleado = {
         id:       row.dataset.id,
         activo:   row.dataset.activo === '1',
@@ -353,7 +326,7 @@ function openUserPanel(row) {
     const badge = document.getElementById('panel-estado-badge');
     if (activo) {
         badge.textContent = 'Activo';
-        badge.style.cssText = 'background:#166534/10;background-color:rgba(22,101,52,.1);color:#166534';
+        badge.style.cssText = 'background-color:rgba(22,101,52,.1);color:#166534';
     } else {
         badge.textContent = 'Baja';
         badge.style.cssText = 'background-color:rgba(153,27,27,.1);color:#991B1B';
@@ -363,6 +336,11 @@ function openUserPanel(row) {
     document.getElementById('panel-correo').innerText = correo || '—';
     document.getElementById('panel-ext').innerText    = ext ? 'ext. ' + ext : '—';
     document.getElementById('panel-depa').innerText   = depa || '—';
+
+    // Equipos: spinner mientras carga
+    document.getElementById('panel-equipos-list').innerHTML =
+        '<div class="flex items-center py-6 text-[#544246] text-xs gap-2"><span class="material-symbols-outlined text-xl animate-spin">progress_activity</span>Cargando equipos…</div>';
+    document.getElementById('panel-eq-count').textContent = '';
 
     // Tabs Historial y Tickets — datos cruzados con el módulo Tickets
     const todos   = ticketsPorCorreo[correo] || [];
@@ -381,6 +359,76 @@ function openUserPanel(row) {
 
     document.getElementById('user-panel').classList.remove('closed');
     document.getElementById('panel-backdrop').classList.remove('hidden');
+
+    // Cargar equipos del empleado via AJAX
+    try {
+        const equipos = await fetch(`/crm/empleado/${currentEmpleado.id}/equipos`).then(r => r.json());
+        renderEquiposPanel(equipos);
+    } catch (e) {
+        document.getElementById('panel-equipos-list').innerHTML =
+            '<p class="text-xs text-red-500">Error al cargar equipos.</p>';
+    }
+}
+
+function renderEquiposPanel(equipos) {
+    const list = document.getElementById('panel-equipos-list');
+    const count = document.getElementById('panel-eq-count');
+
+    if (!equipos.length) {
+        count.textContent = '';
+        list.innerHTML = `<div class="flex flex-col items-center py-8 text-[#544246]">
+            <span class="material-symbols-outlined text-3xl mb-2 opacity-40">computer_off</span>
+            <p class="text-xs">Sin equipos asignados</p>
+        </div>`;
+        return;
+    }
+
+    count.textContent = equipos.length + ' equipo' + (equipos.length > 1 ? 's' : '');
+
+    const tipoIcon  = { 'Laptop':'laptop', 'PC Avanzada':'computer', 'PC Especializada':'developer_board' };
+    const tipoColor = { 'Laptop':'#1E40AF', 'PC Avanzada':'#166534', 'PC Especializada':'#9A3412' };
+
+    list.innerHTML = equipos.map(eq => {
+        const icon  = tipoIcon[eq.tipo]  ?? 'computer';
+        const color = tipoColor[eq.tipo] ?? '#621132';
+        const marca = [eq.cpu_marca, eq.cpu_modelo].filter(Boolean).join(' ') || '—';
+        const serie = eq.cpu_serie || '—';
+        const ip    = eq.ipv4 || eq.ipv4_actual || null;
+        const esFk  = eq.match === 'fk';
+
+        // Badge de vinculación
+        const matchBadge = esFk
+            ? `<span title="Vinculado formalmente (FK)" style="background:#16653410;color:#166534;font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px;letter-spacing:.04em">● VINCULADO</span>`
+            : `<span title="Coincidencia por nombre — vincula desde Kardex" style="background:#92400E18;color:#92400E;font-size:9px;font-weight:700;padding:1px 6px;border-radius:999px;letter-spacing:.04em">⚠ POR NOMBRE</span>`;
+
+        return `<div class="border rounded-lg p-3 mb-2 last:mb-0 transition-colors ${esFk ? 'border-[#166534]/30 hover:border-[#166534]/60' : 'border-[#E5E7EB] hover:border-[#D4C19C]'}">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="material-symbols-outlined text-lg" style="color:${color}">${icon}</span>
+                <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                      style="background:${color}1a;color:${color}">${escHtml(eq.tipo)}</span>
+                ${matchBadge}
+                ${eq.num_inventario ? `<span class="ml-auto text-[10px] font-mono text-[#544246] shrink-0">Inv.&nbsp;${escHtml(String(eq.num_inventario))}</span>` : ''}
+            </div>
+            <p class="text-sm font-bold text-[#1b1c1c] mb-2">${escHtml(marca)}</p>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+                <div>
+                    <p class="text-[10px] text-[#544246] font-bold uppercase">No. Serie</p>
+                    <p class="font-mono text-xs text-[#621132]">${escHtml(serie)}</p>
+                </div>
+                <div>
+                    <p class="text-[10px] text-[#544246] font-bold uppercase">IPv4</p>
+                    ${ip
+                        ? `<p class="font-mono text-xs text-[#621132]">${escHtml(ip)}</p>`
+                        : `<p class="text-xs text-[#544246] opacity-40">Sin IP</p>`
+                    }
+                </div>
+                ${eq.mac ? `<div class="col-span-2 mt-1">
+                    <p class="text-[10px] text-[#544246] font-bold uppercase">MAC</p>
+                    <p class="font-mono text-[11px] text-[#544246]">${escHtml(eq.mac)}</p>
+                </div>` : ''}
+            </div>
+        </div>`;
+    }).join('');
 }
 
 function renderTicketItem(t) {

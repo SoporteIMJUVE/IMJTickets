@@ -12,6 +12,16 @@
         </div>
     </div>
 
+    @if(!$esNativo)
+    <div class="mb-4 flex items-start gap-3 bg-yellow-100 border border-yellow-300 text-on-surface rounded-xl px-4 py-3 text-sm">
+        <span class="material-symbols-outlined text-yellow-600 mt-0.5">image_search</span>
+        <div>
+            <p class="font-bold text-yellow-800">PDF escaneado (imagen) — ingreso manual</p>
+            <p class="text-yellow-700 mt-0.5">No se detectó texto en el archivo. Llena los campos a mano. El PDF se guardará como respaldo.</p>
+        </div>
+    </div>
+    @endif
+
     @if($errors->any())
     <div class="mb-4 flex items-start gap-3 bg-error-container border border-red-200 text-on-surface rounded-xl px-4 py-3 text-sm font-semibold">
         <span class="material-symbols-outlined text-error mt-0.5">error</span>
@@ -64,7 +74,7 @@
                         </div>
                         <div class="col-span-2">
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">
-                                Número de serie <span class="text-error">*</span>
+                                Número de serie @if($esNativo)<span class="text-error">*</span>@endif
                             </label>
                             <input type="text" name="cpu_serie" value="{{ old('cpu_serie', $datos['cpu_serie']) }}"
                                 class="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-2 focus:ring-primary-container
@@ -151,7 +161,8 @@
                                {{ $datos['observaciones'] ? 'bg-yellow-50' : 'bg-white' }}">{{ old('observaciones', $datos['observaciones']) }}</textarea>
                 </div>
 
-                {{-- Texto extraído (colapsado) --}}
+                {{-- Texto extraído (colapsado, solo si hay texto) --}}
+                @if($esNativo && $textoRaw)
                 <details class="bg-surface-low border border-border rounded-2xl shadow-sm">
                     <summary class="px-6 py-4 cursor-pointer text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2">
                         <span class="material-symbols-outlined" style="font-size:16px">article</span>
@@ -159,6 +170,7 @@
                     </summary>
                     <pre class="px-6 pb-5 text-[11px] text-on-surface-variant whitespace-pre-wrap overflow-x-auto font-mono">{{ $textoRaw }}</pre>
                 </details>
+                @endif
 
             </div>
 

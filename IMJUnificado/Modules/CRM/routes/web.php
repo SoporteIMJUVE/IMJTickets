@@ -50,4 +50,38 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
             'ticketsPorCorreo'  => $ticketsPorCorreo,
         ]);
     })->name('index');
+
+    // JSON: equipos asignados a un empleado (para panel lateral)
+    Route::get('/empleado/{id}/equipos', function ($id) {
+        $empleado = \DB::table('empleados')->where('id_empleado', $id)->first();
+        if (!$empleado) return response()->json([]);
+
+        $cols = ['id', 'tipo', 'num_inventario', 'cpu_marca', 'cpu_modelo', 'cpu_serie',
+                 'ipv4', 'ipv4_actual', 'mac', 'area', 'id_empleado'];
+
+        // 1. Ligados por FK (vinculación formal)
+        $porFk = \DB::table('inventario_equipos')
+            ->where('id_empleado', $id)
+            ->select($cols)
+            ->orderBy('tipo')->orderBy('consecutivo')
+            ->get()
+            ->map(fn($e) => array_merge((array)$e, ['match' => 'fk']));
+
+        // 2. Fallback: equipos sin FK cuyo nombre_usuario coincide con este empleado
+        $nombre   = trim($empleado->nombre ?? '');
+        $apellido = trim($empleado->apellido_paterno ?? '');
+        $porNombre = collect();
+        if ($nombre && $apellido) {
+            $porNombre = \DB::table('inventario_equipos')
+                ->whereNull('id_empleado')
+                ->where('nombre_usuario', 'like', "%{$nombre}%")
+                ->where('nombre_usuario', 'like', "%{$apellido}%")
+                ->select($cols)
+                ->orderBy('tipo')->orderBy('consecutivo')
+                ->get()
+                ->map(fn($e) => array_merge((array)$e, ['match' => 'nombre']));
+        }
+
+        return response()->json($porFk->concat($porNombre)->values());
+    })->name('empleado.equipos');
 });

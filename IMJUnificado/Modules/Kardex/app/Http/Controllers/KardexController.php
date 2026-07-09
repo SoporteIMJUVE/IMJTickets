@@ -37,18 +37,18 @@ class KardexController extends Controller
 
         $esNativo = mb_strlen(trim($texto)) > 80;
 
-        if (!$esNativo) {
-            return back()->withErrors([
-                'pdf' => 'Este PDF parece ser una imagen escaneada y no contiene texto seleccionable. '
-                       . 'Proporciona el PDF original tipado para que el sistema pueda extraer los datos automáticamente.',
-            ]);
-        }
+        // Si tiene texto: extraer campos
+        // Si es imagen (sin texto): datos vacíos, formulario manual
+        $datos = $esNativo
+            ? $this->extraerCampos($texto)
+            : array_fill_keys(['nombre_usuario','tipo','cpu_marca','cpu_modelo','cpu_serie',
+                               'consecutivo','num_inventario','area','observaciones'], null);
 
-        $datos = $this->extraerCampos($texto);
+        $hayDatos = $esNativo && count(array_filter($datos)) > 0;
 
-        // Buscar empleados con coincidencia de nombre
+        // Solo buscar candidatos si extrajimos un nombre
         $candidatos = collect();
-        if ($datos['nombre_usuario']) {
+        if ($hayDatos && $datos['nombre_usuario']) {
             $partes   = preg_split('/\s+/', trim($datos['nombre_usuario']));
             $nombre   = $partes[0] ?? '';
             $apellido = $partes[1] ?? '';
@@ -72,15 +72,15 @@ class KardexController extends Controller
                 ->get();
         }
 
-        // Guardar PDF en almacenamiento temporal
+        // Siempre guardar el PDF (también para escaneados)
         $tmpPath = $file->store('resguardos_tmp', 'local');
 
-        // PRG: guardar en sesión y redirigir a GET para evitar reenvío del formulario
         session([
             'resguardo.datos'      => $datos,
             'resguardo.textoRaw'   => $texto,
             'resguardo.candidatos' => $candidatos,
             'resguardo.tmpPdf'     => $tmpPath,
+            'resguardo.esNativo'   => $esNativo,
         ]);
 
         return redirect()->route('kardex.resguardo.preview');
@@ -100,6 +100,7 @@ class KardexController extends Controller
             'textoRaw'   => session('resguardo.textoRaw'),
             'candidatos' => collect(session('resguardo.candidatos', []))->map(fn($e) => (object) $e),
             'tmpPdf'     => session('resguardo.tmpPdf'),
+            'esNativo'   => session('resguardo.esNativo', true),
         ]);
     }
 
@@ -109,13 +110,12 @@ class KardexController extends Controller
     {
         $request->validate([
             'tipo'          => 'required|in:Laptop,PC Avanzada,PC Especializada',
-            'cpu_serie'     => 'required|string|max:100',
+            'cpu_serie'     => 'nullable|string|max:100',
             'tmp_pdf'       => 'required|string',
             'id_empleado'   => 'nullable|exists:empleados,id_empleado',
             'ipv4'          => 'nullable|ip',
         ], [
-            'tipo.required'      => 'El tipo de equipo es obligatorio.',
-            'cpu_serie.required' => 'El número de serie es obligatorio.',
+            'tipo.required' => 'El tipo de equipo es obligatorio.',
         ]);
 
         // Verificar serie duplicada
@@ -158,9 +158,12 @@ class KardexController extends Controller
             'updated_at'     => now(),
         ]);
 
-        // Mover PDF de tmp a almacenamiento permanente
+        // Mover PDF de tmp a almacenamiento permanente y registrar path
+        $pdfPath = null;
         if ($request->tmp_pdf && Storage::disk('local')->exists($request->tmp_pdf)) {
-            Storage::disk('local')->move($request->tmp_pdf, "resguardos/{$idEquipo}.pdf");
+            $pdfPath = "resguardos/{$idEquipo}.pdf";
+            Storage::disk('local')->move($request->tmp_pdf, $pdfPath);
+            DB::table('inventario_equipos')->where('id', $idEquipo)->update(['pdf_resguardo' => $pdfPath]);
         }
 
         return redirect()->route('kardex.index')
