@@ -101,13 +101,20 @@ php artisan db:seed
 
 Crea el usuario `admin@imjuventud.gob.mx`, los tipos de ticket y las áreas.
 
-### Paso 6 — Importar datos desde el respaldo
+### Paso 6 — Importar datos y vincular relaciones
 
 ```bash
 php artisan app:boot --force
 ```
 
-Lee `DB_source/sistemitas.sql` e importa: departamentos, empleados, equipos de cómputo, teléfonos, impresoras, insumos y rangos IP. Si `imjtickets.sql` también está disponible, importa tickets y áreas de ese sistema.
+Lee `DB_source/sistemitas.sql` e importa: departamentos, empleados, equipos de cómputo, teléfonos, impresoras, insumos, rangos IP e inventario de IPs.
+
+Después de importar, el comando corre automáticamente el paso de vinculación:
+- Pobla `inventario_equipos.id_empleado` cruzando `nombre_usuario` con `empleados.(nombre + apellido_paterno)`
+- Pobla `inventario_equipos.ipv4` y `mac` desde `inventario_ips_completo` via `serie = cpu_serie`
+- Pobla `inventario_ips_completo.id_empleado` encadenando el join anterior
+
+Si `imjtickets.sql` también está disponible, importa tickets, áreas y tipos de ese sistema.
 
 ### Paso 7 — Instalar dependencias de Node.js y compilar
 

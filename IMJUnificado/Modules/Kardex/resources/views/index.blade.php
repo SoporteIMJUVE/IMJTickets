@@ -593,7 +593,8 @@ async function abrirPanelEquipo(id) {
                 ${f('Marca', eq.cpu_marca)}
                 ${f('Modelo', eq.cpu_modelo)}
                 ${f('No. Serie', eq.cpu_serie, true)}
-                ${f('IPv4', eq.ipv4, true)}
+                ${f('IPv4', eq.ipv4_real || eq.ipv4, true)}
+                ${f('MAC', eq.mac_real || eq.mac, true)}
             </div>
         </div>`;
 

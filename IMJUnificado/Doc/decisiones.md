@@ -205,6 +205,33 @@ El servidor Windows tiene XAMPP con MySQL. En máquinas de desarrollo (laptops d
 
 **Decisión:** `.env.example` viene con SQLite. El `.env` de producción se configura con MySQL. El código de Laravel no cambia entre ambos.
 
+### Por qué los FK `id_empleado` se poblan en `app:boot` y no en la migración
+
+La migración `2026_07_09_000002` vincula equipos con empleados e IPs mediante PHP (`mb_strtolower`/`str_contains`) y subqueries SQLite. El problema es que esta lógica depende de que los datos ya estén importados. Si corre como parte del `migrate` normal (tablas vacías), no vincula nada.
+
+**Decisión:** la lógica de vinculación vive en dos lugares:
+1. Como migración `2026_07_09_000002` — para que quede en el historial de git y sea reversible.
+2. Como método `vincularRelaciones()` en `FirstBootCommand` — para que se ejecute siempre después de importar datos.
+
+En un fresh install, la migración corre sobre tablas vacías (hace 0 cambios). Luego `app:boot` importa los datos e invoca directamente la misma lógica de vinculación. Resultado: la BD queda correctamente vinculada al terminar `app:boot`.
+
+### Por qué la IP real de un equipo viene de `inventario_ips_completo` y no de `inventario_equipos.ipv4`
+
+En el dump original (`sistemitas.sql`), `inventario_equipos.ipv4` estaba vacío para casi todos los registros. La IP real de cada equipo estaba en `inventario_ips_completo.ip`, asociada por el campo `serie` (número de serie del equipo).
+
+El join correcto es `LOWER(TRIM(inventario_ips_completo.serie)) = LOWER(TRIM(inventario_equipos.cpu_serie))`. El LOWER/TRIM es necesario por inconsistencias en el Excel original.
+
+**Decisión:** se hizo un UPDATE masivo para poblar `inventario_equipos.ipv4` con los 19 registros que tienen match de serie. Adicionalmente, los endpoints de CRM y Kardex hacen un COALESCE en tiempo de consulta (`ipv4_real`) para capturar cualquier match futuro sin necesidad de otro UPDATE.
+
+### Por qué NO se usa Gemini API (ni ningún LLM) para leer PDFs escaneados
+
+La idea inicial era usar Gemini para hacer OCR en PDFs sin texto nativo. Se descartó porque:
+1. Requiere clave de API externa (dependencia de servicio de terceros)
+2. Introduce latencia y posibles costos
+3. Los técnicos revisan los datos antes de guardar de todas formas — el OCR automático solo ahorraría tiempo, pero el riesgo de error es el mismo
+
+**Decisión:** solo `smalot/pdfparser` para PDFs con texto nativo. Si el PDF es escaneado (imagen), se muestra un formulario vacío con un banner amarillo explicando que el técnico debe capturar los datos manualmente. El PDF siempre se guarda como adjunto independientemente del tipo.
+
 ### Por qué se eliminaron los módulos Telefonos e Impresoras
 
 Ambos módulos fueron creados como scaffolding vacío con nwidart pero nunca se implementaron. Sus controladores tenían todos los métodos sin cuerpo y sus rutas solo devolvían una vista de placeholder sin datos.

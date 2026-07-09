@@ -36,7 +36,17 @@ Route::middleware(['auth'])->prefix('kardex')->name('kardex.')->group(function (
             ->select(
                 'inventario_equipos.*',
                 \DB::raw("NULLIF(TRIM(COALESCE(empleados.nombre,'') || ' ' || COALESCE(empleados.apellido_paterno,'')), '') as empleado_nombre"),
-                'empleados.correo as empleado_correo'
+                'empleados.correo as empleado_correo',
+                \DB::raw("COALESCE(
+                    NULLIF(TRIM(inventario_equipos.ipv4), ''),
+                    (SELECT ips.ip FROM inventario_ips_completo ips
+                     WHERE LOWER(TRIM(ips.serie)) = LOWER(TRIM(inventario_equipos.cpu_serie))
+                       AND ips.ip IS NOT NULL LIMIT 1)
+                ) as ipv4_real"),
+                \DB::raw("(SELECT ips.mac FROM inventario_ips_completo ips
+                     WHERE LOWER(TRIM(ips.serie)) = LOWER(TRIM(inventario_equipos.cpu_serie))
+                       AND ips.mac IS NOT NULL AND TRIM(ips.mac) NOT IN ('','/')
+                     LIMIT 1) as mac_real")
             )
             ->where('inventario_equipos.id', $id)
             ->first();

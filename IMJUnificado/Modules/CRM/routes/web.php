@@ -56,13 +56,29 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
         $empleado = \DB::table('empleados')->where('id_empleado', $id)->first();
         if (!$empleado) return response()->json([]);
 
-        $cols = ['id', 'tipo', 'num_inventario', 'cpu_marca', 'cpu_modelo', 'cpu_serie',
-                 'ipv4', 'ipv4_actual', 'mac', 'area', 'id_empleado'];
+        // ipv4 real: usa el campo populado; si está vacío busca en inventario_ips_completo vía serie
+        $selectBase = [
+            'inventario_equipos.id',
+            'inventario_equipos.tipo',
+            'inventario_equipos.num_inventario',
+            'inventario_equipos.cpu_marca',
+            'inventario_equipos.cpu_modelo',
+            'inventario_equipos.cpu_serie',
+            'inventario_equipos.mac',
+            'inventario_equipos.area',
+            'inventario_equipos.id_empleado',
+            \DB::raw("COALESCE(
+                NULLIF(TRIM(inventario_equipos.ipv4), ''),
+                (SELECT ips.ip FROM inventario_ips_completo ips
+                 WHERE LOWER(TRIM(ips.serie)) = LOWER(TRIM(inventario_equipos.cpu_serie))
+                   AND ips.ip IS NOT NULL LIMIT 1)
+            ) as ipv4"),
+        ];
 
         // 1. Ligados por FK (vinculación formal)
         $porFk = \DB::table('inventario_equipos')
-            ->where('id_empleado', $id)
-            ->select($cols)
+            ->where('inventario_equipos.id_empleado', $id)
+            ->select($selectBase)
             ->orderBy('tipo')->orderBy('consecutivo')
             ->get()
             ->map(fn($e) => array_merge((array)$e, ['match' => 'fk']));
@@ -73,10 +89,10 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
         $porNombre = collect();
         if ($nombre && $apellido) {
             $porNombre = \DB::table('inventario_equipos')
-                ->whereNull('id_empleado')
-                ->where('nombre_usuario', 'like', "%{$nombre}%")
-                ->where('nombre_usuario', 'like', "%{$apellido}%")
-                ->select($cols)
+                ->whereNull('inventario_equipos.id_empleado')
+                ->where('inventario_equipos.nombre_usuario', 'like', "%{$nombre}%")
+                ->where('inventario_equipos.nombre_usuario', 'like', "%{$apellido}%")
+                ->select($selectBase)
                 ->orderBy('tipo')->orderBy('consecutivo')
                 ->get()
                 ->map(fn($e) => array_merge((array)$e, ['match' => 'nombre']));

@@ -50,10 +50,13 @@ class FirstBootCommand extends Command
         // ── 2. Importar desde MySQL (IMJTickets) ──────────────────────────────
         $this->importarMysql();
 
-        // ── 3. Recalcular contadores en cat_rangos_ips ────────────────────────
+        // ── 3. Vincular FKs e IPs (debe correr DESPUÉS de tener datos) ────────
+        $this->vincularRelaciones();
+
+        // ── 4. Recalcular contadores en cat_rangos_ips ────────────────────────
         $this->recalcularRangos();
 
-        // ── 4. Guardar estado ─────────────────────────────────────────────────
+        // ── 5. Guardar estado ─────────────────────────────────────────────────
         $state['ultima_importacion'] = now()->toIso8601String();
         $state['fuentes']            = [
             'postgres' => file_exists(self::POSTGRES_DUMP),
@@ -235,6 +238,106 @@ class FirstBootCommand extends Command
         }
 
         $this->line("    ✅ empleados (desde IMJTickets): {$insertados} nuevos, {$vinculados} ya existían");
+    }
+
+    // ─── Vincular FKs e IPs después de importar ──────────────────────────────
+
+    private function vincularRelaciones(): void
+    {
+        $this->line('');
+        $this->line('  <fg=blue>▶ Vinculando relaciones FK e IPs</fg=blue>');
+
+        if (!Schema::hasTable('empleados') || !Schema::hasTable('inventario_equipos')) {
+            $this->warn('    Tablas no encontradas, omitiendo vinculación.');
+            return;
+        }
+
+        // 1. inventario_equipos.id_empleado via nombre_usuario ↔ empleados
+        $empleados = DB::table('empleados')
+            ->whereNotNull('nombre')
+            ->whereNotNull('apellido_paterno')
+            ->get(['id_empleado', 'nombre', 'apellido_paterno']);
+
+        $equiposSinFK = DB::table('inventario_equipos')
+            ->whereNull('id_empleado')
+            ->whereNotNull('nombre_usuario')
+            ->get(['id', 'nombre_usuario']);
+
+        $vinculados = 0;
+        foreach ($equiposSinFK as $eq) {
+            $nu = mb_strtolower(trim($eq->nombre_usuario));
+            foreach ($empleados as $emp) {
+                $nombre   = mb_strtolower(trim($emp->nombre));
+                $apellido = mb_strtolower(trim($emp->apellido_paterno));
+                if ($nombre && $apellido
+                    && str_contains($nu, $nombre)
+                    && str_contains($nu, $apellido)) {
+                    DB::table('inventario_equipos')
+                        ->where('id', $eq->id)
+                        ->update(['id_empleado' => $emp->id_empleado, 'updated_at' => now()]);
+                    $vinculados++;
+                    break;
+                }
+            }
+        }
+        $this->line("    ✅ inventario_equipos.id_empleado: {$vinculados} registros vinculados");
+
+        // 2. inventario_equipos.ipv4 y mac desde inventario_ips_completo via serie
+        if (Schema::hasTable('inventario_ips_completo')) {
+            DB::statement("
+                UPDATE inventario_equipos
+                SET ipv4 = (
+                    SELECT ip FROM inventario_ips_completo ips
+                    WHERE LOWER(TRIM(ips.serie)) = LOWER(TRIM(inventario_equipos.cpu_serie))
+                      AND ips.ip IS NOT NULL
+                    LIMIT 1
+                )
+                WHERE ipv4 IS NULL
+                  AND EXISTS (
+                    SELECT 1 FROM inventario_ips_completo ips
+                    WHERE LOWER(TRIM(ips.serie)) = LOWER(TRIM(inventario_equipos.cpu_serie))
+                  )
+            ");
+
+            DB::statement("
+                UPDATE inventario_equipos
+                SET mac = (
+                    SELECT mac FROM inventario_ips_completo ips
+                    WHERE LOWER(TRIM(ips.serie)) = LOWER(TRIM(inventario_equipos.cpu_serie))
+                      AND ips.mac IS NOT NULL AND TRIM(ips.mac) != '' AND TRIM(ips.mac) != '/'
+                    LIMIT 1
+                )
+                WHERE mac IS NULL
+                  AND EXISTS (
+                    SELECT 1 FROM inventario_ips_completo ips
+                    WHERE LOWER(TRIM(ips.serie)) = LOWER(TRIM(inventario_equipos.cpu_serie))
+                      AND ips.mac IS NOT NULL AND TRIM(ips.mac) != '' AND TRIM(ips.mac) != '/'
+                  )
+            ");
+
+            $conIp = DB::table('inventario_equipos')->whereNotNull('ipv4')->count();
+            $this->line("    ✅ inventario_equipos.ipv4: {$conIp} registros con IP");
+
+            // 3. inventario_ips_completo.id_empleado via la cadena serie→equipo→empleado
+            DB::statement("
+                UPDATE inventario_ips_completo
+                SET id_empleado = (
+                    SELECT ie.id_empleado FROM inventario_equipos ie
+                    WHERE LOWER(TRIM(inventario_ips_completo.serie)) = LOWER(TRIM(ie.cpu_serie))
+                      AND ie.id_empleado IS NOT NULL
+                    LIMIT 1
+                )
+                WHERE id_empleado IS NULL
+                  AND EXISTS (
+                    SELECT 1 FROM inventario_equipos ie
+                    WHERE LOWER(TRIM(inventario_ips_completo.serie)) = LOWER(TRIM(ie.cpu_serie))
+                      AND ie.id_empleado IS NOT NULL
+                  )
+            ");
+
+            $ipsVinc = DB::table('inventario_ips_completo')->whereNotNull('id_empleado')->count();
+            $this->line("    ✅ inventario_ips_completo.id_empleado: {$ipsVinc} registros vinculados");
+        }
     }
 
     // ─── Recalcular rangos IP ─────────────────────────────────────────────────
