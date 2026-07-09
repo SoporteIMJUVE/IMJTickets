@@ -27,8 +27,6 @@ graph TD
             C[CRM]
             K[Kardex]
             N[Network]
-            TEL[Telefonos ⏳]
-            IMP[Impresoras ⏳]
             MNT[Mantenimiento ⏳]
         end
     end

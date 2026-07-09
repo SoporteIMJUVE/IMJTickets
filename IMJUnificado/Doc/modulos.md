@@ -145,17 +145,13 @@ DB::table('empleados')
 
 ---
 
-## Telefonos, Impresoras, Mantenimiento (stubs)
+## Mantenimiento (stub)
 
-**Rutas:** `/telefonos`, `/impresoras`, `/mantenimiento`
+**Ruta:** `/mantenimiento`
 
-Estos módulos están creados con su estructura completa pero la vista muestra solo un placeholder. Las tablas en la base de datos ya existen (`telefonos`, `impresoras`).
+Módulo pendiente de implementación — requiere reunión con el cliente para definir alcance. Ver `Doc/decisiones.md` para el contexto.
 
-**Para implementarlos:** editar la ruta en `Modules/<Nombre>/routes/web.php` para pasar datos reales, y reemplazar el contenido de `Modules/<Nombre>/resources/views/index.blade.php`.
-
-La estructura de datos ya está disponible:
-- `telefonos`: 19 extensiones cargadas del directorio
-- `impresoras`: 10 impresoras cargadas del Excel
+Las tablas `telefonos` e `impresoras` siguen existiendo en la base de datos y son accesibles desde el módulo CRM (panel lateral del empleado) y Kardex respectivamente. Los módulos `Telefonos` e `Impresoras` fueron eliminados por ser cascarones vacíos sin funcionalidad — su gestión quedó absorbida por CRM y Kardex.
 
 ---
 

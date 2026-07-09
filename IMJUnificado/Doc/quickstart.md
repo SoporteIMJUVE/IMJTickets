@@ -214,10 +214,10 @@ git checkout -b feature/nombre-de-la-tarea
 Ejemplos de nombres:
 ```
 feature/kardex-excel-export
-feature/telefonos-crud
 feature/crm-panel-recursos
+feature/kardex-telefonos-tabletas
 fix/tickets-kanban-drag
-docs/manual-impresoras
+docs/mantenimiento-requisitos
 ```
 
 **2. Trabajar y commitear en esa rama:**

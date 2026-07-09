@@ -124,9 +124,7 @@ IMJUnificado/
 │   ├── CRM/              ← directorio de empleados
 │   ├── Kardex/           ← inventario de equipos e insumos
 │   ├── Network/          ← IPs y direccionamiento de red
-│   ├── Telefonos/        ← extensiones telefónicas (placeholder)
-│   ├── Impresoras/       ← inventario de impresoras (placeholder)
-│   └── Mantenimiento/    ← reportes de mantenimiento (placeholder)
+│   └── Mantenimiento/    ← reportes de mantenimiento (stub, requiere reunión con cliente)
 │
 ├── app/                  ← código base de Laravel (modelos compartidos)
 │   └── Models/User.php   ← el modelo del técnico/admin
@@ -199,9 +197,7 @@ Este diagrama aplica a **todos** los módulos. El router siempre consulta el mid
 | CRM (empleados) | `/crm` | 🔧 Vista lista — CRUD pendiente |
 | Kardex (equipos e insumos) | `/kardex` | 🔧 Vista lista — escritura pendiente |
 | Network (IPs) | `/network` | 🔧 Vista lista — edición pendiente |
-| Teléfonos | `/telefonos` | ⏳ Placeholder |
-| Impresoras | `/impresoras` | ⏳ Placeholder |
-| Mantenimiento | `/mantenimiento` | ⏳ Placeholder |
+| Mantenimiento | `/mantenimiento` | ⏳ Stub — requiere definición de alcance |
 
 ---
 

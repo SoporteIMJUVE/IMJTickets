@@ -205,11 +205,14 @@ El servidor Windows tiene XAMPP con MySQL. En máquinas de desarrollo (laptops d
 
 **Decisión:** `.env.example` viene con SQLite. El `.env` de producción se configura con MySQL. El código de Laravel no cambia entre ambos.
 
-### Por qué los módulos stub (Telefonos, Impresoras, Mantenimiento) existen pero están vacíos
+### Por qué se eliminaron los módulos Telefonos e Impresoras
 
-Crear el módulo con su ruta y vista mínima ahora significa que:
-1. El sidebar tiene el ítem con la ruta real (no un link muerto)
-2. Un becario futuro puede trabajar ese módulo sin tocar nada más
-3. Las migraciones de esas tablas ya existen (la estructura de datos está definida)
+Ambos módulos fueron creados como scaffolding vacío con nwidart pero nunca se implementaron. Sus controladores tenían todos los métodos sin cuerpo y sus rutas solo devolvían una vista de placeholder sin datos.
 
-**Decisión:** crear el módulo completo pero con vista stub. Es preferible a no crearlo y tener que registrar routes, providers y service providers más tarde.
+Las tablas `telefonos` e `impresoras` siguen existiendo y son gestionadas desde:
+- `telefonos` → accesible desde el panel lateral del empleado en CRM
+- `impresoras` → migración en `Modules/Kardex/database/migrations/`; teléfonos y tabletas se manejarán como un `tipo` más en `inventario_equipos` dentro de Kardex
+
+**Decisión:** eliminar los módulos vacíos reduce la superficie de código muerto y evita confusión en becarios que asuman que esas rutas tienen funcionalidad real.
+
+El módulo `Mantenimiento` sigue existiendo como stub porque su alcance aún no está definido — requiere reunión con el cliente antes de implementarlo.
