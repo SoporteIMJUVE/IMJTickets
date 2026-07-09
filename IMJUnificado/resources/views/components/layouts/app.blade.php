@@ -69,7 +69,7 @@
            class="flex items-center gap-3 px-4 py-3 rounded text-sm transition-colors
                   {{ request()->routeIs('kardex.*') ? 'text-[#621132] font-bold border-r-4 border-[#621132] bg-[#eae8e7]' : 'text-[#544246] hover:bg-[#F3F4F6]' }}">
             <span class="material-symbols-outlined">inventory_2</span>
-            Kardex
+            Inventario
         </a>
 
         <a href="{{ route('tickets.index') }}"

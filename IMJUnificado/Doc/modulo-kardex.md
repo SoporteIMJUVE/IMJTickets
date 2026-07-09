@@ -164,3 +164,130 @@ Actualmente el umbral está hardcodeado en `2`. A futuro debería compararse con
 - [ ] Registrar entrada/salida de insumos (tabla `suministros` ya existe)
 - [ ] Implementar estado "En mantenimiento" correctamente
 - [ ] Usar `stock_minimo` de la BD para alertas de stock crítico
+- [ ] **Implementar ingesta de resguardo por PDF** (ver regla de negocio abajo)
+
+---
+
+## Regla de Negocio — El Resguardo como fuente primaria de registro
+
+### Contexto
+
+Cuando el departamento de TI recibe un equipo de cómputo (ya sea nuevo, reasignado o de mantenimiento), el proveedor o el área administrativa entrega un documento físico o digital llamado **resguardo** o **reporte de servicio**. Este documento es la fuente oficial de verdad: contiene quién es responsable del equipo, qué periféricos incluye y sus números de serie.
+
+**El sistema debe tomar este documento como punto de entrada preferido** para registrar tanto al usuario como al equipo, en lugar de que el técnico capture los datos a mano campo por campo.
+
+Ejemplo de documento real manejado en IMJUVE (proveedor ECLECSIS):
+
+```
+REPORTE DE SERVICIO DE ATENCIÓN, MANTENIMIENTO PREVENTIVO Y CORRECTIVOS
+Contrato: IMJ-ITP-018-2021-CM-006
+Usuario:  Ernesto Uriel Jarquín Garnett
+Equipo:   Laptop / DELL / Latitude 3420
+Serie:    33KGW93
+Inv:      65
+```
+
+---
+
+### Flujo de registro vía PDF
+
+```mermaid
+flowchart TD
+    A([Técnico sube PDF del resguardo]) --> B{¿PDF tiene texto nativo?}
+
+    B -- Sí --> C[Smalot/PdfParser extrae texto]
+    B -- No / escaneado --> D[Gemini API hace OCR + extracción]
+
+    C --> E[Mapear campos al esquema de BD]
+    D --> E
+
+    E --> F[Mostrar previsualización de datos al técnico]
+    F --> G{¿Técnico confirma?}
+    G -- No --> H[Técnico corrige campos manualmente]
+    H --> G
+    G -- Sí --> I{¿El usuario ya existe en empleados?}
+
+    I -- Coincidencia exacta --> J[Vincular al empleado existente]
+    I -- Posible duplicado --> K[Mostrar candidatos — técnico elige]
+    I -- No existe --> L[Crear nuevo empleado]
+
+    J --> M{¿Ya tiene IP asignada?}
+    L --> N[Sugerir IP libre del rango del departamento]
+    K --> M
+
+    M -- Sí --> O[Prellenar ipv4 con la IP existente]
+    M -- No --> N
+
+    N --> P[Guardar equipo en inventario_equipos]
+    O --> P
+    P --> Q[Guardar copia del PDF original en storage]
+    Q --> R([Registro completo])
+```
+
+---
+
+### Campos capturados por tipo de equipo
+
+No todos los tipos de equipo tienen los mismos periféricos. El sistema solo guarda los campos que aplican:
+
+| Campo | Laptop | PC Avanzada | PC Especializada |
+|---|:---:|:---:|:---:|
+| `cpu_marca` / `cpu_modelo` / `cpu_serie` | ✅ | ✅ | ✅ |
+| `cargador_serie` | ✅ | ❌ | ❌ |
+| `docking_marca` / `docking_serie` | opcional | ❌ | ❌ |
+| `monitor_marca` / `monitor_modelo` / `monitor_serie` | ❌ | ✅ | ✅ |
+| `teclado_serie` | ❌ | ✅ | ✅ |
+| `mouse_serie` | ❌ | ✅ | ✅ |
+| `nobreak_marca` / `nobreak_serie` | ❌ | ✅ | ✅ |
+| `ipv4` / `mac` | ✅ | ✅ | ✅ |
+| `observaciones` | ✅ | ✅ | ✅ |
+
+> El número de serie (`cpu_serie`) es el único campo obligatorio en todos los tipos. Los demás dependen del tipo.
+
+---
+
+### Detección de duplicados de usuario
+
+Antes de crear un empleado nuevo, el sistema busca coincidencias en la tabla `empleados`:
+
+1. **Exacta por correo** — si el PDF trae correo y coincide con `empleados.correo`, se vincula directo
+2. **Por nombre completo** — si `nombre + apellido_paterno` coincide al 90%+ (fuzzy match), se muestra como candidato
+3. **Sin coincidencia** — se crea un nuevo empleado con los datos del PDF; el correo se genera con la lógica `test` (`nombre.apellidotest@imjuventud.gob.mx`) hasta que se confirme el correo real
+
+---
+
+### Asignación de IP
+
+| Condición | Acción |
+|---|---|
+| El usuario ya tiene un equipo en `inventario_equipos` con `ipv4` asignada | Se prellenan `ipv4` e `ipv4_actual` con ese valor |
+| El usuario es nuevo o no tiene IP | Se consulta `cat_rangos_ips` filtrando por el `area`/departamento del empleado y se sugiere la primera IP libre |
+| No hay rangos disponibles para esa área | Se deja en blanco y se marca para asignación manual |
+
+---
+
+### Requisito de calidad del PDF
+
+El sistema da prioridad a PDFs con texto nativo (tipado) porque la extracción es exacta y no requiere servicios externos. El técnico debe ser informado de esto al subir el archivo:
+
+- ✅ **PDF tipado** (texto seleccionable) → extracción inmediata con `Smalot/PdfParser`
+- ⚠️ **PDF escaneado** (imagen) → se envía a Gemini API; puede haber errores en caracteres ambiguos — revisar antes de confirmar
+- ❌ **Foto del documento** (`.jpg`, `.png`) → se acepta como fallback pero la precisión depende de la calidad de la imagen
+
+El mensaje al técnico cuando se detecta un PDF-imagen:
+
+> "Este archivo parece ser una imagen escaneada. Los datos fueron extraídos mediante reconocimiento óptico — revisa cada campo antes de guardar, especialmente los números de serie."
+
+---
+
+### Tecnología a implementar
+
+| Tarea | Librería / Servicio |
+|---|---|
+| Leer PDF con texto nativo | `smalot/pdfparser` (instalar con `composer require smalot/pdfparser`) |
+| OCR en PDF escaneado o imagen | Gemini API (`gemini-1.5-flash`) vía `Http::post()` de Laravel |
+| Detectar si el PDF tiene texto | `$pdf->getText()` vacío → tratar como imagen |
+| Guardar copia del PDF original | `Storage::put('resguardos/{id_equipo}.pdf', $file)` |
+| Prompt a Gemini | JSON estricto con los campos del esquema; `responseMimeType: application/json` para evitar texto libre |
+
+> La API key de Gemini va en `.env` como `GEMINI_API_KEY`. No subir al repositorio.

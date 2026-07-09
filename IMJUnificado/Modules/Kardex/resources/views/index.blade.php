@@ -7,6 +7,12 @@
             <h2 class="text-[32px] font-bold leading-10 tracking-tight text-[#621132]">Kardex de Insumos y Resguardos</h2>
             <p class="text-[#544246] text-sm mt-1">Control de inventario técnico y asignación institucional de recursos.</p>
         </div>
+        <div class="flex items-center gap-3">
+        <a href="{{ route('kardex.resguardo.subir') }}"
+           class="px-4 py-2 bg-[#621132] text-white text-sm font-bold rounded-lg hover:opacity-90 active:scale-95 transition-all flex items-center gap-2">
+            <span class="material-symbols-outlined text-sm">upload_file</span>
+            Registrar equipo
+        </a>
         <div class="flex gap-2 bg-[#efeded] rounded-lg p-1">
             <button id="tab-btn-equipos" onclick="switchKardexTab('equipos', this)"
                     class="px-6 py-2 rounded-md text-sm font-bold transition-all text-[#544246] hover:bg-[#eae8e7]">
@@ -21,6 +27,7 @@
                 Resguardos
             </button>
         </div>
+        </div>{{-- /flex items-center gap-3 --}}
     </div>
 
     {{-- ---- TAB: EQUIPOS ---- --}}

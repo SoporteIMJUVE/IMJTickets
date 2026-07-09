@@ -1,5 +1,6 @@
 <?php
 use Illuminate\Support\Facades\Route;
+use Modules\Kardex\Http\Controllers\KardexController;
 
 Route::middleware(['auth'])->prefix('kardex')->name('kardex.')->group(function () {
     Route::get('/', function () {
@@ -38,4 +39,10 @@ Route::middleware(['auth'])->prefix('kardex')->name('kardex.')->group(function (
             'stockCritico'  => $insumos->where('stock_actual', '<=', 2)->count(),
         ]);
     })->name('index');
+
+    Route::get('/resguardo/subir',      [KardexController::class, 'subirResguardo'])->name('resguardo.subir');
+    Route::post('/resguardo/extraer',   [KardexController::class, 'extraerResguardo'])->name('resguardo.extraer');
+    Route::get('/resguardo/preview',    [KardexController::class, 'mostrarPreview'])->name('resguardo.preview');
+    Route::post('/resguardo/guardar',   [KardexController::class, 'guardarResguardo'])->name('resguardo.guardar');
+    Route::get('/resguardo/ip',         [KardexController::class, 'sugerirIp'])->name('resguardo.ip');
 });
