@@ -50,7 +50,6 @@ return new class extends Migration
                   ->constrained('empleados', 'id_empleado')
                   ->nullOnDelete();
             $table->timestamps();
-
             $table->index('tipo');
             $table->index('area');
         });

@@ -65,7 +65,7 @@
                     @forelse($rangos as $rango)
                     @php
                         $cap  = $rango->capacidad_total ?: 1;
-                        $pctR = round(($rango->ocupadas / $cap) * 100);
+                        $pctR = round(($rango->ocupadas_real / $cap) * 100);
                         $color = $pctR >= 90 ? '#991B1B' : ($pctR >= 70 ? '#9A3412' : '#166534');
                     @endphp
                     <tr class="hover:bg-[#D4C19C]/5 transition-colors">
@@ -78,7 +78,7 @@
                                 <div class="flex-1 h-2 bg-[#F3F4F6] rounded-full overflow-hidden">
                                     <div class="h-full rounded-full" style="width:{{ $pctR }}%; background:{{ $color }}"></div>
                                 </div>
-                                <span class="font-mono text-xs text-[#544246]">{{ $rango->ocupadas }}/{{ $rango->capacidad_total }}</span>
+                                <span class="font-mono text-xs text-[#544246]">{{ $rango->ocupadas_real }}/{{ $rango->capacidad_total }}</span>
                             </div>
                         </td>
                         <td class="px-6 py-4">
@@ -128,7 +128,7 @@
                                 class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
                             <option value="">Todas</option>
                             @foreach($rangos as $r)
-                            <option value="{{ strtolower($r->siglas) }}">{{ $r->siglas }} — {{ Str::limit($r->area_nombre, 40) }}</option>
+                            <option value="{{ strtolower($r->siglas_real ?? '') }}">{{ $r->siglas_real ?: $r->area_nombre }} — {{ Str::limit($r->area_nombre, 35) }}</option>
                             @endforeach
                         </select>
                     </div>

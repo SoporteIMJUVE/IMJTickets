@@ -3,6 +3,7 @@
     'tab'       => 'tabla',
     'conteo'    => null,
     'exportUrl' => null,
+    'importar'  => true,
 ])
 
 {{-- Barra de título + botones --}}
@@ -16,8 +17,8 @@
     <div class="flex gap-2 items-center">
         {{ $acciones ?? '' }}
 
-        {{-- Importar: visible solo cuando hay exportUrl (oculto en resguardos y tabs sin URL) --}}
-        @if($exportUrl)
+        {{-- Importar: visible cuando hay exportUrl Y el módulo lo permite --}}
+        @if($exportUrl && $importar)
         <button onclick="abrirModalImportar('{{ $tab }}')"
                 class="px-3 py-1.5 border border-[#E5E7EB] rounded text-sm font-bold flex items-center gap-2 hover:bg-[#F3F4F6] transition-colors text-[#544246]">
             <span class="material-symbols-outlined text-sm">upload</span> Importar
