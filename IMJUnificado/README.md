@@ -23,6 +23,7 @@ No asumimos que sabes PHP, ni Laravel, ni qué es un "entorno". Si sabes program
 | [Doc/stack.md](Doc/stack.md) | Cuando quieras entender qué tecnología hace qué |
 | [Doc/arquitectura.md](Doc/arquitectura.md) | Cuando necesites entender cómo está organizado el código |
 | [Doc/base-de-datos.md](Doc/base-de-datos.md) | Cuando necesites entender las tablas y sus relaciones |
+| [Doc/estandar-vistas.md](Doc/estandar-vistas.md) | ayuda para diseño de UI y UX |
 | [Doc/modulo-tickets.md](Doc/modulo-tickets.md) | Cuando vayas a tocar el módulo de tickets |
 | [Doc/modulo-crm.md](Doc/modulo-crm.md) | Cuando vayas a tocar el directorio de empleados |
 | [Doc/modulo-kardex.md](Doc/modulo-kardex.md) | Cuando vayas a tocar equipos o insumos |

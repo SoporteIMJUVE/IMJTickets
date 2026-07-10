@@ -315,6 +315,7 @@
 const ticketsPorCorreo = {!! json_encode($ticketsPorCorreo, JSON_HEX_TAG) !!};
 
 let currentEmpleado = {};
+let currentEquipos  = [];
 
 async function openUserPanel(row) {
     currentEmpleado = {
@@ -378,8 +379,10 @@ async function openUserPanel(row) {
     // Cargar equipos del empleado via AJAX
     try {
         const equipos = await fetch(`/crm/empleado/${currentEmpleado.id}/equipos`).then(r => r.json());
+        currentEquipos = equipos;
         renderEquiposPanel(equipos);
     } catch (e) {
+        currentEquipos = [];
         document.getElementById('panel-equipos-list').innerHTML =
             '<p class="text-xs text-red-500">Error al cargar equipos.</p>';
     }
@@ -497,7 +500,7 @@ function switchPanelTab(tab, btn) {
 }
 
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closeUserPanel(); closeNuevoModal(); }
+    if (e.key === 'Escape') { closeUserPanel(); closeUsuarioModal(); }
 });
 
 function aplicarFiltros() {
@@ -521,19 +524,38 @@ function aplicarFiltros() {
 
 // Los filtros usan onchange/oninput inline desde el componente x-tabla-encabezado
 
-// ─── Modal Editar Usuario ────────────────────────────────────────────────────
+// ─── Modal Usuario (Nuevo / Editar) ─────────────────────────────────────────
+let _modalMode = 'nuevo';
+
+function openNuevoModal() {
+    _modalMode = 'nuevo';
+    document.getElementById('form-usuario').reset();
+    document.getElementById('equipos-container').innerHTML = '';
+    equipoIdx = 0;
+    document.getElementById('usr-id').value = '';
+    document.getElementById('modal-usr-titulo').textContent    = 'Nuevo Usuario';
+    document.getElementById('modal-usr-icon').textContent      = 'person_add';
+    document.getElementById('btn-guardar-usuario').textContent = 'Dar de Alta';
+    document.getElementById('section-baja').classList.add('hidden');
+    document.getElementById('section-extras-tel').classList.remove('hidden');
+    document.getElementById('section-extras-eq').classList.remove('hidden');
+    document.getElementById('modal-usuario').classList.remove('hidden');
+    document.getElementById('modal-usuario').classList.add('flex');
+}
+
 function openEditModal() {
     if (!currentEmpleado.id) return;
+    _modalMode = 'editar';
     const e = currentEmpleado;
 
-    document.getElementById('edit-id').value     = e.id;
-    document.getElementById('edit-nombre').value = e.nombreRaw || '';
-    document.getElementById('edit-ap').value     = e.ap || '';
-    document.getElementById('edit-am').value     = e.am || '';
-    document.getElementById('edit-puesto').value = e.puesto || '';
-    document.getElementById('edit-correo').value = e.correo || '';
+    document.getElementById('usr-id').value     = e.id;
+    document.getElementById('usr-nombre').value = e.nombreRaw || '';
+    document.getElementById('usr-ap').value     = e.ap || '';
+    document.getElementById('usr-am').value     = e.am || '';
+    document.getElementById('usr-puesto').value = e.puesto || '';
+    document.getElementById('usr-correo').value = e.correo || '';
 
-    const sel = document.getElementById('edit-depa');
+    const sel = document.getElementById('usr-depa');
     for (const opt of sel.options) opt.selected = opt.value === String(e.depaId);
 
     const btnBaja = document.getElementById('btn-baja-toggle');
@@ -545,52 +567,119 @@ function openEditModal() {
         btnBaja.className   = 'w-full py-2.5 border border-[#166534] text-[#166534] font-bold rounded-lg hover:bg-green-50 transition-colors text-sm';
     }
 
-    document.getElementById('modal-edit').classList.remove('hidden');
-    document.getElementById('modal-edit').classList.add('flex');
+    document.getElementById('modal-usr-titulo').textContent    = 'Editar Usuario';
+    document.getElementById('modal-usr-icon').textContent      = 'manage_accounts';
+    document.getElementById('btn-guardar-usuario').textContent = 'Guardar cambios';
+    document.getElementById('section-baja').classList.remove('hidden');
+    document.getElementById('section-extras-tel').classList.add('hidden');
+
+    // Poblar equipos existentes en el formulario
+    const container = document.getElementById('equipos-container');
+    container.innerHTML = '';
+    equipoIdx = 0;
+    currentEquipos.forEach(eq => {
+        container.appendChild(crearEquipoExistente(equipoIdx++, eq));
+    });
+    const sectionEq = document.getElementById('section-extras-eq');
+    sectionEq.classList.remove('hidden');
+    if (currentEquipos.length > 0) sectionEq.open = true;
+
+    document.getElementById('modal-usuario').classList.remove('hidden');
+    document.getElementById('modal-usuario').classList.add('flex');
 }
-function closeEditModal() {
-    document.getElementById('modal-edit').classList.add('hidden');
-    document.getElementById('modal-edit').classList.remove('flex');
+
+function closeUsuarioModal() {
+    document.getElementById('modal-usuario').classList.add('hidden');
+    document.getElementById('modal-usuario').classList.remove('flex');
+    document.getElementById('form-usuario').reset();
+    document.getElementById('equipos-container').innerHTML = '';
+    equipoIdx = 0;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     const CSRF = '{{ csrf_token() }}';
 
-    document.getElementById('form-edit-usuario')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn  = document.getElementById('btn-guardar-edit');
+    // ── Submit unificado ──────────────────────────────────────────────────────
+    document.getElementById('form-usuario')?.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const btn  = document.getElementById('btn-guardar-usuario');
         const orig = btn.textContent;
         btn.disabled = true; btn.textContent = 'Guardando…';
 
-        const id = document.getElementById('edit-id').value;
-        const payload = {
-            nombre:           document.getElementById('edit-nombre').value,
-            apellido_paterno: document.getElementById('edit-ap').value,
-            apellido_materno: document.getElementById('edit-am').value,
-            puesto:           document.getElementById('edit-puesto').value,
-            correo:           document.getElementById('edit-correo').value,
-            id_departamento:  document.getElementById('edit-depa').value || null,
-        };
-
         try {
-            const r = await fetch(`/crm/empleados/${id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN':CSRF,
-                           'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
-                body: JSON.stringify(payload),
-            });
-            const data = await r.json();
-            if (r.ok && data.ok) { closeEditModal(); window.location.reload(); }
-            else {
-                const msgs = data.errors ? Object.values(data.errors).flat().join('\n') : (data.message || 'Error.');
-                alert(msgs);
+            if (_modalMode === 'nuevo') {
+                const form      = new FormData(ev.target);
+                const equipoEls = document.querySelectorAll('.equipo-item');
+                const equipos   = [];
+                equipoEls.forEach(el => {
+                    const idx = el.dataset.idx;
+                    const eq  = {};
+                    el.querySelectorAll('[name]').forEach(inp => {
+                        const key = inp.name.replace(`equipos[${idx}][`, '').replace(']', '');
+                        eq[key] = inp.value;
+                    });
+                    if (eq.tipo) equipos.push(eq);
+                });
+                const payload = {};
+                for (const [k, v] of form.entries()) {
+                    if (!k.startsWith('equipos[')) payload[k] = v;
+                }
+                if (equipos.length) payload.equipos = equipos;
+
+                const r = await fetch('{{ route("crm.empleados.store") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN':CSRF,
+                               'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await r.json();
+                if (r.ok && data.ok) { closeUsuarioModal(); window.location.reload(); }
+                else {
+                    const msgs = data.errors ? Object.values(data.errors).flat().join('\n') : (data.message || 'Error al guardar.');
+                    alert(msgs);
+                }
+            } else {
+                const id        = document.getElementById('usr-id').value;
+                const equipoEls = document.querySelectorAll('.equipo-item');
+                const equipos   = [];
+                equipoEls.forEach(el => {
+                    const i  = el.dataset.idx;
+                    const eq = {};
+                    el.querySelectorAll('[name]').forEach(inp => {
+                        const key = inp.name.replace(`equipos[${i}][`, '').replace(']', '');
+                        eq[key] = inp.value;
+                    });
+                    if (eq.tipo) equipos.push(eq);
+                });
+                const payload = {
+                    nombre:           document.getElementById('usr-nombre').value,
+                    apellido_paterno: document.getElementById('usr-ap').value,
+                    apellido_materno: document.getElementById('usr-am').value,
+                    puesto:           document.getElementById('usr-puesto').value,
+                    correo:           document.getElementById('usr-correo').value,
+                    id_departamento:  document.getElementById('usr-depa').value || null,
+                };
+                if (equipos.length) payload.equipos = equipos;
+                const r = await fetch(`/crm/empleados/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN':CSRF,
+                               'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await r.json();
+                if (r.ok && data.ok) { closeUsuarioModal(); window.location.reload(); }
+                else {
+                    const msgs = data.errors ? Object.values(data.errors).flat().join('\n') : (data.message || 'Error.');
+                    alert(msgs);
+                }
             }
         } catch (err) { alert('Error de conexión.'); }
         finally { btn.disabled = false; btn.textContent = orig; }
     });
 
+    // ── Baja / Reactivar ─────────────────────────────────────────────────────
     document.getElementById('btn-baja-toggle')?.addEventListener('click', async () => {
-        const id     = document.getElementById('edit-id').value;
+        const id     = document.getElementById('usr-id').value;
         const activo = currentEmpleado.activo;
         const url    = activo ? `/crm/empleados/${id}` : `/crm/empleados/${id}/reactivar`;
         const method = activo ? 'DELETE' : 'PATCH';
@@ -599,30 +688,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const r = await fetch(url, {
             method, headers: { 'X-CSRF-TOKEN':CSRF, 'X-Requested-With':'XMLHttpRequest', 'Accept':'application/json' },
         });
-        if ((await r.json()).ok) { closeEditModal(); window.location.reload(); }
+        if ((await r.json()).ok) { closeUsuarioModal(); window.location.reload(); }
     });
 });
 
-// ─── Modal Nuevo Usuario ────────────────────────────────────────────────────
-function openNuevoModal() {
-    document.getElementById('modal-nuevo').classList.remove('hidden');
-    document.getElementById('modal-nuevo').classList.add('flex');
-}
-function closeNuevoModal() {
-    document.getElementById('modal-nuevo').classList.add('hidden');
-    document.getElementById('modal-nuevo').classList.remove('flex');
-    document.getElementById('form-nuevo-usuario').reset();
-    document.getElementById('equipos-container').innerHTML = '';
-    equipoIdx = 0;
-}
-
 let equipoIdx = 0;
 
-function camposEquipo(idx, tipo) {
-    const f = (name, label, placeholder = '', extra = '') =>
+function camposEquipo(idx, tipo, vals = {}) {
+    const v = name => (vals[name] != null && vals[name] !== '') ? `value="${escHtml(String(vals[name]))}"` : '';
+    const f = (name, label, placeholder = '') =>
         `<div>
             <label class="block text-xs font-bold text-[#544246] mb-1">${label}</label>
-            <input type="text" name="equipos[${idx}][${name}]" placeholder="${placeholder}" ${extra}
+            <input type="text" name="equipos[${idx}][${name}]" placeholder="${placeholder}" ${v(name)}
                 class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
         </div>`;
 
@@ -649,12 +726,12 @@ function camposEquipo(idx, tipo) {
             ${f('cpu_serie',  'No. Serie CPU')}
             <div>
                 <label class="block text-xs font-bold text-[#544246] mb-1">IPv4 asignada</label>
-                <input type="text" name="equipos[${idx}][ipv4]" placeholder="10.10.0.100"
+                <input type="text" name="equipos[${idx}][ipv4]" placeholder="10.10.0.100" ${v('ipv4')}
                     class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#621132]">
             </div>
             <div>
                 <label class="block text-xs font-bold text-[#544246] mb-1">Dirección MAC</label>
-                <input type="text" name="equipos[${idx}][mac]" placeholder="AA-BB-CC-DD-EE-FF"
+                <input type="text" name="equipos[${idx}][mac]" placeholder="AA-BB-CC-DD-EE-FF" ${v('mac')}
                     class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#621132]">
             </div>`;
 
@@ -683,7 +760,7 @@ function camposEquipo(idx, tipo) {
             ${f('nobreak_serie',   'No. Serie No-Break')}
             <div>
                 <label class="block text-xs font-bold text-[#544246] mb-1">IPv4 actual (asignada en red)</label>
-                <input type="text" name="equipos[${idx}][ipv4_actual]" placeholder="10.10.0.101"
+                <input type="text" name="equipos[${idx}][ipv4_actual]" placeholder="10.10.0.101" ${v('ipv4_actual')}
                     class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#621132]">
             </div>
             ${f('check_entrega',   'No. Check / Entrega')}`;
@@ -739,6 +816,30 @@ function actualizarCamposEquipo(select) {
         return;
     }
     campos.innerHTML = camposEquipo(idx, tipo);
+}
+
+function crearEquipoExistente(idx, eq) {
+    const tipoColor = { 'Laptop':'#1E40AF', 'PC Avanzada':'#166534', 'PC Especializada':'#9A3412' };
+    const color = tipoColor[eq.tipo] ?? '#621132';
+    const div = document.createElement('div');
+    div.className = 'equipo-item border border-[#D4C19C] rounded-xl p-4 relative bg-[#fbf9f8]';
+    div.dataset.idx = idx;
+    div.innerHTML = `
+        <button type="button" onclick="this.closest('.equipo-item').remove()"
+            class="absolute top-2 right-2 text-[#544246] hover:text-red-600 transition-colors">
+            <span class="material-symbols-outlined text-lg">close</span>
+        </button>
+        <input type="hidden" name="equipos[${idx}][id]" value="${escHtml(String(eq.id))}">
+        <input type="hidden" name="equipos[${idx}][tipo]" value="${escHtml(eq.tipo)}">
+        <div class="mb-3 flex items-center gap-2">
+            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                  style="background:${color}1a;color:${color}">${escHtml(eq.tipo)}</span>
+            <span class="text-[10px] text-[#544246]">Equipo existente</span>
+        </div>
+        <div class="campos-equipo text-sm">
+            ${camposEquipo(idx, eq.tipo, eq)}
+        </div>`;
+    return div;
 }
 
 document.getElementById('form-nuevo-usuario')?.addEventListener('submit', async (e) => {
@@ -801,26 +902,27 @@ document.getElementById('form-nuevo-usuario')?.addEventListener('submit', async 
 </script>
 
 {{-- ═══════════════════════════════════════════════════════════════════════ --}}
-{{-- MODAL: Nuevo Usuario                                                   --}}
+{{-- MODAL: Usuario (Nuevo / Editar — modal unificado)                      --}}
 {{-- ═══════════════════════════════════════════════════════════════════════ --}}
-<div id="modal-nuevo" class="hidden fixed inset-0 z-[80] items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+<div id="modal-usuario" class="hidden fixed inset-0 z-[80] items-center justify-center bg-black/30 backdrop-blur-sm p-4">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col">
 
         {{-- Header --}}
         <div class="flex items-center justify-between px-6 py-4 border-b border-[#E5E7EB] shrink-0">
             <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-full bg-[#621132]/10 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-[#621132] text-lg">person_add</span>
+                    <span class="material-symbols-outlined text-[#621132] text-lg" id="modal-usr-icon">person_add</span>
                 </div>
-                <h3 class="font-bold text-[#1b1c1c]">Nuevo Usuario</h3>
+                <h3 class="font-bold text-[#1b1c1c]" id="modal-usr-titulo">Nuevo Usuario</h3>
             </div>
-            <button onclick="closeNuevoModal()" class="p-1.5 hover:bg-[#F3F4F6] rounded-full transition-colors text-[#544246]">
+            <button onclick="closeUsuarioModal()" class="p-1.5 hover:bg-[#F3F4F6] rounded-full transition-colors text-[#544246]">
                 <span class="material-symbols-outlined text-lg">close</span>
             </button>
         </div>
 
         {{-- Form (scrollable) --}}
-        <form id="form-nuevo-usuario" class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+        <form id="form-usuario" class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+            <input type="hidden" id="usr-id">
 
             {{-- Datos personales --}}
             <section>
@@ -828,35 +930,35 @@ document.getElementById('form-nuevo-usuario')?.addEventListener('submit', async 
                 <div class="grid grid-cols-3 gap-3 mb-3">
                     <div>
                         <label class="block text-xs font-bold text-[#544246] mb-1">Nombre(s) <span class="text-red-500">*</span></label>
-                        <input type="text" name="nombre" required placeholder="Ana"
+                        <input type="text" id="usr-nombre" name="nombre" required placeholder="Ana"
                             class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-[#544246] mb-1">Apellido Paterno <span class="text-red-500">*</span></label>
-                        <input type="text" name="apellido_paterno" required placeholder="García"
+                        <label class="block text-xs font-bold text-[#544246] mb-1">Ap. Paterno <span class="text-red-500">*</span></label>
+                        <input type="text" id="usr-ap" name="apellido_paterno" required placeholder="García"
                             class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-[#544246] mb-1">Apellido Materno</label>
-                        <input type="text" name="apellido_materno" placeholder="López"
+                        <label class="block text-xs font-bold text-[#544246] mb-1">Ap. Materno</label>
+                        <input type="text" id="usr-am" name="apellido_materno" placeholder="López"
                             class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-bold text-[#544246] mb-1">Puesto</label>
-                        <input type="text" name="puesto" placeholder="Analista de sistemas"
+                        <input type="text" id="usr-puesto" name="puesto" placeholder="Analista de sistemas"
                             class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-[#544246] mb-1">Correo institucional</label>
-                        <input type="email" name="correo" placeholder="ana.garcia@imjuventud.gob.mx"
+                        <input type="email" id="usr-correo" name="correo" placeholder="ana.garcia@imjuventud.gob.mx"
                             class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
                     </div>
                 </div>
                 <div class="mt-3">
                     <label class="block text-xs font-bold text-[#544246] mb-1">Departamento</label>
-                    <select name="id_departamento"
+                    <select id="usr-depa" name="id_departamento"
                         class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
                         <option value="">— Sin asignar —</option>
                         @foreach($departamentos as $d)
@@ -866,8 +968,17 @@ document.getElementById('form-nuevo-usuario')?.addEventListener('submit', async 
                 </div>
             </section>
 
-            {{-- Teléfono (colapsable) --}}
-            <details class="border border-[#E5E7EB] rounded-xl overflow-hidden">
+            {{-- Estado — solo visible en modo editar --}}
+            <div id="section-baja" class="hidden border-t border-[#E5E7EB] pt-4">
+                <p class="text-xs font-bold uppercase tracking-wider text-[#544246] mb-2">Estado del usuario</p>
+                <button type="button" id="btn-baja-toggle"
+                    class="w-full py-2.5 border border-[#991B1B] text-[#991B1B] font-bold rounded-lg hover:bg-red-50 transition-colors text-sm">
+                    Dar de Baja
+                </button>
+            </div>
+
+            {{-- Teléfono — solo visible en modo nuevo --}}
+            <details id="section-extras-tel" class="border border-[#E5E7EB] rounded-xl overflow-hidden">
                 <summary class="flex items-center gap-2 px-4 py-3 cursor-pointer select-none font-bold text-sm text-[#1b1c1c] hover:bg-[#fbf9f8] transition-colors list-none">
                     <span class="material-symbols-outlined text-[#544246] text-lg">phone</span>
                     Teléfono
@@ -887,8 +998,8 @@ document.getElementById('form-nuevo-usuario')?.addEventListener('submit', async 
                 </div>
             </details>
 
-            {{-- Equipos de cómputo (colapsable) --}}
-            <details class="border border-[#E5E7EB] rounded-xl overflow-hidden">
+            {{-- Equipos de cómputo — solo visible en modo nuevo --}}
+            <details id="section-extras-eq" class="border border-[#E5E7EB] rounded-xl overflow-hidden">
                 <summary class="flex items-center gap-2 px-4 py-3 cursor-pointer select-none font-bold text-sm text-[#1b1c1c] hover:bg-[#fbf9f8] transition-colors list-none">
                     <span class="material-symbols-outlined text-[#544246] text-lg">computer</span>
                     Equipos de cómputo
@@ -908,96 +1019,13 @@ document.getElementById('form-nuevo-usuario')?.addEventListener('submit', async 
 
         {{-- Footer --}}
         <div class="flex gap-3 px-6 py-4 border-t border-[#E5E7EB] shrink-0">
-            <button type="button" onclick="closeNuevoModal()"
+            <button type="button" onclick="closeUsuarioModal()"
                 class="flex-1 py-2.5 border border-[#E5E7EB] text-[#544246] font-bold rounded-lg hover:bg-[#F3F4F6] transition-colors text-sm">
                 Cancelar
             </button>
-            <button type="submit" form="form-nuevo-usuario" id="btn-guardar-usuario"
+            <button type="submit" form="form-usuario" id="btn-guardar-usuario"
                 class="flex-1 py-2.5 bg-[#621132] text-white font-bold rounded-lg hover:opacity-90 transition-opacity text-sm">
                 Dar de Alta
-            </button>
-        </div>
-    </div>
-</div>
-
-{{-- ═══════════════════════════════════════════════════════════════════════ --}}
-{{-- MODAL: Editar Usuario                                                  --}}
-{{-- ═══════════════════════════════════════════════════════════════════════ --}}
-<div id="modal-edit" class="hidden fixed inset-0 z-[80] items-center justify-center bg-black/30 backdrop-blur-sm p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
-
-        <div class="flex items-center justify-between px-6 py-4 border-b border-[#E5E7EB] shrink-0">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-full bg-[#621132]/10 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-[#621132] text-lg">manage_accounts</span>
-                </div>
-                <h3 class="font-bold text-[#1b1c1c]">Editar Usuario</h3>
-            </div>
-            <button onclick="closeEditModal()" class="p-1.5 hover:bg-[#F3F4F6] rounded-full transition-colors text-[#544246]">
-                <span class="material-symbols-outlined text-lg">close</span>
-            </button>
-        </div>
-
-        <form id="form-edit-usuario" class="overflow-y-auto flex-1 px-6 py-5 space-y-4">
-            <input type="hidden" id="edit-id">
-
-            <div class="grid grid-cols-3 gap-3">
-                <div>
-                    <label class="block text-xs font-bold text-[#544246] mb-1">Nombre(s) <span class="text-red-500">*</span></label>
-                    <input type="text" id="edit-nombre" name="nombre" required
-                        class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-[#544246] mb-1">Ap. Paterno <span class="text-red-500">*</span></label>
-                    <input type="text" id="edit-ap" name="apellido_paterno" required
-                        class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-[#544246] mb-1">Ap. Materno</label>
-                    <input type="text" id="edit-am" name="apellido_materno"
-                        class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
-                </div>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs font-bold text-[#544246] mb-1">Puesto</label>
-                    <input type="text" id="edit-puesto" name="puesto"
-                        class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-[#544246] mb-1">Correo institucional</label>
-                    <input type="email" id="edit-correo" name="correo"
-                        class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
-                </div>
-            </div>
-            <div>
-                <label class="block text-xs font-bold text-[#544246] mb-1">Departamento</label>
-                <select id="edit-depa" name="id_departamento"
-                    class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
-                    <option value="">— Sin asignar —</option>
-                    @foreach($departamentos as $d)
-                    <option value="{{ $d->id_departamento }}">{{ $d->nombre }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            {{-- Separador estado --}}
-            <div class="border-t border-[#E5E7EB] pt-4">
-                <p class="text-xs font-bold uppercase tracking-wider text-[#544246] mb-2">Estado del usuario</p>
-                <button type="button" id="btn-baja-toggle" class="w-full py-2.5 border border-[#991B1B] text-[#991B1B] font-bold rounded-lg hover:bg-red-50 transition-colors text-sm">
-                    Dar de Baja
-                </button>
-            </div>
-        </form>
-
-        <div class="flex gap-3 px-6 py-4 border-t border-[#E5E7EB] shrink-0">
-            <button type="button" onclick="closeEditModal()"
-                class="flex-1 py-2.5 border border-[#E5E7EB] text-[#544246] font-bold rounded-lg hover:bg-[#F3F4F6] transition-colors text-sm">
-                Cancelar
-            </button>
-            <button type="submit" form="form-edit-usuario" id="btn-guardar-edit"
-                class="flex-1 py-2.5 bg-[#621132] text-white font-bold rounded-lg hover:opacity-90 transition-opacity text-sm">
-                Guardar cambios
             </button>
         </div>
     </div>

@@ -130,6 +130,31 @@ class CRMController extends Controller
             'puesto'           => 'nullable|string|max:120',
             'correo'           => "nullable|email|max:120|unique:empleados,correo,{$id},id_empleado",
             'id_departamento'  => 'nullable|exists:departamentos,id_departamento',
+            'equipos'                  => 'nullable|array|max:20',
+            'equipos.*.id'             => 'nullable|integer',
+            'equipos.*.tipo'           => 'required_with:equipos|string|in:Laptop,PC Avanzada,PC Especializada',
+            'equipos.*.nombre_equipo'  => 'nullable|string|max:60',
+            'equipos.*.cpu_marca'      => 'nullable|string|max:60',
+            'equipos.*.cpu_modelo'     => 'nullable|string|max:100',
+            'equipos.*.cpu_serie'      => 'nullable|string|max:100',
+            'equipos.*.teclado_serie'  => 'nullable|string|max:100',
+            'equipos.*.mouse_serie'    => 'nullable|string|max:100',
+            'equipos.*.monitor_marca'  => 'nullable|string|max:60',
+            'equipos.*.monitor_modelo' => 'nullable|string|max:100',
+            'equipos.*.monitor_serie'  => 'nullable|string|max:100',
+            'equipos.*.nobreak_marca'  => 'nullable|string|max:60',
+            'equipos.*.nobreak_modelo' => 'nullable|string|max:100',
+            'equipos.*.nobreak_serie'  => 'nullable|string|max:100',
+            'equipos.*.cargador_serie' => 'nullable|string|max:100',
+            'equipos.*.docking_marca'  => 'nullable|string|max:60',
+            'equipos.*.docking_modelo' => 'nullable|string|max:100',
+            'equipos.*.docking_serie'  => 'nullable|string|max:100',
+            'equipos.*.candado'        => 'nullable|string|max:50',
+            'equipos.*.mac'            => 'nullable|string|max:30',
+            'equipos.*.ipv4'           => 'nullable|ip',
+            'equipos.*.ipv4_actual'    => 'nullable|ip',
+            'equipos.*.check_entrega'  => 'nullable|string|max:50',
+            'equipos.*.observaciones'  => 'nullable|string',
         ], [
             'nombre.required'           => 'El nombre es obligatorio.',
             'apellido_paterno.required' => 'El apellido paterno es obligatorio.',
@@ -146,6 +171,50 @@ class CRMController extends Controller
             'id_departamento'  => $validated['id_departamento'] ?? null,
             'updated_at'       => now(),
         ]);
+
+        foreach ($validated['equipos'] ?? [] as $equipo) {
+            if (empty($equipo['tipo'])) continue;
+            $campos = [
+                'tipo'           => $equipo['tipo'],
+                'nombre_equipo'  => $equipo['nombre_equipo']  ?? null,
+                'cpu_marca'      => $equipo['cpu_marca']       ?? null,
+                'cpu_modelo'     => $equipo['cpu_modelo']      ?? null,
+                'cpu_serie'      => $equipo['cpu_serie']       ?? null,
+                'teclado_serie'  => $equipo['teclado_serie']   ?? null,
+                'mouse_serie'    => $equipo['mouse_serie']     ?? null,
+                'monitor_marca'  => $equipo['monitor_marca']   ?? null,
+                'monitor_modelo' => $equipo['monitor_modelo']  ?? null,
+                'monitor_serie'  => $equipo['monitor_serie']   ?? null,
+                'nobreak_marca'  => $equipo['nobreak_marca']   ?? null,
+                'nobreak_modelo' => $equipo['nobreak_modelo']  ?? null,
+                'nobreak_serie'  => $equipo['nobreak_serie']   ?? null,
+                'cargador_serie' => $equipo['cargador_serie']  ?? null,
+                'docking_marca'  => $equipo['docking_marca']   ?? null,
+                'docking_modelo' => $equipo['docking_modelo']  ?? null,
+                'docking_serie'  => $equipo['docking_serie']   ?? null,
+                'candado'        => $equipo['candado']         ?? null,
+                'mac'            => $equipo['mac']             ?? null,
+                'ipv4'           => $equipo['ipv4']            ?? null,
+                'ipv4_actual'    => $equipo['ipv4_actual']     ?? null,
+                'check_entrega'  => $equipo['check_entrega']   ?? null,
+                'observaciones'  => $equipo['observaciones']   ?? null,
+                'updated_at'     => now(),
+            ];
+
+            if (!empty($equipo['id'])) {
+                // Equipo existente — solo actualizar si pertenece a este empleado
+                DB::table('inventario_equipos')
+                    ->where('id', $equipo['id'])
+                    ->where('id_empleado', $id)
+                    ->update($campos);
+            } else {
+                // Nuevo equipo agregado durante la edición
+                DB::table('inventario_equipos')->insert(array_merge($campos, [
+                    'id_empleado' => $id,
+                    'created_at'  => now(),
+                ]));
+            }
+        }
 
         if (request()->expectsJson()) {
             return response()->json(['ok' => true]);

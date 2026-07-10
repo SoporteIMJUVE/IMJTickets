@@ -26,11 +26,11 @@
 
     {{-- Brand --}}
     <div class="mb-8 flex items-center gap-3">
-        <div class="w-10 h-10 rounded-lg bg-[#621132] flex items-center justify-center">
-            <span class="material-symbols-outlined text-white" style="font-variation-settings:'FILL' 1">account_balance</span>
+        <div class="w-10 h-10 rounded-lg bg-[#D4C19C] flex items-center justify-center overflow-hidden">
+            <img src="/images/IMJCabezaT.png" alt="IMJUVE" class="w-8 h-8 object-contain">
         </div>
         <div>
-            <h2 class="font-bold text-lg leading-none text-[#621132]">IMJUVE CRM</h2>
+            <h2 class="font-bold text-lg leading-none text-[#621132]">IMJUVE - Sistemas</h2>
             <p class="text-[11px] text-[#544246]">IT Administration</p>
         </div>
     </div>
