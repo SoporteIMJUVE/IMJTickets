@@ -133,7 +133,7 @@ Route::middleware(['auth'])->group(function () {
                 ->orWhereRaw("LOWER(COALESCE(e.puesto,'')) LIKE LOWER(?)",        [$like])
                 ->orWhereRaw("LOWER(COALESCE(e.correo,'')) LIKE LOWER(?)",        [$like])
                 ->orWhereRaw("LOWER(COALESCE(d.nombre,'')) LIKE LOWER(?)",        [$like])
-                ->orWhereRaw("CAST(COALESCE(t.extension,0) AS TEXT) LIKE ?",      [$like]);
+                ->orWhereRaw("t.extension LIKE ?",                                    [$like]);
             $baseEmp = \DB::table('empleados as e')
                 ->leftJoin('departamentos as d', 'd.id_departamento', '=', 'e.id_departamento')
                 ->leftJoin('telefonos as t', 't.id_empleado', '=', 'e.id_empleado')
@@ -198,7 +198,7 @@ Route::middleware(['auth'])->group(function () {
             // Red e IPs
             if (\Schema::hasTable('inventario_ips_completo')) {
                 $condIp = fn ($b) => $b
-                    ->whereRaw("CAST(ip AS TEXT) LIKE ?",                                    [$like])
+                    ->whereRaw("ip LIKE ?",                                                  [$like])
                     ->orWhereRaw("LOWER(COALESCE(usuario,'')) LIKE LOWER(?)",                [$like])
                     ->orWhereRaw("LOWER(COALESCE(area_excel,'')) LIKE LOWER(?)",             [$like])
                     ->orWhereRaw("LOWER(COALESCE(departamento_pestana,'')) LIKE LOWER(?)",   [$like])

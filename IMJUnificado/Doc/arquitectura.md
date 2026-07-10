@@ -448,7 +448,88 @@ php artisan migrate
 
 ---
 
-## 10. Reglas que No Se Rompen
+## 10. Omnibuscador Global
+
+La barra de búsqueda del topbar busca simultáneamente en los 4 módulos principales. El flujo es completamente server-side: no hay AJAX, no hay dropdown flotante.
+
+### Flujo
+
+```
+Usuario escribe → Enter → GET /dashboard?q=término
+                                  ↓
+                    Dashboard route corre 4 queries en paralelo
+                    (empleados, inventario, red, tickets)
+                                  ↓
+                    $searchResults = [ { modulo, icon, total, items[] } ]
+                                  ↓
+                    dashboard.blade.php renderiza panel a ancho completo
+                    con columnas por módulo (una por cada grupo con resultados)
+```
+
+### Dónde vive el código
+
+| Archivo | Qué hace |
+|---|---|
+| `resources/views/components/layouts/app.blade.php` | Form GET en el topbar; función `submitSearch()` |
+| `Modules/Core/routes/web.php` → ruta `/dashboard` | Corre las 4 búsquedas, pasa `$searchResults` a la vista |
+| `Modules/Core/resources/views/dashboard.blade.php` | Renderiza el panel cuando `$searchResults !== null` |
+
+### Campos que se buscan por módulo
+
+| Módulo | Campos |
+|---|---|
+| **Empleados** | nombre, apellidos, puesto, correo, nombre del departamento (JOIN), extensión telefónica (JOIN) |
+| **Inventario** | nombre_usuario, nombre_equipo, área, marca/modelo/serie de CPU, monitor, teclado, mouse, nobreak, cargador, docking, IPv4, MAC, num_inventario |
+| **Red e IPs** | ip, usuario, area_excel, departamento_pestana, tipo_equipo, MAC |
+| **Tickets** | descripción, tipo, área, nombre del solicitante, correo |
+
+### Añadir un módulo nuevo a la búsqueda
+
+1. Agregar un bloque `// Nombre del módulo` en la ruta `/dashboard` de `Core/routes/web.php`, siguiendo el mismo patrón: `$cond → $total → if ($total > 0) → $groups[]`.
+2. Asegurarse de que la URL del item incluya `?open=ID` para activar el deep-link.
+3. Si la tabla puede no existir en algunos entornos, envolver en `if (\Schema::hasTable('tabla'))`.
+
+### Compatibilidad SQLite / MySQL
+
+Todas las queries del omnibuscador usan solo sintaxis estándar SQL compatible con ambos motores:
+- `LOWER(COALESCE(campo,'')) LIKE LOWER(?)` — funciona en SQLite y MySQL
+- `campo LIKE ?` en columnas de texto — funciona en ambos (no usar `CAST(... AS TEXT)`, eso es SQLite-only)
+- Para columnas enteras (`extension`), usar `campo LIKE ?` directamente — ambos motores coercionan INT → string para LIKE
+
+---
+
+## 11. Deep-links desde la Búsqueda
+
+Cada resultado del omnibuscador lleva una URL con `?open=ID` que, al cargar la página del módulo, abre automáticamente el panel lateral del elemento exacto.
+
+### Cómo funciona por módulo
+
+| Módulo | URL | Mecanismo |
+|---|---|---|
+| CRM | `/crm?open={id_empleado}` | Busca `tr[data-id="X"]` y llama `openUserPanel(row)` |
+| Kardex | `/kardex?open={id}` | Llama `abrirPanelEquipo(id)` directamente |
+| Tickets | `/tickets?open={id}` | Busca `[data-ticket-id="X"]` y llama `openPanel(el)` |
+| Network | `/network?open={ip}` | Busca `tr[data-ip="X"]`, hace scroll y llama `.click()` |
+
+### Snippet estándar (copiar al final del `<script>` de cada módulo)
+
+```js
+// Deep-link: ?open=ID abre el panel del elemento directamente
+(function () {
+    const id = new URLSearchParams(location.search).get('open');
+    if (!id) return;
+    // CRM:     const row = document.querySelector(`tr[data-id="${id}"]`); if (row) openUserPanel(row);
+    // Kardex:  abrirPanelEquipo(parseInt(id));
+    // Tickets: const el = document.querySelector(`[data-ticket-id="${id}"]`); if (el) openPanel(el);
+    // Network: const row = document.querySelector(`tr[data-ip="${id}"]`); if (row) { row.scrollIntoView({block:'center'}); row.click(); }
+})();
+```
+
+Para que Network funcione, cada `<tr>` de la tabla de IPs debe tener `data-ip="{{ $ip->ip }}"`.
+
+---
+
+## 12. Reglas que No Se Rompen
 
 | # | Regla | Razón |
 |---|---|---|

@@ -5,21 +5,127 @@ El archivo base para copiar es `resources/views/stubs/module.blade.php`.
 
 ---
 
-## Paleta de colores
+## Sistema de temas (claro / oscuro)
 
-| Token          | Hex       | Uso principal                                    |
-|----------------|-----------|--------------------------------------------------|
-| Guinda         | `#621132` | Títulos, botones primarios, acentos              |
-| Guinda oscura  | `#991B1B` | Alertas, estados críticos, botón "Cerrar caso"   |
-| Oro            | `#D4C19C` | Bordes decorativos, hover suave, badges          |
-| Fondo suave    | `#fbf9f8` | Header del panel lateral, footers                |
-| Gris borde     | `#E5E7EB` | Bordes de tablas, separadores                    |
-| Gris fondo     | `#F3F4F6` | Fondo de filtros, encabezados de tabla, toggle   |
-| Texto secundario | `#544246` | Subtítulos, labels, texto de apoyo              |
-| Verde estado   | `#166534` | "Activo", "Ocupada", "Disponible"                |
-| Rojo estado    | `#991B1B` | "Baja", "Saturado"                               |
-| Naranja estado | `#9A3412` | "Atendiendo", "Lleno"                            |
-| Azul estado    | `#1E40AF` | "Abierto", "Libre"                               |
+El sistema soporta tema claro, tema oscuro y detección automática del sistema operativo del usuario.
+
+### Cómo funciona
+
+1. **CSS variables en `resources/css/app.css`** — todos los colores son variables, no valores fijos.  
+2. **Tailwind v4 `@theme`** — los tokens como `text-brand`, `bg-canvas`, `border-border` generan utilidades que referencian las variables en tiempo de ejecución. Cambiar la variable cambia todos los elementos que la usan, sin tocar el HTML.
+3. **`data-theme` en `<html>`** — el atributo `data-theme="dark"` (o `"light"`) activa el bloque `:root[data-theme="dark"]` que sobreescribe todas las variables.
+4. **Sin flash al cargar** — hay un script inline en `<head>` (antes del primer paint) que lee `localStorage` y aplica el tema correcto antes de que el navegador pinte la página.
+
+```js
+// En <head> de app.blade.php — NO mover al final del body
+(function () {
+    const saved = localStorage.getItem('imj-theme');
+    const sys   = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = saved ?? sys;
+})();
+```
+
+El botón en el topbar llama a `toggleTheme()` (definido en `app.blade.php`) que alterna entre `dark` y `light` y persiste en `localStorage`.
+
+### Regla para nuevas vistas
+
+**Nunca usar colores hexadecimales directos.** Usar siempre los tokens de Tailwind o las variables CSS:
+
+```blade
+{{-- ❌ MAL --}}
+<div class="bg-[#621132] text-[#ffffff]">
+
+{{-- ✅ BIEN --}}
+<div class="bg-brand text-white">
+```
+
+```html
+<!-- ❌ MAL — en style inline -->
+<div style="background:#621132">
+
+<!-- ✅ BIEN -->
+<div style="background:var(--color-brand)">
+```
+
+---
+
+## Paleta de tokens
+
+Usar **siempre** estos tokens en las vistas. Son las únicas clases de color válidas.
+
+### Fondos y superficies
+
+| Token Tailwind   | Variable CSS              | Uso                                          |
+|------------------|---------------------------|----------------------------------------------|
+| `bg-canvas`      | `--color-canvas`          | Tarjetas, paneles, modales, fondos de tabla  |
+| `bg-surface`     | `--color-surface`         | Fondo general de la página (`<body>`)         |
+| `bg-wash`        | `--color-wash`            | `<thead>`, filtros colapsables, hover suave  |
+| `bg-surface-high`| `--color-surface-high`    | Item activo del sidebar                      |
+
+### Texto
+
+| Token Tailwind        | Variable CSS                   | Uso                              |
+|-----------------------|--------------------------------|----------------------------------|
+| `text-ink`            | `--color-ink`                  | Texto principal, contenido       |
+| `text-muted`          | `--color-muted`                | Labels, subtítulos, texto apoyo  |
+| `text-brand`          | `--color-brand`                | Títulos, acentos, links activos  |
+
+### Bordes y líneas
+
+| Token Tailwind    | Variable CSS          | Uso                              |
+|-------------------|-----------------------|----------------------------------|
+| `border-border`   | `--color-border`      | Bordes de tablas, tarjetas       |
+| `border-gold`     | `--color-gold`        | Bordes decorativos, separadores  |
+
+### Acción / Marca
+
+| Token Tailwind  | Variable CSS        | Hex claro  | Uso                             |
+|-----------------|---------------------|------------|----------------------------------|
+| `bg-brand`      | `--color-brand`     | `#621132`  | Botones primarios, badges        |
+| `bg-gold`       | `--color-gold`      | `#D4C19C`  | Hover suave, decorativos         |
+
+### Estados (badges, kanban)
+
+| Token Tailwind          | Variable CSS                 | Hex claro  | Uso              |
+|-------------------------|------------------------------|------------|-----------------|
+| `text-status-active`    | `--color-status-active`      | `#166534`  | Activo, Ocupada  |
+| `text-status-free`      | `--color-status-free`        | `#1E40AF`  | Abierto, Libre   |
+| `text-status-attend`    | `--color-status-attend`      | `#92400E`  | Atendiendo       |
+| `text-status-critical`  | `--color-status-critical`    | `#991B1B`  | Baja, Error      |
+
+Para el fondo de un badge de estado usar `bg-status-active/10` (10% de opacidad del token):
+
+```html
+<!-- Badge verde "Activo" -->
+<span class="bg-status-active/10 text-status-active px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
+    Activo
+</span>
+
+<!-- Badge azul "Abierto" -->
+<span class="bg-status-free/10 text-status-free px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
+    Abierto
+</span>
+
+<!-- Badge naranja "Atendiendo" -->
+<span class="bg-status-attend/10 text-status-attend px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
+    Atendiendo
+</span>
+
+<!-- Badge rojo "Baja" -->
+<span class="bg-status-critical/10 text-status-critical px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
+    Baja
+</span>
+```
+
+En JavaScript, cuando se necesite el color como valor de `style`:
+```js
+// ✅ BIEN — referencia la variable
+element.style.color = 'var(--color-brand)';
+element.style.background = 'var(--color-status-free)';
+
+// ❌ MAL — hardcodeado, no respeta tema oscuro
+element.style.color = '#621132';
+```
 
 ---
 
