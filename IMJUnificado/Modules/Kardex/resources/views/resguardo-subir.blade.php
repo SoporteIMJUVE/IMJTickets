@@ -25,7 +25,7 @@
 
     <form method="POST" action="{{ route('kardex.resguardo.extraer') }}" enctype="multipart/form-data">
         @csrf
-        <div class="bg-white border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div class="bg-canvas border border-border rounded-2xl shadow-sm overflow-hidden">
 
             {{-- Zona de carga --}}
             <div class="px-6 pt-6 pb-5 border-b border-surface-muted">

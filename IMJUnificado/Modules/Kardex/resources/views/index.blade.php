@@ -4,21 +4,21 @@
     {{-- Header --}}
     <div class="flex justify-between items-end mb-8">
         <div>
-            <h2 class="text-[32px] font-bold leading-10 tracking-tight text-[#621132]">Kardex de Insumos y Resguardos</h2>
-            <p class="text-[#544246] text-sm mt-1">Control de inventario técnico y asignación institucional de recursos.</p>
+            <h2 class="text-[32px] font-bold leading-10 tracking-tight text-brand">Kardex de Insumos y Resguardos</h2>
+            <p class="text-muted text-sm mt-1">Control de inventario técnico y asignación institucional de recursos.</p>
         </div>
         <div class="flex items-center gap-3">
             <div class="flex gap-2 bg-[#efeded] rounded-lg p-1">
                 <button id="tab-btn-equipos" onclick="switchKardexTab('equipos', this)"
-                        class="px-6 py-2 rounded-md text-sm font-bold transition-all bg-white text-[#621132] shadow-sm">
+                        class="px-6 py-2 rounded-md text-sm font-bold transition-all bg-canvas text-brand shadow-sm">
                     Equipos
                 </button>
                 <button id="tab-btn-insumos" onclick="switchKardexTab('insumos', this)"
-                        class="px-6 py-2 rounded-md text-sm font-bold transition-all text-[#544246] hover:bg-[#eae8e7]">
+                        class="px-6 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high">
                     Insumos
                 </button>
                 <button id="tab-btn-resguardos" onclick="switchKardexTab('resguardos', this)"
-                        class="px-6 py-2 rounded-md text-sm font-bold transition-all text-[#544246] hover:bg-[#eae8e7]">
+                        class="px-6 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high">
                     Resguardos
                 </button>
             </div>
@@ -30,18 +30,18 @@
         {{-- Stats --}}
         <div class="grid grid-cols-4 gap-4 mb-6">
             @php $equipStats = [
-                ['label'=>'Total Equipos',    'value'=>$totalEquipos,  'icon'=>'computer',       'color'=>'#166534'],
-                ['label'=>'En Almacén',        'value'=>$enAlmacen,     'icon'=>'inventory',      'color'=>'#1E40AF'],
-                ['label'=>'Mantenimiento',     'value'=>$mantenimiento, 'icon'=>'build',          'color'=>'#9A3412'],
-                ['label'=>'Insumos Críticos',  'value'=>$criticos,      'icon'=>'report_problem', 'color'=>'#991B1B'],
+                ['label'=>'Total Equipos',    'value'=>$totalEquipos,  'icon'=>'computer',       'color'=>'var(--color-status-active)'],
+                ['label'=>'En Almacén',        'value'=>$enAlmacen,     'icon'=>'inventory',      'color'=>'var(--color-status-free)'],
+                ['label'=>'Mantenimiento',     'value'=>$mantenimiento, 'icon'=>'build',          'color'=>'var(--color-status-low)'],
+                ['label'=>'Insumos Críticos',  'value'=>$criticos,      'icon'=>'report_problem', 'color'=>'var(--color-status-critical)'],
             ]; @endphp
             @foreach($equipStats as $s)
-            <div class="bg-white border border-[#E5E7EB] p-5 rounded-xl flex items-center gap-4">
+            <div class="bg-canvas border border-border p-5 rounded-xl flex items-center gap-4">
                 <div class="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style="background:{{ $s['color'] }}1a; color:{{ $s['color'] }}">
                     <span class="material-symbols-outlined">{{ $s['icon'] }}</span>
                 </div>
                 <div>
-                    <p class="text-[11px] font-bold uppercase tracking-wider text-[#544246]">{{ $s['label'] }}</p>
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-muted">{{ $s['label'] }}</p>
                     <p class="text-2xl font-bold leading-tight">{{ $s['value'] }}</p>
                 </div>
             </div>
@@ -49,13 +49,13 @@
         </div>
 
         {{-- Tabla Equipos --}}
-        <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm">
+        <div class="bg-canvas border border-border rounded-xl overflow-hidden shadow-sm">
             <x-tabla-encabezado titulo="Inventario de Equipos" tab="equipos" exportUrl="{{ route('kardex.exportar', 'equipos') }}">
                 <x-slot:filtros>
                     <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Tipo</label>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Tipo</label>
                         <select id="f-eq-tipo" onchange="filtrarEquipos()"
-                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                                class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
                             <option value="">Todos</option>
                             <option>Laptop</option>
                             <option>PC Avanzada</option>
@@ -63,9 +63,9 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Estado</label>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Estado</label>
                         <select id="f-eq-estado" onchange="filtrarEquipos()"
-                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                                class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
                             <option value="">Todos</option>
                             <option>Almacén</option>
                             <option>Asignado</option>
@@ -74,28 +74,28 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Área / Responsable</label>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Área / Responsable</label>
                         <input id="f-eq-texto" oninput="filtrarEquipos()" type="text" placeholder="Buscar..."
-                               class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132] w-52">
+                               class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand w-52">
                     </div>
                 </x-slot:filtros>
             </x-tabla-encabezado>
 
             <div class="overflow-x-auto">
             <table class="w-full text-left">
-                <thead class="bg-[#F3F4F6] border-b border-[#E5E7EB]">
+                <thead class="bg-wash border-b border-border">
                     <tr>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">No. Inv</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Tipo</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Marca / Modelo</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">No. Serie</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Área</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Responsable</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Estado</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246] text-right">Detalle</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">No. Inv</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Tipo</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Marca / Modelo</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">No. Serie</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Área</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Responsable</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Estado</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted text-right">Detalle</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-[#E5E7EB]" id="tbody-equipos">
+                <tbody class="divide-y divide-border" id="tbody-equipos">
                     @forelse($equipos as $eq)
                     @php
                         $estadoDisplay = match(true) {
@@ -106,35 +106,35 @@
                         };
                         $responsable = $eq->empleado_nombre ?? $eq->nombre_usuario ?? '—';
                     @endphp
-                    <tr class="hover:bg-[#D4C19C]/5 transition-colors cursor-pointer eq-row"
+                    <tr class="hover:bg-gold/5 transition-colors cursor-pointer eq-row"
                         data-tipo="{{ $eq->tipo }}"
                         data-estado="{{ $estadoDisplay }}"
                         data-texto="{{ strtolower(($eq->area ?? '') . ' ' . $responsable . ' ' . ($eq->cpu_serie ?? '')) }}"
                         onclick="abrirPanelEquipo({{ $eq->id }})">
-                        <td class="px-4 py-3 font-mono text-sm text-[#621132]">{{ $eq->num_inventario ?? '—' }}</td>
+                        <td class="px-4 py-3 font-mono text-sm text-brand">{{ $eq->num_inventario ?? '—' }}</td>
                         <td class="px-4 py-3">
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase whitespace-nowrap
-                                {{ $eq->tipo === 'Laptop' ? 'bg-[#1E40AF]/10 text-[#1E40AF]' : 'bg-[#166534]/10 text-[#166534]' }}">
+                                {{ $eq->tipo === 'Laptop' ? 'bg-status-free/10 text-status-free' : 'bg-status-active/10 text-status-active' }}">
                                 {{ $eq->tipo }}
                             </span>
                         </td>
                         <td class="px-4 py-3 text-sm">
                             @if($eq->cpu_marca || $eq->cpu_modelo)
                                 <span class="font-medium">{{ $eq->cpu_marca }}</span>
-                                <span class="text-[#544246]"> {{ $eq->cpu_modelo }}</span>
+                                <span class="text-muted"> {{ $eq->cpu_modelo }}</span>
                             @else
-                                <span class="text-[#544246]">—</span>
+                                <span class="text-muted">—</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3 font-mono text-sm text-[#621132] whitespace-nowrap">{{ $eq->cpu_serie ?? '—' }}</td>
-                        <td class="px-4 py-3 text-sm text-[#544246] max-w-[160px] truncate" title="{{ $eq->area }}">{{ $eq->area ?? '—' }}</td>
+                        <td class="px-4 py-3 font-mono text-sm text-brand whitespace-nowrap">{{ $eq->cpu_serie ?? '—' }}</td>
+                        <td class="px-4 py-3 text-sm text-muted max-w-[160px] truncate" title="{{ $eq->area }}">{{ $eq->area ?? '—' }}</td>
                         <td class="px-4 py-3 text-sm max-w-[160px] truncate" title="{{ $responsable }}">{{ $responsable }}</td>
                         <td class="px-4 py-3">
                             @php $estadoColors = [
-                                'Asignado'      => 'bg-[#166534]/10 text-[#166534]',
-                                'Almacén'       => 'bg-[#1E40AF]/10 text-[#1E40AF]',
-                                'Mantenimiento' => 'bg-[#9A3412]/10 text-[#9A3412]',
-                                'Baja'          => 'bg-[#544246]/10 text-[#544246]',
+                                'Asignado'      => 'bg-status-active/10 text-status-active',
+                                'Almacén'       => 'bg-status-free/10 text-status-free',
+                                'Mantenimiento' => 'bg-status-low/10 text-status-low',
+                                'Baja'          => 'bg-muted/10 text-muted',
                             ]; @endphp
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase {{ $estadoColors[$estadoDisplay] ?? '' }}"
                                   id="estado-badge-{{ $eq->id }}">
@@ -143,14 +143,14 @@
                         </td>
                         <td class="px-4 py-3 text-right">
                             <button onclick="event.stopPropagation(); abrirPanelEquipo({{ $eq->id }})"
-                                    class="p-1.5 hover:bg-[#F3F4F6] rounded text-[#544246] hover:text-[#621132]">
+                                    class="p-1.5 hover:bg-wash rounded text-muted hover:text-brand">
                                 <span class="material-symbols-outlined text-sm">open_in_new</span>
                             </button>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="8" class="px-6 py-10 text-center text-[#544246] text-sm">Sin equipos registrados</td>
+                        <td colspan="8" class="px-6 py-10 text-center text-muted text-sm">Sin equipos registrados</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -162,42 +162,42 @@
     {{-- ---- TAB: INSUMOS ---- --}}
     <div id="tab-insumos" class="hidden">
         <div class="grid grid-cols-4 gap-4 mb-6">
-            <div class="bg-white border border-[#E5E7EB] p-5 rounded-xl shadow-sm">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-[#544246] mb-2">Total Items</p>
+            <div class="bg-canvas border border-border p-5 rounded-xl shadow-sm">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Total Items</p>
                 <p class="text-2xl font-bold">{{ $totalInsumos }}</p>
-                <div class="mt-3 flex items-center gap-1 text-[#166534] text-xs font-bold">
+                <div class="mt-3 flex items-center gap-1 text-status-active text-xs font-bold">
                     <span class="material-symbols-outlined text-sm">trending_up</span> Actualizado
                 </div>
             </div>
-            <div class="bg-white border border-[#E5E7EB] p-5 rounded-xl shadow-sm border-l-4 border-l-[#991B1B]">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-[#991B1B] mb-2">Stock Crítico</p>
+            <div class="bg-canvas border border-border p-5 rounded-xl shadow-sm border-l-4 border-l-status-critical">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-status-critical mb-2">Stock Crítico</p>
                 <p class="text-2xl font-bold">{{ $stockCritico }}</p>
-                <p class="mt-3 text-xs text-[#544246]">Requiere atención</p>
+                <p class="mt-3 text-xs text-muted">Requiere atención</p>
             </div>
-            <div class="bg-white border border-[#E5E7EB] p-5 rounded-xl shadow-sm">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-[#544246] mb-2">Salidas recientes</p>
+            <div class="bg-canvas border border-border p-5 rounded-xl shadow-sm">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Salidas recientes</p>
                 <p class="text-2xl font-bold">—</p>
-                <p class="mt-3 text-xs text-[#544246]">Últimas 24 horas</p>
+                <p class="mt-3 text-xs text-muted">Últimas 24 horas</p>
             </div>
-            <div class="bg-white border border-[#E5E7EB] p-5 rounded-xl shadow-sm">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-[#544246] mb-2">Valor en Almacén</p>
+            <div class="bg-canvas border border-border p-5 rounded-xl shadow-sm">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Valor en Almacén</p>
                 <p class="text-2xl font-bold">—</p>
-                <p class="mt-3 text-xs text-[#544246]">Solo insumos</p>
+                <p class="mt-3 text-xs text-muted">Solo insumos</p>
             </div>
         </div>
 
-        <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm">
+        <div class="bg-canvas border border-border rounded-xl overflow-hidden shadow-sm">
             <x-tabla-encabezado titulo="Inventario de Insumos" tab="insumos" exportUrl="{{ route('kardex.exportar', 'insumos') }}">
                 <x-slot:filtros>
                     <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Buscar</label>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Buscar</label>
                         <input id="f-ins-texto" oninput="filtrarInsumos()" type="text" placeholder="Nombre o No. parte..."
-                               class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132] w-56">
+                               class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand w-56">
                     </div>
                     <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Stock</label>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Stock</label>
                         <select id="f-ins-stock" onchange="filtrarInsumos()"
-                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                                class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
                             <option value="">Todos</option>
                             <option value="ok">OK</option>
                             <option value="critico">Crítico</option>
@@ -208,36 +208,36 @@
 
             <div class="overflow-x-auto">
             <table class="w-full text-left">
-                <thead class="bg-[#F3F4F6] border-b border-[#E5E7EB]">
+                <thead class="bg-wash border-b border-border">
                     <tr>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Part Number</th>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Descripción</th>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Stock Mín.</th>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Stock Actual</th>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Estado</th>
+                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Part Number</th>
+                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Descripción</th>
+                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Stock Mín.</th>
+                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Stock Actual</th>
+                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Estado</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-[#E5E7EB]" id="tbody-insumos">
+                <tbody class="divide-y divide-border" id="tbody-insumos">
                     @forelse($insumos as $ins)
                     @php $critico = $ins->stock_actual <= $ins->stock_minimo; @endphp
-                    <tr class="hover:bg-[#D4C19C]/5 transition-colors ins-row"
+                    <tr class="hover:bg-gold/5 transition-colors ins-row"
                         data-texto="{{ strtolower($ins->nombre_insumo . ' ' . ($ins->numero_parte ?? '')) }}"
                         data-stock="{{ $critico ? 'critico' : 'ok' }}">
-                        <td class="px-6 py-3 font-mono text-sm text-[#621132]">{{ $ins->numero_parte ?? '—' }}</td>
+                        <td class="px-6 py-3 font-mono text-sm text-brand">{{ $ins->numero_parte ?? '—' }}</td>
                         <td class="px-6 py-3 text-sm font-medium">{{ $ins->nombre_insumo }}</td>
                         <td class="px-6 py-3 font-mono text-sm text-center">{{ $ins->stock_minimo }}</td>
                         <td class="px-6 py-3 font-mono text-sm font-bold text-center">{{ $ins->stock_actual }}</td>
                         <td class="px-6 py-3">
                             @if(!$critico)
-                            <span class="bg-[#166534]/10 text-[#166534] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">OK</span>
+                            <span class="bg-status-active/10 text-status-active px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">OK</span>
                             @else
-                            <span class="bg-[#991B1B]/10 text-[#991B1B] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Crítico</span>
+                            <span class="bg-status-critical/10 text-status-critical px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Crítico</span>
                             @endif
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" class="px-6 py-10 text-center text-[#544246] text-sm">Sin insumos registrados</td>
+                        <td colspan="5" class="px-6 py-10 text-center text-muted text-sm">Sin insumos registrados</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -248,20 +248,20 @@
 
     {{-- ---- TAB: RESGUARDOS ---- --}}
     <div id="tab-resguardos" class="hidden">
-        <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm">
+        <div class="bg-canvas border border-border rounded-xl overflow-hidden shadow-sm">
             <x-tabla-encabezado titulo="Documentos de Resguardo" tab="resguardos">
                 <x-slot:acciones>
                     <a href="{{ route('kardex.resguardo.subir') }}"
-                       class="px-3 py-1.5 bg-[#621132] text-white rounded text-sm font-bold flex items-center gap-2 hover:opacity-90 transition-colors">
+                       class="px-3 py-1.5 bg-brand text-white rounded text-sm font-bold flex items-center gap-2 hover:opacity-90 transition-colors">
                         <span class="material-symbols-outlined text-sm">upload_file</span>
                         Registrar equipo
                     </a>
                 </x-slot:acciones>
                 <x-slot:filtros>
                     <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Tipo</label>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Tipo</label>
                         <select id="f-rsg-tipo" onchange="filtrarResguardos()"
-                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                                class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
                             <option value="">Todos</option>
                             <option>Laptop</option>
                             <option>PC Avanzada</option>
@@ -269,84 +269,84 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">PDF</label>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">PDF</label>
                         <select id="f-rsg-pdf" onchange="filtrarResguardos()"
-                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                                class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
                             <option value="">Todos</option>
                             <option value="si">Con PDF</option>
                             <option value="no">Sin PDF</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Área / Responsable</label>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Área / Responsable</label>
                         <input id="f-rsg-texto" oninput="filtrarResguardos()" type="text" placeholder="Buscar..."
-                               class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132] w-52">
+                               class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand w-52">
                     </div>
                 </x-slot:filtros>
             </x-tabla-encabezado>
 
             <div class="overflow-x-auto">
             <table class="w-full text-left">
-                <thead class="bg-[#F3F4F6] border-b border-[#E5E7EB]">
+                <thead class="bg-wash border-b border-border">
                     <tr>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">ID</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Tipo</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Marca / Modelo</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">No. Serie</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Responsable</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Área</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">PDF</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Registrado</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246] text-right">Detalle</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">ID</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Tipo</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Marca / Modelo</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">No. Serie</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Responsable</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Área</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">PDF</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Registrado</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted text-right">Detalle</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-[#E5E7EB]" id="tbody-resguardos">
+                <tbody class="divide-y divide-border" id="tbody-resguardos">
                     @forelse($equipos as $eq)
                     @php
                         $responsable = $eq->empleado_nombre ?? $eq->nombre_usuario ?? '—';
                         $tienePdf    = !empty($eq->pdf_resguardo);
                     @endphp
-                    <tr class="hover:bg-[#D4C19C]/5 transition-colors cursor-pointer rsg-row"
+                    <tr class="hover:bg-gold/5 transition-colors cursor-pointer rsg-row"
                         data-tipo="{{ $eq->tipo }}"
                         data-pdf="{{ $tienePdf ? 'si' : 'no' }}"
                         data-texto="{{ strtolower(($eq->area ?? '') . ' ' . $responsable) }}"
                         onclick="abrirPanelEquipo({{ $eq->id }})">
-                        <td class="px-4 py-3 font-mono text-xs text-[#544246]">#{{ $eq->id }}</td>
+                        <td class="px-4 py-3 font-mono text-xs text-muted">#{{ $eq->id }}</td>
                         <td class="px-4 py-3">
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase
-                                {{ $eq->tipo === 'Laptop' ? 'bg-[#1E40AF]/10 text-[#1E40AF]' : 'bg-[#166534]/10 text-[#166534]' }}">
+                                {{ $eq->tipo === 'Laptop' ? 'bg-status-free/10 text-status-free' : 'bg-status-active/10 text-status-active' }}">
                                 {{ $eq->tipo }}
                             </span>
                         </td>
                         <td class="px-4 py-3 text-sm">
                             <span class="font-medium">{{ $eq->cpu_marca }}</span>
-                            <span class="text-[#544246]"> {{ $eq->cpu_modelo }}</span>
+                            <span class="text-muted"> {{ $eq->cpu_modelo }}</span>
                         </td>
-                        <td class="px-4 py-3 font-mono text-sm text-[#621132]">{{ $eq->cpu_serie ?? '—' }}</td>
+                        <td class="px-4 py-3 font-mono text-sm text-brand">{{ $eq->cpu_serie ?? '—' }}</td>
                         <td class="px-4 py-3 text-sm max-w-[150px] truncate" title="{{ $responsable }}">{{ $responsable }}</td>
-                        <td class="px-4 py-3 text-sm text-[#544246] max-w-[150px] truncate" title="{{ $eq->area }}">{{ $eq->area ?? '—' }}</td>
+                        <td class="px-4 py-3 text-sm text-muted max-w-[150px] truncate" title="{{ $eq->area }}">{{ $eq->area ?? '—' }}</td>
                         <td class="px-4 py-3">
                             @if($tienePdf)
-                            <span class="flex items-center gap-1 text-[#166534] text-xs font-bold">
+                            <span class="flex items-center gap-1 text-status-active text-xs font-bold">
                                 <span class="material-symbols-outlined" style="font-size:16px">picture_as_pdf</span> PDF
                             </span>
                             @else
-                            <span class="text-[#544246] text-xs">—</span>
+                            <span class="text-muted text-xs">—</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-xs text-[#544246]">
+                        <td class="px-4 py-3 text-xs text-muted">
                             {{ $eq->created_at ? \Carbon\Carbon::parse($eq->created_at)->format('d/m/Y') : '—' }}
                         </td>
                         <td class="px-4 py-3 text-right">
                             <button onclick="event.stopPropagation(); abrirPanelEquipo({{ $eq->id }})"
-                                    class="p-1.5 hover:bg-[#F3F4F6] rounded text-[#544246] hover:text-[#621132]">
+                                    class="p-1.5 hover:bg-wash rounded text-muted hover:text-brand">
                                 <span class="material-symbols-outlined text-sm">open_in_new</span>
                             </button>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="9" class="px-6 py-10 text-center text-[#544246] text-sm">Sin equipos registrados</td>
+                        <td colspan="9" class="px-6 py-10 text-center text-muted text-sm">Sin equipos registrados</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -358,34 +358,34 @@
 </div>
 
 {{-- ══ Panel lateral: Detalle de equipo ══ --}}
-<div class="fixed top-0 right-0 h-screen w-[440px] bg-white shadow-2xl border-l border-[#D4C19C] z-[60] flex flex-col translate-x-full transition-transform duration-300" id="equipo-panel">
+<div class="fixed top-0 right-0 h-screen w-[440px] bg-canvas shadow-2xl border-l border-gold z-[60] flex flex-col translate-x-full transition-transform duration-300" id="equipo-panel">
     {{-- Header del panel --}}
-    <div class="p-5 border-b border-[#E5E7EB] bg-[#fbf9f8] flex justify-between items-start shrink-0">
+    <div class="p-5 border-b border-border bg-surface flex justify-between items-start shrink-0">
         <div>
-            <p class="text-[11px] font-bold uppercase tracking-wider text-[#544246]" id="panel-tipo-badge">—</p>
-            <h4 class="text-xl font-bold text-[#621132]" id="panel-serie">—</h4>
-            <p class="text-sm text-[#544246] mt-0.5" id="panel-marca-modelo">—</p>
+            <p class="text-[11px] font-bold uppercase tracking-wider text-muted" id="panel-tipo-badge">—</p>
+            <h4 class="text-xl font-bold text-brand" id="panel-serie">—</h4>
+            <p class="text-sm text-muted mt-0.5" id="panel-marca-modelo">—</p>
         </div>
-        <button class="text-[#544246] hover:text-[#621132] p-1" onclick="cerrarPanelEquipo()">
+        <button class="text-muted hover:text-brand p-1" onclick="cerrarPanelEquipo()">
             <span class="material-symbols-outlined">close</span>
         </button>
     </div>
 
     {{-- Cuerpo del panel --}}
     <div class="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar" id="panel-cuerpo">
-        <div class="flex items-center justify-center py-16 text-[#544246]">
+        <div class="flex items-center justify-center py-16 text-muted">
             <span class="material-symbols-outlined text-4xl animate-spin">progress_activity</span>
         </div>
     </div>
 
     {{-- Footer --}}
-    <div class="p-5 border-t border-[#E5E7EB] shrink-0 flex gap-3 items-center" id="panel-footer">
+    <div class="p-5 border-t border-border shrink-0 flex gap-3 items-center" id="panel-footer">
         <a id="panel-pdf-link" href="#" target="_blank"
-           class="flex-1 py-2.5 bg-[#621132] text-white font-bold rounded text-sm flex items-center justify-center gap-2 hover:opacity-90 hidden">
+           class="flex-1 py-2.5 bg-brand text-white font-bold rounded text-sm flex items-center justify-center gap-2 hover:opacity-90 hidden">
             <span class="material-symbols-outlined text-sm">download</span> Descargar PDF
         </a>
         <button onclick="cerrarPanelEquipo()"
-                class="flex-1 py-2.5 border border-[#E5E7EB] rounded text-sm font-bold text-[#544246] hover:bg-[#F3F4F6] transition-colors">
+                class="flex-1 py-2.5 border border-border rounded text-sm font-bold text-muted hover:bg-wash transition-colors">
             Cerrar
         </button>
     </div>
@@ -396,14 +396,14 @@
 
 <style>
 .detail-field { display: flex; flex-direction: column; gap: 2px; }
-.detail-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #544246; }
+.detail-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-muted); }
 .detail-value { font-size: 13px; color: #1a1a1a; }
-.detail-value.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #621132; }
+.detail-value.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--color-brand); }
 </style>
 
 <script>
-const ACTIVE_TAB  = 'px-6 py-2 rounded-md text-sm font-bold transition-all bg-white text-[#621132] shadow-sm';
-const INACTIVE_TAB= 'px-6 py-2 rounded-md text-sm font-bold transition-all text-[#544246] hover:bg-[#eae8e7]';
+const ACTIVE_TAB  = 'px-6 py-2 rounded-md text-sm font-bold transition-all bg-canvas text-brand shadow-sm';
+const INACTIVE_TAB= 'px-6 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high';
 let currentTab    = 'equipos';
 
 function switchKardexTab(tab, btn) {
@@ -474,7 +474,7 @@ async function abrirPanelEquipo(id) {
     document.getElementById('panel-serie').textContent      = '…';
     document.getElementById('panel-marca-modelo').textContent = '';
     document.getElementById('panel-cuerpo').innerHTML =
-        '<div class="flex items-center justify-center py-16 text-[#544246]"><span class="material-symbols-outlined text-4xl animate-spin">progress_activity</span></div>';
+        '<div class="flex items-center justify-center py-16 text-muted"><span class="material-symbols-outlined text-4xl animate-spin">progress_activity</span></div>';
     document.getElementById('panel-pdf-link').classList.add('hidden');
 
     const eq = await fetch(`/kardex/equipo/${id}`).then(r => r.json());
@@ -506,8 +506,8 @@ async function abrirPanelEquipo(id) {
 
     let html = `
         {{-- Identificación --}}
-        <div class="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-4">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-3">Identificación</p>
+        <div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">Identificación</p>
             <div class="grid grid-cols-2 gap-3">
                 ${f('No. Inventario', eq.num_inventario, true)}
                 ${f('Consecutivo', eq.consecutivo, true)}
@@ -517,8 +517,8 @@ async function abrirPanelEquipo(id) {
         </div>
 
         {{-- CPU --}}
-        <div class="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-4">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-3">CPU / Equipo principal</p>
+        <div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">CPU / Equipo principal</p>
             <div class="grid grid-cols-2 gap-3">
                 ${f('Marca', eq.cpu_marca)}
                 ${f('Modelo', eq.cpu_modelo)}
@@ -536,8 +536,8 @@ async function abrirPanelEquipo(id) {
         ['Docking serie', eq.docking_serie, true],
     ].filter(([, v]) => v);
     if (eq.tipo === 'Laptop' && laptopFields.length) {
-        html += `<div class="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-4">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-3">Periféricos — Laptop</p>
+        html += `<div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">Periféricos — Laptop</p>
             <div class="grid grid-cols-2 gap-3">
                 ${laptopFields.map(([l,v,m]) => f(l,v,m)).join('')}
             </div></div>`;
@@ -555,29 +555,29 @@ async function abrirPanelEquipo(id) {
         ['Nobreak serie', eq.nobreak_serie, true],
     ].filter(([, v]) => v);
     if ((eq.tipo === 'PC Avanzada' || eq.tipo === 'PC Especializada') && pcFields.length) {
-        html += `<div class="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-4">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-3">Periféricos — PC</p>
+        html += `<div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">Periféricos — PC</p>
             <div class="grid grid-cols-2 gap-3">
                 ${pcFields.map(([l,v,m]) => f(l,v,m)).join('')}
             </div></div>`;
     }
 
     // Empleado vinculado
-    html += `<div class="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-4">
-        <p class="text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-3">Responsable / Estado</p>
+    html += `<div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
+        <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">Responsable / Estado</p>
         <div class="grid grid-cols-1 gap-3">
             ${f('Empleado vinculado', eq.empleado_nombre ? `${eq.empleado_nombre} &lt;${eq.empleado_correo ?? ''}&gt;` : 'Sin vincular')}
             <div class="detail-field">
                 <span class="detail-label">Estado del equipo</span>
                 <div class="flex items-center gap-2 mt-1">
-                    <select id="select-estado-panel" class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]"
+                    <select id="select-estado-panel" class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand"
                             onchange="">
                         <option value="" ${!eq.estado ? 'selected' : ''}>Automático (${estadoDisplay})</option>
                         <option value="mantenimiento" ${eq.estado === 'mantenimiento' ? 'selected' : ''}>Mantenimiento</option>
                         <option value="baja" ${eq.estado === 'baja' ? 'selected' : ''}>Baja</option>
                     </select>
                     <button onclick="guardarEstado(${eq.id})"
-                            class="px-3 py-1.5 bg-[#621132] text-white text-xs font-bold rounded hover:opacity-90">
+                            class="px-3 py-1.5 bg-brand text-white text-xs font-bold rounded hover:opacity-90">
                         Guardar
                     </button>
                 </div>
@@ -586,13 +586,13 @@ async function abrirPanelEquipo(id) {
     </div>`;
 
     if (eq.observaciones) {
-        html += `<div class="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-4">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-2">Observaciones</p>
-            <p class="text-sm text-[#544246]">${eq.observaciones}</p>
+        html += `<div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-2">Observaciones</p>
+            <p class="text-sm text-muted">${eq.observaciones}</p>
         </div>`;
     }
 
-    html += `<p class="text-[11px] text-[#544246] text-center pb-2">
+    html += `<p class="text-[11px] text-muted text-center pb-2">
         Registrado: ${eq.created_at ? new Date(eq.created_at).toLocaleDateString('es-MX') : '—'}
     </p>`;
 

@@ -12,10 +12,10 @@
 
     {{-- Left panel (maroon brand) --}}
     <div class="hidden lg:flex lg:w-1/2 flex-col justify-between p-12"
-         style="background-color:#621132;">
+         style="background-color:var(--color-brand);">
         <div>
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <div class="w-10 h-10 bg-canvas/20 rounded-xl flex items-center justify-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none"
                          viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -32,7 +32,7 @@
         <div>
             <h2 class="text-4xl font-bold text-white leading-snug">
                 Gestión integral<br>
-                <span style="color:#D4C19C;">de activos</span><br>
+                <span style="color:var(--color-gold);">de activos</span><br>
                 institucionales
             </h2>
             <p class="text-white/60 mt-4 text-sm leading-relaxed max-w-sm">
@@ -66,7 +66,7 @@
                         Correo electrónico
                     </label>
                     <input type="email" name="email" value="{{ old('email') }}" required autofocus
-                           class="input input-bordered w-full bg-white focus:ring-2 focus:ring-imjuve/30"
+                           class="input input-bordered w-full bg-canvas focus:ring-2 focus:ring-imjuve/30"
                            placeholder="usuario@imjuventud.gob.mx">
                 </div>
 
@@ -75,7 +75,7 @@
                         Contraseña
                     </label>
                     <input type="password" name="password" required
-                           class="input input-bordered w-full bg-white focus:ring-2 focus:ring-imjuve/30"
+                           class="input input-bordered w-full bg-canvas focus:ring-2 focus:ring-imjuve/30"
                            placeholder="••••••••">
                 </div>
 

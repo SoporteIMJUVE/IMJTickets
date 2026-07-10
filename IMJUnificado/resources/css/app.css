@@ -53,8 +53,13 @@
     /* ── Estados de activos ──────────────────────────────── */
     --color-status-active:        #166534;
     --color-status-free:          #1E40AF;
+    --color-status-attend:        #92400E;
     --color-status-low:           #9A3412;
     --color-status-critical:      #991B1B;
+    /* Fondos de estado (badges, kanban handles) */
+    --color-status-free-bg:       #DBEAFE;
+    --color-status-attend-bg:     #FEF3C7;
+    --color-status-closed-bg:     #DCFCE7;
 
     /* ── Error ───────────────────────────────────────────── */
     --color-error:                #ba1a1a;
@@ -64,6 +69,83 @@
     /* ── Tipografía ──────────────────────────────────────── */
     --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+    /* ── Aliases cortos (los que se usan en las vistas) ─── */
+    --color-brand:  #621132;   /* = primary-container        */
+    --color-canvas: #ffffff;   /* blanco → oscuro en dark    */
+    --color-wash:   #F3F4F6;   /* = surface-muted            */
+    --color-muted:  #544246;   /* = on-surface-variant       */
+    --color-ink:    #1b1c1c;   /* = on-surface               */
+}
+
+/* ── Paleta dark ───────────────────────────────────────────── */
+:root[data-theme="dark"] {
+    --color-brand:               #c44472;
+    --color-imjuve:              #c44472;
+    --color-imjuve-dark:         #a83560;
+    --color-gold:                #b8a07a;
+    --color-surface:             #1e1b1c;
+    --color-surface-dim:         #141213;
+    --color-surface-low:         #231f20;
+    --color-surface-container:   #282425;
+    --color-surface-high:        #2a2527;
+    --color-surface-highest:     #312c2d;
+    --color-surface-muted:       #232021;
+    --color-on-surface:          #ece8e9;
+    --color-on-surface-variant:  #9d8f92;
+    --color-outline:             #5e5153;
+    --color-outline-variant:     #3d3233;
+    --color-border:              #2e2a2b;
+    --color-primary:             #c44472;
+    --color-primary-container:   #a83560;
+    --color-on-primary:          #ffffff;
+    --color-on-primary-container:#ffd9e4;
+    --color-secondary:           #b8a07a;
+    --color-secondary-container: #3d3221;
+    --color-on-secondary:        #ffffff;
+    --color-canvas:              #141213;
+    --color-wash:                #232021;
+    --color-muted:               #9d8f92;
+    --color-ink:                 #ece8e9;
+    /* Fondos de estado en dark */
+    --color-status-free-bg:      #172554;
+    --color-status-attend-bg:    #451a03;
+    --color-status-closed-bg:    #052e16;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --color-brand:               #c44472;
+        --color-imjuve:              #c44472;
+        --color-imjuve-dark:         #a83560;
+        --color-gold:                #b8a07a;
+        --color-surface:             #1e1b1c;
+        --color-surface-dim:         #141213;
+        --color-surface-low:         #231f20;
+        --color-surface-container:   #282425;
+        --color-surface-high:        #2a2527;
+        --color-surface-highest:     #312c2d;
+        --color-surface-muted:       #232021;
+        --color-on-surface:          #ece8e9;
+        --color-on-surface-variant:  #9d8f92;
+        --color-outline:             #5e5153;
+        --color-outline-variant:     #3d3233;
+        --color-border:              #2e2a2b;
+        --color-primary:             #c44472;
+        --color-primary-container:   #a83560;
+        --color-on-primary:          #ffffff;
+        --color-on-primary-container:#ffd9e4;
+        --color-secondary:           #b8a07a;
+        --color-secondary-container: #3d3221;
+        --color-on-secondary:        #ffffff;
+        --color-canvas:              #141213;
+        --color-wash:                #232021;
+        --color-muted:               #9d8f92;
+        --color-ink:                 #ece8e9;
+        --color-status-free-bg:      #172554;
+        --color-status-attend-bg:    #451a03;
+        --color-status-closed-bg:    #052e16;
+    }
 }
 
 .nav-item-active {

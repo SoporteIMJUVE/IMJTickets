@@ -7,11 +7,11 @@
 ])
 
 {{-- Barra de título + botones --}}
-<div class="px-6 py-4 border-b border-[#E5E7EB] flex justify-between items-center">
+<div class="px-6 py-4 border-b border-border flex justify-between items-center">
     <div class="flex items-center gap-3">
         <h3 class="font-bold text-lg">{{ $titulo }}</h3>
         @if($conteo !== null)
-            <span class="text-xs text-[#544246]" id="conteo-{{ $tab }}">{{ $conteo }}</span>
+            <span class="text-xs text-muted" id="conteo-{{ $tab }}">{{ $conteo }}</span>
         @endif
     </div>
     <div class="flex gap-2 items-center">
@@ -20,7 +20,7 @@
         {{-- Importar: visible cuando hay exportUrl Y el módulo lo permite --}}
         @if($exportUrl && $importar)
         <button onclick="abrirModalImportar('{{ $tab }}')"
-                class="px-3 py-1.5 border border-[#E5E7EB] rounded text-sm font-bold flex items-center gap-2 hover:bg-[#F3F4F6] transition-colors text-[#544246]">
+                class="px-3 py-1.5 border border-border rounded text-sm font-bold flex items-center gap-2 hover:bg-wash transition-colors text-muted">
             <span class="material-symbols-outlined text-sm">upload</span> Importar
         </button>
         @endif
@@ -28,13 +28,13 @@
         {{-- Filtrar: siempre visible --}}
         <button onclick="toggleFiltros('{{ $tab }}')"
                 id="btn-filtros-{{ $tab }}"
-                class="px-3 py-1.5 border border-[#E5E7EB] rounded text-sm font-bold flex items-center gap-2 hover:bg-[#F3F4F6] transition-colors">
+                class="px-3 py-1.5 border border-border rounded text-sm font-bold flex items-center gap-2 hover:bg-wash transition-colors">
             <span class="material-symbols-outlined text-sm">filter_list</span> Filtrar
         </button>
 
         {{-- Exportar: siempre visible --}}
         <button onclick="abrirModalExportar('{{ $tab }}')"
-                class="px-3 py-1.5 bg-[#621132] text-white rounded text-sm font-bold flex items-center gap-2 hover:opacity-90 transition-colors">
+                class="px-3 py-1.5 bg-brand text-white rounded text-sm font-bold flex items-center gap-2 hover:opacity-90 transition-colors">
             <span class="material-symbols-outlined text-sm">download</span> Exportar
         </button>
     </div>
@@ -43,13 +43,13 @@
 {{-- Panel de filtros colapsable --}}
 @if(isset($filtros))
 <div id="filtros-{{ $tab }}"
-     class="hidden border-b border-[#E5E7EB] px-6 py-3 bg-[#F9FAFB] flex flex-wrap gap-3 items-end">
+     class="hidden border-b border-border px-6 py-3 bg-[#F9FAFB] flex flex-wrap gap-3 items-end">
     {{ $filtros }}
     <button onclick="limpiarFiltros('{{ $tab }}')"
-            class="text-xs font-bold text-[#544246] hover:text-[#621132] px-2 py-1.5 rounded hover:bg-white transition-colors">
+            class="text-xs font-bold text-muted hover:text-brand px-2 py-1.5 rounded hover:bg-canvas transition-colors">
         Limpiar
     </button>
-    <p class="ml-auto text-xs text-[#544246]" id="f-{{ $tab }}-count"></p>
+    <p class="ml-auto text-xs text-muted" id="f-{{ $tab }}-count"></p>
 </div>
 @endif
 
@@ -68,22 +68,22 @@ window._exportUrls['{{ $tab }}'] = '{{ $exportUrl }}';
 <div id="modal-exportar"
      class="fixed inset-0 z-50 hidden items-center justify-center"
      style="background:rgba(0,0,0,.35)">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
-        <div class="px-6 py-5 border-b border-[#E5E7EB] flex items-center gap-3">
-            <span class="material-symbols-outlined text-[#621132]">download</span>
+    <div class="bg-canvas rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+        <div class="px-6 py-5 border-b border-border flex items-center gap-3">
+            <span class="material-symbols-outlined text-brand">download</span>
             <h3 class="font-bold text-base">Exportar datos</h3>
         </div>
-        <div class="px-6 py-5 text-sm text-[#544246]">
-            <p id="modal-exportar-texto">Se exportará la tabla con los <span class="font-bold text-[#1b1c1c]">filtros activos</span> en este momento como archivo CSV.</p>
-            <p id="modal-exportar-nota" class="mt-2 text-xs text-[#544246] opacity-70 hidden"></p>
+        <div class="px-6 py-5 text-sm text-muted">
+            <p id="modal-exportar-texto">Se exportará la tabla con los <span class="font-bold text-ink">filtros activos</span> en este momento como archivo CSV.</p>
+            <p id="modal-exportar-nota" class="mt-2 text-xs text-muted opacity-70 hidden"></p>
         </div>
-        <div class="px-6 py-4 border-t border-[#E5E7EB] flex justify-end gap-3">
+        <div class="px-6 py-4 border-t border-border flex justify-end gap-3">
             <button onclick="cerrarModalExportar()"
-                    class="px-4 py-2 border border-[#E5E7EB] rounded-lg text-sm font-bold text-[#544246] hover:bg-[#F3F4F6] transition-colors">
+                    class="px-4 py-2 border border-border rounded-lg text-sm font-bold text-muted hover:bg-wash transition-colors">
                 Cancelar
             </button>
             <button id="btn-modal-exportar-aceptar" onclick="confirmarExportar()"
-                    class="px-4 py-2 bg-[#621132] text-white rounded-lg text-sm font-bold hover:opacity-90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    class="px-4 py-2 bg-brand text-white rounded-lg text-sm font-bold hover:opacity-90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 Aceptar
             </button>
         </div>
@@ -94,9 +94,9 @@ window._exportUrls['{{ $tab }}'] = '{{ $exportUrl }}';
 <div id="modal-importar"
      class="fixed inset-0 z-50 hidden items-center justify-center"
      style="background:rgba(0,0,0,.35)">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
-        <div class="px-6 py-5 border-b border-[#E5E7EB] flex items-center gap-3">
-            <span class="material-symbols-outlined text-[#9A3412]">upload</span>
+    <div class="bg-canvas rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div class="px-6 py-5 border-b border-border flex items-center gap-3">
+            <span class="material-symbols-outlined text-status-low">upload</span>
             <h3 class="font-bold text-base">Importar datos</h3>
         </div>
         <div class="px-6 py-5 space-y-4">
@@ -106,23 +106,23 @@ window._exportUrls['{{ $tab }}'] = '{{ $exportUrl }}';
                 <p class="text-sm text-[#92400E]">La importación requiere un <strong>formato especial de CSV o Excel</strong>. Archivos con estructura incorrecta serán rechazados.</p>
             </div>
             {{-- Paso 1: descargar formato --}}
-            <div class="bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg px-4 py-4">
-                <p class="text-sm font-bold text-[#1b1c1c] mb-1">Paso 1 — Descargue el formato vacío</p>
-                <p class="text-xs text-[#544246] mb-3">El formato contiene las columnas exactas requeridas. Llénelo con sus datos <strong>sin modificar los encabezados</strong>.</p>
+            <div class="bg-[#F9FAFB] border border-border rounded-lg px-4 py-4">
+                <p class="text-sm font-bold text-ink mb-1">Paso 1 — Descargue el formato vacío</p>
+                <p class="text-xs text-muted mb-3">El formato contiene las columnas exactas requeridas. Llénelo con sus datos <strong>sin modificar los encabezados</strong>.</p>
                 <button onclick="descargarFormato()"
-                        class="flex items-center gap-2 px-3 py-1.5 border border-[#D4C19C] text-[#621132] rounded text-sm font-bold hover:bg-[#eae8e7] transition-colors">
+                        class="flex items-center gap-2 px-3 py-1.5 border border-gold text-brand rounded text-sm font-bold hover:bg-surface-high transition-colors">
                     <span class="material-symbols-outlined text-sm">table_view</span> Descargar formato vacío
                 </button>
             </div>
             {{-- Paso 2: subir archivo (próximamente) --}}
-            <div class="bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg px-4 py-4 opacity-50 select-none">
-                <p class="text-sm font-bold text-[#1b1c1c] mb-1">Paso 2 — Suba el archivo completado</p>
-                <p class="text-xs text-[#544246]">La carga de archivos estará disponible próximamente.</p>
+            <div class="bg-[#F9FAFB] border border-border rounded-lg px-4 py-4 opacity-50 select-none">
+                <p class="text-sm font-bold text-ink mb-1">Paso 2 — Suba el archivo completado</p>
+                <p class="text-xs text-muted">La carga de archivos estará disponible próximamente.</p>
             </div>
         </div>
-        <div class="px-6 py-4 border-t border-[#E5E7EB] flex justify-end">
+        <div class="px-6 py-4 border-t border-border flex justify-end">
             <button onclick="cerrarModalImportar()"
-                    class="px-4 py-2 border border-[#E5E7EB] rounded-lg text-sm font-bold text-[#544246] hover:bg-[#F3F4F6] transition-colors">
+                    class="px-4 py-2 border border-border rounded-lg text-sm font-bold text-muted hover:bg-wash transition-colors">
                 Cerrar
             </button>
         </div>
@@ -141,7 +141,7 @@ function toggleFiltros(tab) {
     if (!panel) return;
     const abierto = !panel.classList.contains('hidden');
     panel.classList.toggle('hidden');
-    if (btn) btn.classList.toggle('bg-[#F3F4F6]', !abierto);
+    if (btn) btn.classList.toggle('bg-wash', !abierto);
 }
 
 function limpiarFiltros(tab) {
@@ -160,7 +160,7 @@ function abrirModalExportar(tab) {
     const aceptar = document.getElementById('btn-modal-exportar-aceptar');
 
     if (hasUrl) {
-        if (texto) texto.innerHTML = 'Se exportará la tabla con los <span class="font-bold text-[#1b1c1c]">filtros activos</span> en este momento como archivo CSV.';
+        if (texto) texto.innerHTML = 'Se exportará la tabla con los <span class="font-bold text-ink">filtros activos</span> en este momento como archivo CSV.';
         if (nota)  { nota.textContent = ''; nota.classList.add('hidden'); }
         if (aceptar) aceptar.disabled = false;
     } else {
@@ -174,7 +174,7 @@ function abrirModalExportar(tab) {
     const btn   = document.getElementById('btn-filtros-' + tab);
     if (panel && panel.classList.contains('hidden')) {
         panel.classList.remove('hidden');
-        if (btn) btn.classList.add('bg-[#F3F4F6]');
+        if (btn) btn.classList.add('bg-wash');
     }
 
     const modal = document.getElementById('modal-exportar');

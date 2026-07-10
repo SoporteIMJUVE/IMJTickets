@@ -39,7 +39,7 @@
             <div class="lg:col-span-2 space-y-4">
 
                 {{-- Tipo de equipo --}}
-                <div class="bg-white border border-border rounded-2xl shadow-sm p-6">
+                <div class="bg-canvas border border-border rounded-2xl shadow-sm p-6">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-4">Tipo de equipo</h3>
                     <div class="flex gap-3">
                         @foreach(['Laptop', 'PC Avanzada', 'PC Especializada'] as $t)
@@ -57,20 +57,20 @@
                 </div>
 
                 {{-- CPU --}}
-                <div class="bg-white border border-border rounded-2xl shadow-sm p-6">
+                <div class="bg-canvas border border-border rounded-2xl shadow-sm p-6">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-4">CPU / Equipo principal</h3>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Marca</label>
                             <input type="text" name="cpu_marca" value="{{ old('cpu_marca', $datos['cpu_marca']) }}"
                                 class="w-full rounded-lg px-3 py-2 text-sm border border-border outline-none focus:ring-2 focus:ring-primary-container
-                                       {{ $datos['cpu_marca'] ? 'bg-yellow-50' : 'bg-white' }}">
+                                       {{ $datos['cpu_marca'] ? 'bg-yellow-50' : 'bg-canvas' }}">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Modelo</label>
                             <input type="text" name="cpu_modelo" value="{{ old('cpu_modelo', $datos['cpu_modelo']) }}"
                                 class="w-full rounded-lg px-3 py-2 text-sm border border-border outline-none focus:ring-2 focus:ring-primary-container
-                                       {{ $datos['cpu_modelo'] ? 'bg-yellow-50' : 'bg-white' }}">
+                                       {{ $datos['cpu_modelo'] ? 'bg-yellow-50' : 'bg-canvas' }}">
                         </div>
                         <div class="col-span-2">
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">
@@ -78,87 +78,87 @@
                             </label>
                             <input type="text" name="cpu_serie" value="{{ old('cpu_serie', $datos['cpu_serie']) }}"
                                 class="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-2 focus:ring-primary-container
-                                       {{ $errors->has('cpu_serie') ? 'border-error bg-error-container' : ($datos['cpu_serie'] ? 'border-border bg-yellow-50' : 'border-border bg-white') }}">
+                                       {{ $errors->has('cpu_serie') ? 'border-error bg-error-container' : ($datos['cpu_serie'] ? 'border-border bg-yellow-50' : 'border-border bg-canvas') }}">
                             @error('cpu_serie')<p class="mt-1 text-xs text-error">{{ $message }}</p>@enderror
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">No. Inventario</label>
                             <input type="text" name="num_inventario" value="{{ old('num_inventario', $datos['num_inventario']) }}"
                                 class="w-full rounded-lg px-3 py-2 text-sm border border-border outline-none focus:ring-2 focus:ring-primary-container
-                                       {{ $datos['num_inventario'] ? 'bg-yellow-50' : 'bg-white' }}">
+                                       {{ $datos['num_inventario'] ? 'bg-yellow-50' : 'bg-canvas' }}">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Consecutivo</label>
                             <input type="number" name="consecutivo" value="{{ old('consecutivo', $datos['consecutivo']) }}"
-                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-white outline-none focus:ring-2 focus:ring-primary-container">
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
                         </div>
                     </div>
                 </div>
 
                 {{-- Periféricos (se muestran según tipo, controlado con JS) --}}
-                <div class="bg-white border border-border rounded-2xl shadow-sm p-6" id="sec-laptop">
+                <div class="bg-canvas border border-border rounded-2xl shadow-sm p-6" id="sec-laptop">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-4">Periféricos — Laptop</h3>
                     <div class="grid grid-cols-2 gap-4">
                         <div class="col-span-2">
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Serie cargador</label>
                             <input type="text" name="cargador_serie" value="{{ old('cargador_serie') }}"
-                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-white outline-none focus:ring-2 focus:ring-primary-container">
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Docking marca</label>
                             <input type="text" name="docking_marca" value="{{ old('docking_marca') }}"
-                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-white outline-none focus:ring-2 focus:ring-primary-container">
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Docking serie</label>
                             <input type="text" name="docking_serie" value="{{ old('docking_serie') }}"
-                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-white outline-none focus:ring-2 focus:ring-primary-container">
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white border border-border rounded-2xl shadow-sm p-6 hidden" id="sec-pc">
+                <div class="bg-canvas border border-border rounded-2xl shadow-sm p-6 hidden" id="sec-pc">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-4">Periféricos — PC</h3>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Monitor marca</label>
                             <input type="text" name="monitor_marca" value="{{ old('monitor_marca') }}"
-                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-white outline-none focus:ring-2 focus:ring-primary-container">
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Monitor serie</label>
                             <input type="text" name="monitor_serie" value="{{ old('monitor_serie') }}"
-                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-white outline-none focus:ring-2 focus:ring-primary-container">
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Teclado serie</label>
                             <input type="text" name="teclado_serie" value="{{ old('teclado_serie') }}"
-                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-white outline-none focus:ring-2 focus:ring-primary-container">
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Mouse serie</label>
                             <input type="text" name="mouse_serie" value="{{ old('mouse_serie') }}"
-                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-white outline-none focus:ring-2 focus:ring-primary-container">
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Nobreak marca</label>
                             <input type="text" name="nobreak_marca" value="{{ old('nobreak_marca') }}"
-                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-white outline-none focus:ring-2 focus:ring-primary-container">
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Nobreak serie</label>
                             <input type="text" name="nobreak_serie" value="{{ old('nobreak_serie') }}"
-                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-white outline-none focus:ring-2 focus:ring-primary-container">
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
                         </div>
                     </div>
                 </div>
 
                 {{-- Observaciones --}}
-                <div class="bg-white border border-border rounded-2xl shadow-sm p-6">
+                <div class="bg-canvas border border-border rounded-2xl shadow-sm p-6">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-4">Observaciones</h3>
                     <textarea name="observaciones" rows="3"
                         class="w-full rounded-lg px-3 py-2 text-sm border border-border outline-none focus:ring-2 focus:ring-primary-container resize-none
-                               {{ $datos['observaciones'] ? 'bg-yellow-50' : 'bg-white' }}">{{ old('observaciones', $datos['observaciones']) }}</textarea>
+                               {{ $datos['observaciones'] ? 'bg-yellow-50' : 'bg-canvas' }}">{{ old('observaciones', $datos['observaciones']) }}</textarea>
                 </div>
 
                 {{-- Texto extraído (colapsado, solo si hay texto) --}}
@@ -178,7 +178,7 @@
             <div class="space-y-4">
 
                 {{-- Responsable --}}
-                <div class="bg-white border border-border rounded-2xl shadow-sm p-5">
+                <div class="bg-canvas border border-border rounded-2xl shadow-sm p-5">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-3">Responsable del equipo</h3>
 
                     @if($datos['nombre_usuario'])
@@ -216,19 +216,19 @@
                 </div>
 
                 {{-- Red --}}
-                <div class="bg-white border border-border rounded-2xl shadow-sm p-5">
+                <div class="bg-canvas border border-border rounded-2xl shadow-sm p-5">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-3">Dirección IP</h3>
                     <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Área</label>
                     <input type="text" name="area" id="campo-area" value="{{ old('area', $datos['area']) }}"
                         placeholder="Ej: DRHM, DEC..."
                         class="w-full rounded-lg px-3 py-2 text-sm border border-border outline-none focus:ring-2 focus:ring-primary-container mb-3
-                               {{ $datos['area'] ? 'bg-yellow-50' : 'bg-white' }}">
+                               {{ $datos['area'] ? 'bg-yellow-50' : 'bg-canvas' }}">
 
                     <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">IPv4 asignada</label>
                     <div class="flex gap-2">
                         <input type="text" name="ipv4" id="campo-ip" value="{{ old('ipv4') }}"
                             placeholder="0.0.0.0"
-                            class="flex-1 rounded-lg px-3 py-2 text-sm border border-border bg-white outline-none focus:ring-2 focus:ring-primary-container">
+                            class="flex-1 rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
                         <button type="button" id="btn-sugerir-ip"
                             class="px-3 py-2 bg-surface-high border border-border rounded-lg text-xs font-bold text-on-surface-variant hover:bg-surface-highest transition-colors"
                             title="Sugerir primera IP libre del área">
@@ -239,7 +239,7 @@
                 </div>
 
                 {{-- Guardar --}}
-                <div class="bg-white border border-border rounded-2xl shadow-sm p-5 flex flex-col gap-3">
+                <div class="bg-canvas border border-border rounded-2xl shadow-sm p-5 flex flex-col gap-3">
                     <button type="submit"
                         class="w-full py-2.5 bg-primary-container text-on-primary text-sm font-bold rounded-lg
                                hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2">

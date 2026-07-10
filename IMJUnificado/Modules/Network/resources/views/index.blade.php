@@ -5,22 +5,22 @@
     {{-- Header + toggle de vista --}}
     <div class="flex justify-between items-end mb-6">
         <div>
-            <h2 class="text-[32px] font-bold leading-10 tracking-tight text-[#621132]">Gestión de Red e IPs</h2>
-            <p class="text-[#544246] text-sm mt-1">Monitoreo y administración de infraestructura de red institucional.</p>
+            <h2 class="text-[32px] font-bold leading-10 tracking-tight text-brand">Gestión de Red e IPs</h2>
+            <p class="text-muted text-sm mt-1">Monitoreo y administración de infraestructura de red institucional.</p>
         </div>
         <div class="flex items-center gap-3">
-            <div class="flex bg-[#F3F4F6] rounded-lg p-1">
+            <div class="flex bg-wash rounded-lg p-1">
                 <button id="nav-rangos" onclick="switchNetTab('rangos')"
-                        class="px-4 py-2 rounded-md text-sm font-bold transition-all bg-white text-[#621132] shadow-sm">
+                        class="px-4 py-2 rounded-md text-sm font-bold transition-all bg-canvas text-brand shadow-sm">
                     Rangos y Disponibilidad
                 </button>
                 <button id="nav-inventario" onclick="switchNetTab('inventario')"
-                        class="px-4 py-2 rounded-md text-sm font-bold transition-all text-[#544246] hover:bg-[#eae8e7]">
+                        class="px-4 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high">
                     Inventario de IPs
                 </button>
             </div>
             <button onclick="alert('Ajustes del módulo aún no disponibles.')"
-                    class="p-2 border border-[#E5E7EB] rounded-lg hover:bg-[#F3F4F6] transition-colors text-[#544246]"
+                    class="p-2 border border-border rounded-lg hover:bg-wash transition-colors text-muted"
                     title="Ajustes">
                 <span class="material-symbols-outlined text-sm">settings</span>
             </button>
@@ -31,26 +31,26 @@
     <div id="view-rangos">
         {{-- Stats --}}
         <div class="grid grid-cols-3 gap-6 mb-8">
-            <div class="bg-white p-6 rounded-xl border border-[#E5E7EB] shadow-sm">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-[#544246] mb-2">IPs Totales</p>
-                <h3 class="text-3xl font-bold text-[#621132]">{{ $totalIps }}</h3>
-                <div class="mt-4 flex items-center gap-2 text-[#166534] text-xs">
+            <div class="bg-canvas p-6 rounded-xl border border-border shadow-sm">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">IPs Totales</p>
+                <h3 class="text-3xl font-bold text-brand">{{ $totalIps }}</h3>
+                <div class="mt-4 flex items-center gap-2 text-status-active text-xs">
                     <span class="material-symbols-outlined text-sm">check_circle</span>
                     Sistema Operativo
                 </div>
             </div>
-            <div class="bg-white p-6 rounded-xl border border-[#E5E7EB] shadow-sm">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-[#544246] mb-2">IPs En Uso</p>
-                <h3 class="text-3xl font-bold text-[#621132]">{{ $ipsEnUso }}</h3>
+            <div class="bg-canvas p-6 rounded-xl border border-border shadow-sm">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">IPs En Uso</p>
+                <h3 class="text-3xl font-bold text-brand">{{ $ipsEnUso }}</h3>
                 @php $pct = $totalIps > 0 ? round($ipsEnUso / $totalIps * 100) : 0; @endphp
-                <div class="mt-4 h-2 bg-[#F3F4F6] rounded-full overflow-hidden">
-                    <div class="h-full bg-[#D4C19C] rounded-full" style="width:{{ $pct }}%"></div>
+                <div class="mt-4 h-2 bg-wash rounded-full overflow-hidden">
+                    <div class="h-full bg-gold rounded-full" style="width:{{ $pct }}%"></div>
                 </div>
             </div>
-            <div class="bg-white p-6 rounded-xl border border-[#E5E7EB] shadow-sm">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-[#544246] mb-2">Alertas de Saturación</p>
-                <h3 class="text-3xl font-bold text-[#991B1B]">{{ $alertas }}</h3>
-                <div class="mt-4 flex items-center gap-2 text-[#991B1B] text-xs">
+            <div class="bg-canvas p-6 rounded-xl border border-border shadow-sm">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Alertas de Saturación</p>
+                <h3 class="text-3xl font-bold text-status-critical">{{ $alertas }}</h3>
+                <div class="mt-4 flex items-center gap-2 text-status-critical text-xs">
                     <span class="material-symbols-outlined text-sm">warning</span>
                     Rangos con &gt;90%
                 </div>
@@ -58,56 +58,56 @@
         </div>
 
         {{-- Ranges Table --}}
-        <div class="bg-white rounded-xl border border-[#E5E7EB] shadow-sm overflow-hidden">
+        <div class="bg-canvas rounded-xl border border-border shadow-sm overflow-hidden">
             <table class="w-full text-left">
-                <thead class="bg-[#F3F4F6] border-b border-[#E5E7EB]">
+                <thead class="bg-wash border-b border-border">
                     <tr>
-                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Área Institucional</th>
-                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Rango de IPs</th>
-                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Uso de Capacidad</th>
-                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Estado</th>
-                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Acción</th>
+                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-muted">Área Institucional</th>
+                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-muted">Rango de IPs</th>
+                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-muted">Uso de Capacidad</th>
+                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-muted">Estado</th>
+                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-muted">Acción</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-[#E5E7EB]">
+                <tbody class="divide-y divide-border">
                     @forelse($rangos as $rango)
                     @php
                         $cap  = $rango->capacidad_total ?: 1;
                         $pctR = round(($rango->ocupadas_real / $cap) * 100);
-                        $color = $pctR >= 90 ? '#991B1B' : ($pctR >= 70 ? '#9A3412' : '#166534');
+                        $color = $pctR >= 90 ? 'var(--color-status-critical)' : ($pctR >= 70 ? 'var(--color-status-low)' : 'var(--color-status-active)');
                     @endphp
-                    <tr class="hover:bg-[#D4C19C]/5 transition-colors">
+                    <tr class="hover:bg-gold/5 transition-colors">
                         <td class="px-6 py-4 text-sm font-medium">{{ $rango->area_nombre }}</td>
-                        <td class="px-6 py-4 font-mono text-sm text-[#544246]">
+                        <td class="px-6 py-4 font-mono text-sm text-muted">
                             {{ $rango->ip_inicial }} – {{ $rango->ip_final }}
                         </td>
                         <td class="px-6 py-4 text-sm">
                             <div class="flex items-center gap-2">
-                                <div class="flex-1 h-2 bg-[#F3F4F6] rounded-full overflow-hidden">
+                                <div class="flex-1 h-2 bg-wash rounded-full overflow-hidden">
                                     <div class="h-full rounded-full" style="width:{{ $pctR }}%; background:{{ $color }}"></div>
                                 </div>
-                                <span class="font-mono text-xs text-[#544246]">{{ $rango->ocupadas_real }}/{{ $rango->capacidad_total }}</span>
+                                <span class="font-mono text-xs text-muted">{{ $rango->ocupadas_real }}/{{ $rango->capacidad_total }}</span>
                             </div>
                         </td>
                         <td class="px-6 py-4">
                             @if($pctR >= 90)
-                            <span class="bg-[#991B1B]/10 text-[#991B1B] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Saturado</span>
+                            <span class="bg-status-critical/10 text-status-critical px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Saturado</span>
                             @elseif($pctR >= 70)
-                            <span class="bg-[#9A3412]/10 text-[#9A3412] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Lleno</span>
+                            <span class="bg-status-low/10 text-status-low px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Lleno</span>
                             @else
-                            <span class="bg-[#166534]/10 text-[#166534] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Disponible</span>
+                            <span class="bg-status-active/10 text-status-active px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Disponible</span>
                             @endif
                         </td>
                         <td class="px-6 py-4">
                             <button onclick="switchNetTab('inventario')"
-                                    class="px-3 py-1 border border-[#D4C19C] rounded text-[#621132] text-xs font-bold hover:bg-[#eae8e7]">
+                                    class="px-3 py-1 border border-gold rounded text-brand text-xs font-bold hover:bg-surface-high">
                                 Ver IPs
                             </button>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" class="px-6 py-10 text-center text-[#544246] text-sm">Sin rangos configurados</td>
+                        <td colspan="5" class="px-6 py-10 text-center text-muted text-sm">Sin rangos configurados</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -117,13 +117,13 @@
 
     {{-- ---- VIEW: INVENTARIO IPs ---- --}}
     <div id="view-inventario" class="hidden">
-        <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm mb-6">
+        <div class="bg-canvas border border-border rounded-xl overflow-hidden shadow-sm mb-6">
             <x-tabla-encabezado titulo="Inventario de IPs" tab="ips" exportUrl="{{ route('network.exportar') }}">
                 <x-slot:filtros>
                     <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Estado</label>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Estado</label>
                         <select id="net-filter-estatus" onchange="filterIpTable()"
-                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                                class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
                             <option value="">Todos</option>
                             <option value="ocupada">Ocupada</option>
                             <option value="libre">Libre</option>
@@ -131,9 +131,9 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Área</label>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Área</label>
                         <select id="net-filter-area" onchange="filterIpTable()"
-                                class="text-sm border border-[#E5E7EB] rounded px-3 py-1.5 bg-white outline-none focus:ring-2 focus:ring-[#621132]">
+                                class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
                             <option value="">Todas</option>
                             @foreach($rangos as $r)
                             <option value="{{ strtolower($r->siglas_real ?? '') }}">{{ $r->siglas_real ?: $r->area_nombre }} — {{ Str::limit($r->area_nombre, 35) }}</option>
@@ -144,46 +144,46 @@
             </x-tabla-encabezado>
         </div>
 
-        <div class="bg-white rounded-xl border border-[#E5E7EB] shadow-sm overflow-hidden">
+        <div class="bg-canvas rounded-xl border border-border shadow-sm overflow-hidden">
             <table class="w-full text-left">
-                <thead class="bg-[#F3F4F6] border-b border-[#E5E7EB]">
+                <thead class="bg-wash border-b border-border">
                     <tr>
-                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#544246]">IP Address</th>
-                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Usuario Asignado</th>
-                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Dispositivo</th>
-                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#544246]">Estado</th>
-                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-[#544246] text-right">Detalles</th>
+                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-muted">IP Address</th>
+                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-muted">Usuario Asignado</th>
+                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-muted">Dispositivo</th>
+                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-muted">Estado</th>
+                        <th class="px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-muted text-right">Detalles</th>
                     </tr>
                 </thead>
-                <tbody id="ip-tbody" class="divide-y divide-[#E5E7EB]">
+                <tbody id="ip-tbody" class="divide-y divide-border">
                     @forelse($ipsAll as $ip)
-                    <tr class="hover:bg-[#D4C19C]/5 transition-colors cursor-pointer"
+                    <tr class="hover:bg-gold/5 transition-colors cursor-pointer"
                         data-area="{{ strtolower($ip->departamento_pestana ?? '') }}"
                         data-estatus="{{ strtolower($ip->estatus ?? 'libre') }}"
                         onclick="openIpPanel('{{ $ip->ip }}', '{{ addslashes($ip->usuario ?? '—') }}', '{{ addslashes($ip->area_excel ?? $ip->departamento_pestana ?? '—') }}')">
-                        <td class="px-6 py-3 font-mono text-sm text-[#621132]">{{ $ip->ip }}</td>
+                        <td class="px-6 py-3 font-mono text-sm text-brand">{{ $ip->ip }}</td>
                         <td class="px-6 py-3 text-sm">{{ $ip->usuario ?: '—' }}</td>
-                        <td class="px-6 py-3 text-sm text-[#544246]">{{ $ip->tipo_equipo ?: '—' }}
+                        <td class="px-6 py-3 text-sm text-muted">{{ $ip->tipo_equipo ?: '—' }}
                             @if($ip->marca) · {{ $ip->marca }} @endif
                         </td>
                         <td class="px-6 py-3">
                             @if(strtolower($ip->estatus ?? '') === 'ocupada')
-                            <span class="bg-[#166534]/10 text-[#166534] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Ocupada</span>
+                            <span class="bg-status-active/10 text-status-active px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Ocupada</span>
                             @elseif(strtolower($ip->estatus ?? '') === 'reservada')
-                            <span class="bg-[#9A3412]/10 text-[#9A3412] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Reservada</span>
+                            <span class="bg-status-low/10 text-status-low px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Reservada</span>
                             @else
-                            <span class="bg-[#1E40AF]/10 text-[#1E40AF] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Libre</span>
+                            <span class="bg-status-free/10 text-status-free px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Libre</span>
                             @endif
                         </td>
                         <td class="px-6 py-3 text-right">
-                            <button class="p-1.5 hover:bg-[#F3F4F6] rounded text-[#544246] hover:text-[#621132]">
+                            <button class="p-1.5 hover:bg-wash rounded text-muted hover:text-brand">
                                 <span class="material-symbols-outlined text-sm">info</span>
                             </button>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" class="px-6 py-10 text-center text-[#544246] text-sm">Sin IPs registradas</td>
+                        <td colspan="5" class="px-6 py-10 text-center text-muted text-sm">Sin IPs registradas</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -193,13 +193,13 @@
 </div>
 
 {{-- Side Panel: IP Detail --}}
-<div class="fixed top-0 right-0 h-screen w-[400px] bg-white shadow-2xl border-l border-[#D4C19C] z-[60] detail-panel closed flex flex-col" id="ip-panel">
-    <div class="p-6 border-b border-[#E5E7EB] bg-[#fbf9f8] flex justify-between items-center">
+<div class="fixed top-0 right-0 h-screen w-[400px] bg-canvas shadow-2xl border-l border-gold z-[60] detail-panel closed flex flex-col" id="ip-panel">
+    <div class="p-6 border-b border-border bg-surface flex justify-between items-center">
         <div>
-            <p class="text-[11px] font-bold uppercase tracking-wider text-[#544246]">Detalles de Dispositivo</p>
-            <h2 class="font-mono text-xl font-bold text-[#621132]" id="panel-ip-addr">—.—.—.—</h2>
+            <p class="text-[11px] font-bold uppercase tracking-wider text-muted">Detalles de Dispositivo</p>
+            <h2 class="font-mono text-xl font-bold text-brand" id="panel-ip-addr">—.—.—.—</h2>
         </div>
-        <button class="w-10 h-10 rounded-full hover:bg-[#F3F4F6] flex items-center justify-center transition-colors" onclick="closeIpPanel()">
+        <button class="w-10 h-10 rounded-full hover:bg-wash flex items-center justify-center transition-colors" onclick="closeIpPanel()">
             <span class="material-symbols-outlined">close</span>
         </button>
     </div>
@@ -207,27 +207,27 @@
     <div class="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
         {{-- Hardware Specs --}}
         <section>
-            <h4 class="text-[11px] font-bold uppercase tracking-wider text-[#544246] mb-4 pb-2 border-b border-[#E5E7EB]">
+            <h4 class="text-[11px] font-bold uppercase tracking-wider text-muted mb-4 pb-2 border-b border-border">
                 Información Técnica
             </h4>
             <div class="grid grid-cols-2 gap-4 text-sm">
                 <div class="space-y-1">
-                    <p class="text-[10px] text-[#544246] font-medium">MAC Address</p>
+                    <p class="text-[10px] text-muted font-medium">MAC Address</p>
                     <p class="font-mono text-sm" id="panel-mac">—</p>
                 </div>
                 <div class="space-y-1">
-                    <p class="text-[10px] text-[#544246] font-medium">Tipo Conexión</p>
+                    <p class="text-[10px] text-muted font-medium">Tipo Conexión</p>
                     <p class="text-sm flex items-center gap-1">
                         <span class="material-symbols-outlined text-sm">settings_ethernet</span>
                         Ethernet
                     </p>
                 </div>
                 <div class="space-y-1">
-                    <p class="text-[10px] text-[#544246] font-medium">Usuario</p>
+                    <p class="text-[10px] text-muted font-medium">Usuario</p>
                     <p class="text-sm font-bold" id="panel-ip-user">—</p>
                 </div>
                 <div class="space-y-1">
-                    <p class="text-[10px] text-[#544246] font-medium">Área</p>
+                    <p class="text-[10px] text-muted font-medium">Área</p>
                     <p class="text-sm" id="panel-ip-area">—</p>
                 </div>
             </div>
@@ -235,9 +235,9 @@
 
         {{-- Permisos de Navegación --}}
         <section>
-            <div class="flex items-center justify-between mb-4 pb-2 border-b border-[#E5E7EB]">
-                <h4 class="text-[11px] font-bold uppercase tracking-wider text-[#544246]">Permisos de Navegación</h4>
-                <span class="text-[10px] bg-[#D4C19C]/20 text-[#621132] px-2 py-0.5 font-bold rounded">Perfil: Estándar</span>
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-border">
+                <h4 class="text-[11px] font-bold uppercase tracking-wider text-muted">Permisos de Navegación</h4>
+                <span class="text-[10px] bg-gold/20 text-brand px-2 py-0.5 font-bold rounded">Perfil: Estándar</span>
             </div>
             <div class="grid grid-cols-3 gap-3">
                 @php $perms = [
@@ -249,10 +249,10 @@
                     ['icon'=>'public',          'label'=>'Intranet',    'ok'=>true],
                 ]; @endphp
                 @foreach($perms as $p)
-                <div class="p-3 bg-[#fbf9f8] border border-[#E5E7EB] rounded flex flex-col items-center gap-1 text-center {{ !$p['ok'] ? 'grayscale opacity-60' : '' }}">
-                    <span class="material-symbols-outlined {{ $p['ok'] ? 'text-[#166534]' : 'text-[#991B1B]' }}">{{ $p['icon'] }}</span>
+                <div class="p-3 bg-surface border border-border rounded flex flex-col items-center gap-1 text-center {{ !$p['ok'] ? 'grayscale opacity-60' : '' }}">
+                    <span class="material-symbols-outlined {{ $p['ok'] ? 'text-status-active' : 'text-status-critical' }}">{{ $p['icon'] }}</span>
                     <span class="text-[10px] font-medium leading-tight">{{ $p['label'] }}</span>
-                    <span class="material-symbols-outlined text-xs {{ $p['ok'] ? 'text-[#166534]' : 'text-[#991B1B]' }}"
+                    <span class="material-symbols-outlined text-xs {{ $p['ok'] ? 'text-status-active' : 'text-status-critical' }}"
                           style="font-variation-settings:'FILL' 1">{{ $p['ok'] ? 'check_circle' : 'cancel' }}</span>
                 </div>
                 @endforeach
@@ -261,17 +261,17 @@
 
         {{-- Historial Reciente --}}
         <section>
-            <h4 class="text-[11px] font-bold uppercase tracking-wider text-[#544246] mb-4 pb-2 border-b border-[#E5E7EB]">Historial Reciente</h4>
-            <div class="text-center text-[#544246] py-6">
+            <h4 class="text-[11px] font-bold uppercase tracking-wider text-muted mb-4 pb-2 border-b border-border">Historial Reciente</h4>
+            <div class="text-center text-muted py-6">
                 <span class="material-symbols-outlined text-3xl block mb-2">history</span>
                 <p class="text-sm">Sin historial disponible</p>
             </div>
         </section>
     </div>
 
-    <div class="p-6 border-t border-[#E5E7EB] bg-[#F3F4F6] flex gap-3">
-        <button class="flex-1 py-3 bg-[#621132] text-white font-bold rounded-lg text-sm hover:opacity-90 transition-opacity">Editar Configuración</button>
-        <button class="flex-1 py-3 bg-white border border-[#D4C19C] text-[#621132] font-bold rounded-lg text-sm hover:bg-[#D4C19C]/10 transition-colors">Liberar IP</button>
+    <div class="p-6 border-t border-border bg-wash flex gap-3">
+        <button class="flex-1 py-3 bg-brand text-white font-bold rounded-lg text-sm hover:opacity-90 transition-opacity">Editar Configuración</button>
+        <button class="flex-1 py-3 bg-canvas border border-gold text-brand font-bold rounded-lg text-sm hover:bg-gold/10 transition-colors">Liberar IP</button>
     </div>
 </div>
 
@@ -284,8 +284,8 @@ function switchNetTab(tab) {
     document.getElementById('view-rangos').classList.toggle('hidden', !isRangos);
     document.getElementById('view-inventario').classList.toggle('hidden', isRangos);
 
-    const activeClass = 'px-4 py-2 rounded-md text-sm font-bold transition-all bg-white text-[#621132] shadow-sm';
-    const inactiveClass = 'px-4 py-2 rounded-md text-sm font-bold transition-all text-[#544246] hover:bg-[#eae8e7]';
+    const activeClass = 'px-4 py-2 rounded-md text-sm font-bold transition-all bg-canvas text-brand shadow-sm';
+    const inactiveClass = 'px-4 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high';
     document.getElementById('nav-rangos').className = isRangos ? activeClass : inactiveClass;
     document.getElementById('nav-inventario').className = !isRangos ? activeClass : inactiveClass;
 }

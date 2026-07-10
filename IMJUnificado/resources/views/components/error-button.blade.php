@@ -3,7 +3,7 @@
 
     {{-- Panel de errores (arriba del botón) --}}
     <div id="error-panel"
-         class="absolute bottom-20 right-0 w-80 bg-white rounded-2xl shadow-2xl border border-red-100 overflow-hidden
+         class="absolute bottom-20 right-0 w-80 bg-canvas rounded-2xl shadow-2xl border border-red-100 overflow-hidden
                 transition-all duration-200 origin-bottom-right scale-95 opacity-0 pointer-events-none"
          style="transform-origin: bottom right;">
         <div class="bg-red-50 border-b border-red-100 px-4 py-3 flex items-center justify-between">
@@ -19,7 +19,7 @@
         </div>
         <ul class="px-4 py-3 space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
             @foreach($errors->all() as $error)
-            <li class="flex items-start gap-2 text-sm text-[#1b1c1c]">
+            <li class="flex items-start gap-2 text-sm text-ink">
                 <span class="material-symbols-outlined text-red-400 shrink-0" style="font-size:16px;margin-top:2px">chevron_right</span>
                 {{ $error }}
             </li>
@@ -35,7 +35,7 @@
                    transition-all duration-150 cursor-pointer"
             title="{{ $errors->count() }} {{ $errors->count() === 1 ? 'error en el formulario' : 'errores en el formulario' }}">
         <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;font-size:26px">error</span>
-        <span class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-white text-red-600 text-[10px] font-bold
+        <span class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-canvas text-red-600 text-[10px] font-bold
                      flex items-center justify-center border-2 border-red-600">
             {{ $errors->count() }}
         </span>
