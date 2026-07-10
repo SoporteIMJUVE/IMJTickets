@@ -98,11 +98,24 @@
             @auth
                 <!-- Botones de administración -->
                 <div class="relative inline-block">                    
+                    {{-- Botón cambiar al sistema de inventario --}}
+                    @if(env('INVENTARIO_URL'))
+                    <a href="{{ env('INVENTARIO_URL') }}" target="_blank"
+                       class="btn btn-outline btn-sm tooltip tooltip-bottom"
+                       data-tip="Abrir sistema de inventario (Streamlit)">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                        </svg>
+                        <span class="hidden xl:inline">Inventario</span>
+                    </a>
+                    @endif
+
                     <button wire:click="logout" class="btn btn-imjuve">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24">
                             <path fill="currentColor" d="M6 2h9a2 2 0 0 1 2 2v2h-2V4H6v16h9v-2h2v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2"/>
                             <path fill="currentColor" d="M16.09 15.59L17.5 17l5-5l-5-5l-1.41 1.41L18.67 11H9v2h9.67z"/>
-                        </svg>    
+                        </svg>
                         <span class="hidden xl:inline">Cerrar sesión</span>
                     </button>
 

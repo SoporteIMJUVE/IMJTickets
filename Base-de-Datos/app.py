@@ -724,6 +724,18 @@ menu = st.sidebar.selectbox("Selecciona un modulo", [
     "📦 Insumos",
 ])
 
+_tickets_url = os.getenv("TICKETS_URL", "")
+if _tickets_url:
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(
+        f'<a href="{_tickets_url}" target="_blank" style="'
+        'display:block;text-align:center;padding:8px 12px;'
+        'background:#621132;color:white;border-radius:8px;'
+        'font-weight:600;font-size:14px;text-decoration:none;">'
+        '🎫 Ir al sistema de tickets</a>',
+        unsafe_allow_html=True,
+    )
+
 # ════════════════════════════════════════
 # INICIO
 # ════════════════════════════════════════
