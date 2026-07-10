@@ -1,61 +1,153 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# IMJTickets + Inventario IMJUVE
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistema de gestión de tickets de soporte técnico y control de inventario para el **Instituto Mexicano de la Juventud**.
 
-## About Laravel
+Este repositorio contiene dos sistemas independientes que pueden ejecutarse en paralelo y enlazarse mediante un botón de cambio:
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+| Sistema | Tecnología | Puerto por defecto |
+|---|---|---|
+| **IMJTickets** — tickets de soporte | Laravel 12 + Livewire | `8000` |
+| **Inventario** — equipos, IPs, insumos | Python 3 + Streamlit + PostgreSQL | `8501` |
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Requisitos previos
 
-## Learning Laravel
+- PHP >= 8.2 + Composer
+- Node.js >= 18 + npm
+- Python >= 3.10 + pip
+- PostgreSQL >= 14 (para el sistema de inventario)
+- `psql` disponible en el PATH (para el script de arranque del inventario)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+---
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## 1. Sistema de Tickets (Laravel)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Instalación
 
-## Laravel Sponsors
+```bash
+# Desde la raíz del repositorio
+composer install
+npm install && npm run build
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### Variables de entorno (`.env`)
 
-### Premium Partners
+```
+APP_URL=http://localhost:8000
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+# URL del sistema de inventario Streamlit (activa el botón de cambio en el navbar)
+INVENTARIO_URL=http://localhost:8501
+```
 
-## Contributing
+### Arranque
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+php artisan serve
+```
 
-## Code of Conduct
+Accede en: `http://localhost:8000`
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+---
 
-## Security Vulnerabilities
+## 2. Sistema de Inventario (Streamlit)
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+El inventario conecta a **PostgreSQL**. El script `start.sh` verifica si la base de datos tiene tablas; si está vacía, importa automáticamente el dump antes de levantar la aplicación.
 
-## License
+### Instalación
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+cd Base-de-Datos
+pip install -r requirements.txt
+```
+
+### Base de datos
+
+1. Crea la base de datos en PostgreSQL:
+
+```sql
+CREATE DATABASE imjuve;
+```
+
+2. Coloca el dump en la ruta esperada:
+
+```
+/home/robute/Documentos/codes/IPMJ_proyect/DB_source/sistemitas.sql
+```
+
+> El archivo `DB_source/sistemitas.sql.example` contiene el schema completo sin datos. Úsalo como referencia de la estructura esperada.
+
+### Variables de entorno (`Base-de-Datos/.env`)
+
+```
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=imjuve
+DB_USER=postgres
+DB_PASS=tu_password
+
+# URL del sistema de tickets Laravel (activa el botón de cambio en el sidebar)
+TICKETS_URL=http://localhost:8000
+```
+
+### Arranque
+
+```bash
+cd Base-de-Datos
+./start.sh
+```
+
+El script:
+1. Lee `Base-de-Datos/.env`
+2. Comprueba si la tabla `usuarios` existe en PostgreSQL
+3. Si la base está vacía — importa `DB_source/sistemitas.sql`
+4. Lanza `streamlit run app.py`
+
+Accede en: `http://localhost:8501`
+
+---
+
+## Cambio entre sistemas
+
+Una vez que ambos están corriendo:
+
+- Desde **IMJTickets**: botón **Inventario** en el navbar (solo visible si `INVENTARIO_URL` está configurado)
+- Desde **Inventario**: botón **Ir al sistema de tickets** al fondo del sidebar (solo visible si `TICKETS_URL` está configurado)
+
+Ambos botones abren el otro sistema en una nueva pestaña.
+
+---
+
+## Estructura del repositorio
+
+```
+/
+├── app/                        # Laravel — lógica de la aplicación
+├── resources/views/            # Laravel — vistas Blade + Livewire
+├── routes/                     # Laravel — rutas web
+├── database/migrations/        # Laravel — migraciones
+├── Base-de-Datos/
+│   ├── app.py                  # Streamlit — aplicación principal (~2700 líneas)
+│   ├── start.sh                # Script de arranque con auto-importación de BD
+│   ├── requirements.txt        # Dependencias Python
+│   └── .env                    # Credenciales PostgreSQL (no versionado)
+└── DB_source/
+    └── sistemitas.sql.example  # Schema PostgreSQL sin datos (referencia)
+    # sistemitas.sql            # Dump real con datos institucionales (NO versionado)
+```
+
+---
+
+## Datos sensibles — qué NO se versiona
+
+| Archivo | Razón |
+|---|---|
+| `.env` / `Base-de-Datos/.env` | Credenciales de base de datos |
+| `DB_source/sistemitas.sql` | Dump con datos institucionales reales |
+| `Base-de-Datos/*.xlsx` / `*.csv` | Inventario con nombres y series de equipos |
+| `Base-de-Datos/*.pdf` | Resguardos firmados |
+
+Ver `.gitignore` para la lista completa.

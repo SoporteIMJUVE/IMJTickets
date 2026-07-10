@@ -1,9 +1,8 @@
-# ─── Laravel / PHP ──────────────────────────────────────
+# Laravel / PHP
 /vendor/
 node_modules/
 npm-debug.log
 yarn-error.log
-
 bootstrap/compiled.php
 app/storage/
 public/storage
@@ -17,7 +16,7 @@ storage/*.key
 .phpactor.json
 auth.json
 
-# ─── Python / Streamlit (Base-de-Datos) ────────────────
+# Python / Streamlit (Base-de-Datos)
 __pycache__/
 *.pyc
 .vscode/
@@ -25,7 +24,7 @@ __pycache__/
 iniciodeSesion.txt
 app_local_backup.py
 
-# ─── Credenciales y configuración local ─────────────────
+# Credenciales y configuracion local
 .env
 .env.backup
 .env.production
@@ -33,9 +32,21 @@ Homestead.yaml
 Homestead.json
 /.vagrant
 
-# ─── Backups de base de datos ──────────��────────────────
+# Backups de base de datos con datos reales (NUNCA versionar)
+# Solo se versiona *.sql.example (schema sin datos institucionales)
 *.dump
 *.sql
+!*.sql.example
 
-# ─── SQLite local ───────────────────────────────────────
+# Datos sensibles del inventario (Base-de-Datos)
+# Archivos Excel y CSV con informacion institucional real
+Base-de-Datos/*.xlsx
+Base-de-Datos/*.csv
+Base-de-Datos/*.pdf
+Base-de-Datos/settings.local.json
+Base-de-Datos/prueba.py
+Base-de-Datos/pruebas.py
+
+# SQLite local (IMJUnificado)
 /IMJUnificado/database/database.sqlite
+IMJUnificado/
