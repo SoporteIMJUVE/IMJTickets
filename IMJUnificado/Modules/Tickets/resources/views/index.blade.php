@@ -31,10 +31,11 @@
                     Kanban
                 </button>
             </div>
-            <a href="{{ route('tickets.create') }}" class="px-4 py-2 bg-[#621132] text-white rounded-lg flex items-center gap-2 hover:opacity-90 text-sm font-bold">
-                <span class="material-symbols-outlined text-sm">add</span>
-                Nuevo Ticket
-            </a>
+            <button onclick="alert('Ajustes del módulo aún no disponibles.')"
+                    class="p-2 border border-[#E5E7EB] rounded-lg hover:bg-[#F3F4F6] transition-colors text-[#544246]"
+                    title="Ajustes">
+                <span class="material-symbols-outlined text-sm">settings</span>
+            </button>
         </div>
     </div>
 
@@ -42,6 +43,10 @@
     <div class="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden shadow-sm mb-6">
         <x-tabla-encabezado titulo="Gestión de Tickets" tab="tickets" exportUrl="{{ route('tickets.exportar') }}" :importar="false">
             <x-slot:acciones>
+                <a href="{{ route('tickets.create') }}" class="px-4 py-2 bg-[#621132] text-white rounded-lg flex items-center gap-2 hover:opacity-90 text-sm font-bold">
+                        <span class="material-symbols-outlined text-sm">add</span>
+                        Nuevo Ticket
+                </a>
                 <span class="text-xs text-[#544246] mr-2">
                     Total: <span class="font-bold text-[#621132]" id="total-visible">{{ $tickets->count() }}</span> tickets
                 </span>

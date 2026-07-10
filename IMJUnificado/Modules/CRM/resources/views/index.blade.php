@@ -2,19 +2,17 @@
 <div class="p-8 relative" id="crm-page">
 
     {{-- Header --}}
+    {{-- Header + toggle de vista --}}
     <div class="flex justify-between items-end mb-8">
         <div>
             <h2 class="text-[32px] font-bold leading-10 tracking-tight text-[#621132]">Gestión de Usuarios</h2>
             <p class="text-[#544246] text-sm mt-1">Directorio institucional y asignación de activos.</p>
         </div>
-        <div class="flex gap-3">
-            <button class="px-4 py-2 border border-[#D4C19C] text-[#621132] rounded flex items-center gap-2 hover:bg-[#eae8e7] transition-colors text-sm font-bold">
-                <span class="material-symbols-outlined text-sm">filter_list</span>
-                Filtrar
-            </button>
-            <button onclick="openNuevoModal()" class="px-4 py-2 bg-[#621132] text-white rounded flex items-center gap-2 hover:opacity-90 transition-opacity text-sm font-bold">
-                <span class="material-symbols-outlined text-sm">person_add</span>
-                Nuevo Usuario
+        <div class="flex items-center gap-3">
+            <button onclick="alert('Ajustes del módulo aún no disponibles.')"
+                    class="p-2 border border-[#E5E7EB] rounded-lg hover:bg-[#F3F4F6] transition-colors text-[#544246]"
+                    title="Ajustes">
+                <span class="material-symbols-outlined text-sm">settings</span>
             </button>
         </div>
     </div>
@@ -64,6 +62,12 @@
 
         {{-- Encabezado con filtros --}}
         <x-tabla-encabezado titulo="Directorio de Empleados" tab="crm" exportUrl="{{ route('crm.exportar') }}">
+            <x-slot:acciones>
+                    <button onclick="openNuevoModal()" class="px-4 py-2 bg-[#621132] text-white rounded flex items-center gap-2 hover:opacity-90 transition-opacity text-sm font-bold">
+                        <span class="material-symbols-outlined text-sm">person_add</span>
+                        Nuevo Usuario
+                    </button>
+            </x-slot:acciones>
             <x-slot:filtros>
                 <div>
                     <label class="block text-[10px] font-bold uppercase tracking-wider text-[#544246] mb-1">Buscar</label>
@@ -118,7 +122,7 @@
                         $correo = strtolower(
                             iconv('UTF-8','ASCII//TRANSLIT', preg_replace('/\s+/','.',explode(' ', trim($emp->nombre))[0])) .
                             '.' . iconv('UTF-8','ASCII//TRANSLIT', $emp->apellido_paterno ?? 'imjuve')
-                        ) . '@imjuve.gob.mx';
+                        ) . '@imjuventud.gob.mx';
                     @endphp
                     <tr class="hover:bg-[#D4C19C]/5 transition-colors cursor-pointer group user-row"
                         data-id="{{ $emp->id_empleado }}"
@@ -846,7 +850,7 @@ document.getElementById('form-nuevo-usuario')?.addEventListener('submit', async 
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-[#544246] mb-1">Correo institucional</label>
-                        <input type="email" name="correo" placeholder="ana.garcia@imjuve.gob.mx"
+                        <input type="email" name="correo" placeholder="ana.garcia@imjuventud.gob.mx"
                             class="w-full border border-[#E5E7EB] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#621132]">
                     </div>
                 </div>

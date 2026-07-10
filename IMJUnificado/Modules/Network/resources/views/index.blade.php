@@ -1,22 +1,30 @@
 <x-layouts.app title="Red e IPs — IMJUVE CRM">
 <div class="p-8" id="network-page">
 
-    {{-- Header --}}
-    <div class="mb-8">
-        <h2 class="text-[32px] font-bold leading-10 tracking-tight text-[#621132]">Gestión de Red e IPs</h2>
-        <p class="text-[#544246] text-sm mt-1">Monitoreo y administración de infraestructura de red institucional.</p>
-    </div>
-
-    {{-- Tabs: Rangos / Inventario --}}
-    <div class="flex items-center border-b border-[#E5E7EB] mb-6">
-        <button id="nav-rangos" onclick="switchNetTab('rangos')"
-                class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider border-b-2 border-[#621132] text-[#621132] transition-all">
-            Rangos y Disponibilidad
-        </button>
-        <button id="nav-inventario" onclick="switchNetTab('inventario')"
-                class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246] hover:text-[#621132] transition-all">
-            Inventario de IPs
-        </button>
+{{-- Header + toggle de vista --}}
+    {{-- Header + toggle de vista --}}
+    <div class="flex justify-between items-end mb-6">
+        <div>
+            <h2 class="text-[32px] font-bold leading-10 tracking-tight text-[#621132]">Gestión de Red e IPs</h2>
+            <p class="text-[#544246] text-sm mt-1">Monitoreo y administración de infraestructura de red institucional.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="flex bg-[#F3F4F6] rounded-lg p-1">
+                <button id="nav-rangos" onclick="switchNetTab('rangos')"
+                        class="px-4 py-2 rounded-md text-sm font-bold transition-all bg-white text-[#621132] shadow-sm">
+                    Rangos y Disponibilidad
+                </button>
+                <button id="nav-inventario" onclick="switchNetTab('inventario')"
+                        class="px-4 py-2 rounded-md text-sm font-bold transition-all text-[#544246] hover:bg-[#eae8e7]">
+                    Inventario de IPs
+                </button>
+            </div>
+            <button onclick="alert('Ajustes del módulo aún no disponibles.')"
+                    class="p-2 border border-[#E5E7EB] rounded-lg hover:bg-[#F3F4F6] transition-colors text-[#544246]"
+                    title="Ajustes">
+                <span class="material-symbols-outlined text-sm">settings</span>
+            </button>
+        </div>
     </div>
 
     {{-- ---- VIEW: RANGOS ---- --}}
@@ -276,8 +284,8 @@ function switchNetTab(tab) {
     document.getElementById('view-rangos').classList.toggle('hidden', !isRangos);
     document.getElementById('view-inventario').classList.toggle('hidden', isRangos);
 
-    const activeClass = 'px-6 py-3 text-[11px] font-bold uppercase tracking-wider border-b-2 border-[#621132] text-[#621132] transition-all';
-    const inactiveClass = 'px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-[#544246] hover:text-[#621132] transition-all';
+    const activeClass = 'px-4 py-2 rounded-md text-sm font-bold transition-all bg-white text-[#621132] shadow-sm';
+    const inactiveClass = 'px-4 py-2 rounded-md text-sm font-bold transition-all text-[#544246] hover:bg-[#eae8e7]';
     document.getElementById('nav-rangos').className = isRangos ? activeClass : inactiveClass;
     document.getElementById('nav-inventario').className = !isRangos ? activeClass : inactiveClass;
 }
