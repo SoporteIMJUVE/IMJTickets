@@ -899,6 +899,14 @@ document.getElementById('form-nuevo-usuario')?.addEventListener('submit', async 
         btn.textContent = orig;
     }
 });
+
+// Deep-link: ?open=id_empleado abre el panel del usuario directamente
+(function () {
+    const id = new URLSearchParams(location.search).get('open');
+    if (!id) return;
+    const row = document.querySelector(`tr[data-id="${id}"]`);
+    if (row) { row.scrollIntoView({ block: 'center' }); openUserPanel(row); }
+})();
 </script>
 
 {{-- ═══════════════════════════════════════════════════════════════════════ --}}

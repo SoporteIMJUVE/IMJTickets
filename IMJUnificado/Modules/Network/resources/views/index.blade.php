@@ -158,6 +158,7 @@
                 <tbody id="ip-tbody" class="divide-y divide-border">
                     @forelse($ipsAll as $ip)
                     <tr class="hover:bg-gold/5 transition-colors cursor-pointer"
+                        data-ip="{{ $ip->ip }}"
                         data-area="{{ strtolower($ip->departamento_pestana ?? '') }}"
                         data-estatus="{{ strtolower($ip->estatus ?? 'libre') }}"
                         onclick="openIpPanel('{{ $ip->ip }}', '{{ addslashes($ip->usuario ?? '—') }}', '{{ addslashes($ip->area_excel ?? $ip->departamento_pestana ?? '—') }}')">
@@ -316,5 +317,13 @@ function filterIpTable() {
         row.style.display = (areaOk && statOk) ? '' : 'none';
     });
 }
+
+// Deep-link: ?open=ip abre el panel de esa IP directamente
+(function () {
+    const ip = new URLSearchParams(location.search).get('open');
+    if (!ip) return;
+    const row = document.querySelector(`tr[data-ip="${ip}"]`);
+    if (row) { row.scrollIntoView({ block: 'center' }); row.click(); }
+})();
 </script>
 </x-layouts.app>

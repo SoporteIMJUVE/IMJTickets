@@ -736,6 +736,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Escape cierra panel
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePanel(); });
+
+    // Deep-link: ?open=id abre el panel del ticket directamente
+    const openId = new URLSearchParams(location.search).get('open');
+    if (openId) {
+        const el = document.querySelector(`[data-ticket-id="${openId}"]`);
+        if (el) openPanel(el);
+    }
 });
 </script>
 </x-layouts.app>

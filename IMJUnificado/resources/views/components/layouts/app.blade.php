@@ -115,12 +115,21 @@
     {{-- TopBar --}}
     <header class="h-16 bg-canvas border-b border-border shadow-sm flex justify-between items-center px-8 z-40 sticky top-0">
         <div class="flex items-center flex-1 max-w-xl">
-            <div class="relative w-full">
-                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted">search</span>
-                <input class="w-full bg-wash border-none rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-brand outline-none"
-                       placeholder="Buscar empleados, departamentos, activos..."
-                       type="text">
-            </div>
+            <form id="global-search-form" action="{{ route('dashboard') }}" method="GET"
+                  class="relative w-full" onsubmit="submitSearch(event)">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none">search</span>
+                <input id="global-search"
+                       name="q"
+                       value="{{ request('q') }}"
+                       class="w-full bg-wash border border-transparent rounded-lg pl-10 pr-10 py-2 text-sm focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all"
+                       placeholder="Buscar en todo el sistema… (Enter)"
+                       type="text"
+                       autocomplete="off">
+                <button type="submit"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-brand transition-colors">
+                    <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                </button>
+            </form>
         </div>
         <div class="flex items-center gap-6 ml-6">
             <div class="flex items-center gap-4">
@@ -161,6 +170,23 @@
 <x-error-button />
 @livewireScripts
 <script>
+// ── Búsqueda global — Enter navega al dashboard con ?q= ──────────────────────
+function submitSearch(e) {
+    e.preventDefault();
+    const q = document.getElementById('global-search')?.value.trim();
+    if (!q) return;
+    window.location.href = '{{ route("dashboard") }}?q=' + encodeURIComponent(q);
+}
+
+// Ctrl+K o / para enfocar el buscador desde cualquier página
+document.addEventListener('keydown', function (e) {
+    if ((e.key === 'k' && (e.ctrlKey || e.metaKey))) {
+        e.preventDefault();
+        document.getElementById('global-search')?.focus();
+    }
+});
+
+// ── Toggle de tema ───────────────────────────────────────────────────────────
 function toggleTheme() {
     const root    = document.documentElement;
     const current = root.dataset.theme ?? 'light';

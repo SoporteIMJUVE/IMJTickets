@@ -631,5 +631,11 @@ async function guardarEstado(id) {
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') cerrarPanelEquipo();
 });
+
+// Deep-link: ?open=id abre el panel del equipo directamente
+(function () {
+    const id = new URLSearchParams(location.search).get('open');
+    if (id) abrirPanelEquipo(parseInt(id));
+})();
 </script>
 </x-layouts.app>
