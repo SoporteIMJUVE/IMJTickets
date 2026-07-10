@@ -60,7 +60,7 @@ routes/web.php            Modules/CRM/routes/web.php
 ```
 
 **Por qué es importante para este proyecto:**  
-El equipo es rotativo. Un becario puede trabajar en el módulo de Telefonos sin entender ni tocar el módulo de Tickets. Si introduce un bug en su módulo, los demás siguen funcionando. Es la diferencia entre construir un castillo de arena (todo junto) y construir con bloques LEGO (módulos separados).
+El equipo es rotativo. Un becario puede trabajar en el módulo de Kardex sin entender ni tocar el módulo de Tickets. Si introduce un bug en su módulo, los demás siguen funcionando. Es la diferencia entre construir un castillo de arena (todo junto) y construir con bloques LEGO (módulos separados).
 
 **Comandos clave:**
 ```bash

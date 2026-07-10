@@ -101,13 +101,20 @@ php artisan db:seed
 
 Crea el usuario `admin@imjuventud.gob.mx`, los tipos de ticket y las áreas.
 
-### Paso 6 — Importar datos desde el respaldo
+### Paso 6 — Importar datos y vincular relaciones
 
 ```bash
 php artisan app:boot --force
 ```
 
-Lee `DB_source/sistemitas.sql` e importa: departamentos, empleados, equipos de cómputo, teléfonos, impresoras, insumos y rangos IP. Si `imjtickets.sql` también está disponible, importa tickets y áreas de ese sistema.
+Lee `DB_source/sistemitas.sql` e importa: departamentos, empleados, equipos de cómputo, teléfonos, impresoras, insumos, rangos IP e inventario de IPs.
+
+Después de importar, el comando corre automáticamente el paso de vinculación:
+- Pobla `inventario_equipos.id_empleado` cruzando `nombre_usuario` con `empleados.(nombre + apellido_paterno)`
+- Pobla `inventario_equipos.ipv4` y `mac` desde `inventario_ips_completo` via `serie = cpu_serie`
+- Pobla `inventario_ips_completo.id_empleado` encadenando el join anterior
+
+Si `imjtickets.sql` también está disponible, importa tickets, áreas y tipos de ese sistema.
 
 ### Paso 7 — Instalar dependencias de Node.js y compilar
 
@@ -188,6 +195,60 @@ php artisan serve --host=0.0.0.0 --port=8000
 ```
 
 `--host=0.0.0.0` hace que el servidor sea accesible desde otros equipos en la red local.
+
+---
+
+## Flujo de trabajo con Git
+
+El proyecto usa tres niveles de ramas. **Nunca commitear directo a `main` ni a `developer`.**
+
+```
+main          ← producción, siempre estable y probada
+developer     ← integración, aquí se prueba antes de pasar a main
+feature/*     ← una rama por tarea, sale de developer y regresa a developer
+```
+
+### Paso a paso para un becario
+
+**1. Antes de empezar cualquier tarea, crear una rama desde `developer`:**
+
+```bash
+git checkout developer
+git pull origin developer
+git checkout -b feature/nombre-de-la-tarea
+```
+
+Ejemplos de nombres:
+```
+feature/kardex-excel-export
+feature/crm-panel-recursos
+feature/kardex-telefonos-tabletas
+fix/tickets-kanban-drag
+docs/mantenimiento-requisitos
+```
+
+**2. Trabajar y commitear en esa rama:**
+
+```bash
+git add archivo_modificado.php
+git commit -m "descripción clara de lo que hace el cambio"
+```
+
+**3. Cuando la tarea esté lista, abrir un Pull Request hacia `developer` en GitHub.**
+
+El encargado del proyecto revisa y aprueba el PR. Solo cuando está aprobado se hace merge.
+
+**4. De `developer` a `main` — solo cuando todo funciona:**
+
+Una vez que `developer` tiene funcionalidades probadas y estables, el encargado abre un PR de `developer` → `main`.
+
+### Reglas
+
+| Rama | Quién commitea | Cuándo |
+|---|---|---|
+| `feature/*` | Becarios | Durante el desarrollo |
+| `developer` | Solo por merge de PRs | Cuando una feature está lista |
+| `main` | Solo por merge de PRs | Cuando `developer` está probado |
 
 ---
 

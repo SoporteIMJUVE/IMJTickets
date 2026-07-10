@@ -45,6 +45,8 @@ erDiagram
         string ipv4
         string mac
         int id_empleado FK
+        string estado
+        string pdf_resguardo
     }
 
     impresoras {
@@ -94,6 +96,7 @@ erDiagram
         string tipo_equipo
         string marca
         string modelo
+        string serie
         string mac
         string departamento_pestana
         string estatus
@@ -204,14 +207,19 @@ Todos los equipos de cómputo asignados o en almacén.
 | `nombre_equipo` | string | Hostname del equipo |
 | `nombre_usuario` | string | Nombre del usuario asignado (texto libre del Excel original) |
 | `area` | string | Área donde está físicamente |
-| `cpu_marca/modelo/serie` | string | Especificaciones del procesador/equipo |
-| `cargador/docking_*` | string | Series de accesorios |
-| `ipv4` | string | IP asignada en la tabla de inventario |
+| `cpu_marca` / `cpu_modelo` | string | Fabricante y referencia del equipo |
+| `cpu_serie` | string | **Número de serie del fabricante** — clave para vincular con `inventario_ips_completo.serie` |
+| `cargador/docking_*` | string | Series de accesorios de laptop |
+| `monitor/teclado/mouse/nobreak_*` | string | Series de periféricos de PC |
+| `ipv4` | string | IP asignada — poblada desde `inventario_ips_completo.ip` via `serie = cpu_serie` |
 | `mac` | string | Dirección MAC |
-| `responsiva` | string | Número de resguardo/responsiva firmada |
-| `id_empleado` | FK | Empleado al que está asignado. NULL = en almacén |
+| `id_empleado` | FK | Empleado al que está asignado. Poblado por migración de datos desde `nombre_usuario`. NULL = en almacén o sin match |
+| `estado` | string nullable | `null`=derivado, `'mantenimiento'`, `'baja'` |
+| `pdf_resguardo` | string | Ruta relativa dentro de `storage/app/` al PDF de resguardo |
 
-**Datos actuales:** 183 equipos — 93 Laptops, 23 PCs Especializadas, 67 PCs Avanzadas.
+**Datos actuales:** 180 equipos. **110 tienen `id_empleado` poblado** (vinculados por nombre en la migración `2026_07_09_000002`); 70 en almacén o sin match de nombre. **19 tienen `ipv4` poblada** desde `inventario_ips_completo`.
+
+> **Nota:** los FK `id_empleado` en `inventario_equipos` estaban vacíos en la BD original (sistemitas.sql). La migración `2026_07_09_000002` los pobló haciendo `mb_strtolower(nombre_usuario)` contra `empleados.(nombre + apellido_paterno)`. El campo `nombre_usuario` sigue siendo el texto original como respaldo.
 
 ---
 
@@ -274,18 +282,22 @@ Todos los equipos de cómputo asignados o en almacén.
 | Campo | Tipo | Descripción |
 |---|---|---|
 | `ip` | string(45) UNIQUE | Dirección IP (índice único) |
-| `usuario` | string | Nombre del usuario que la usa |
-| `tipo_equipo` | string | Laptop, PC, impresora, etc. |
+| `usuario` | string | Login del usuario que la usa (texto del Excel, ej: `grivera`, `ELAP-JALOPEZ`) |
+| `tipo_equipo` | string | `LAP`, `lap`, `PC`, `pc`, `PCA`, `TABLET`, `CEL`, `IMPRESORA`, etc. |
 | `institucional_o_personal` | string | Si el equipo es del instituto o personal |
+| `serie` | string | **Número de serie del equipo** — se une con `inventario_equipos.cpu_serie` para vincular IP↔equipo |
 | `mac` | string | Dirección MAC del dispositivo |
 | `tipo_conexion` | string | Cableado / WiFi |
 | `config_red` | string | DHCP / Estática |
-| `departamento_pestana` | string | Siglas del área (DG, DBEJ, etc.) — indica de qué hoja del Excel vino |
+| `departamento_pestana` | string | Siglas del área (DG, DBEJ, etc.) |
 | `restricciones` | string | Restricciones de acceso especiales |
 | `youtube` / `facebook` / ... | string(10) | Permisos de acceso a servicios web por IP |
 | `estatus` | string | `'Ocupada'`, `'Libre'`, `'Reservada'` |
+| `id_empleado` | FK nullable | Poblado por migración `2026_07_09_000002` via la cadena `serie → inventario_equipos.cpu_serie → id_empleado` |
 
-**Datos actuales:** 11 rangos, 491 IPs distribuidas en 11 áreas.
+**Datos actuales:** 11 rangos, 490 IPs en 11 áreas. **17 tienen `id_empleado` poblado.**
+
+> **Cómo vincular IP con equipo:** el campo `serie` en esta tabla corresponde al número de serie físico del equipo. El join correcto es `LOWER(TRIM(inventario_ips_completo.serie)) = LOWER(TRIM(inventario_equipos.cpu_serie))` — necesario el LOWER/TRIM porque el Excel original tenía inconsistencias de mayúsculas y espacios. Los endpoints de CRM y Kardex usan esto como subquery COALESCE para devolver la IP real en tiempo de consulta.
 
 ---
 
@@ -371,59 +383,93 @@ flowchart LR
 
 ## Relaciones clave explicadas
 
-### Empleado ↔ Equipo (muchos a muchos implícito)
-En el diseño actual, `inventario_equipos.id_empleado` es una FK simple (un equipo → un empleado). Si un empleado tiene laptop y PC, aparece dos veces en la tabla. No hay tabla intermedia porque en la práctica institucional un empleado tiene máximo 2-3 equipos y la asignación es directa.
+### Empleado ↔ Equipo
+`inventario_equipos.id_empleado` es FK simple (un equipo → un empleado). Un empleado puede tener N equipos — aparece en N filas. No hay tabla intermedia porque la asignación institucional es directa.
+
+**Estado actual de los datos:** los FK estaban vacíos en el dump original. La migración `2026_07_09_000002` / paso 3 de `app:boot` los pobló comparando `nombre_usuario` contra `empleados.(nombre + apellido_paterno)` con `mb_strtolower` + `str_contains`. 110 de 180 equipos quedaron vinculados. Los 70 restantes no tienen nombre en el Excel o el nombre no coincide exactamente.
+
+### Equipo ↔ IP (la relación real)
+La IP de un equipo NO está en `inventario_equipos.ipv4` directamente en el dump original — ese campo estaba vacío. La IP real está en `inventario_ips_completo.ip` y se vincula por:
+
+```sql
+LOWER(TRIM(inventario_ips_completo.serie)) = LOWER(TRIM(inventario_equipos.cpu_serie))
+```
+
+Este join devuelve 19 coincidencias (de 180 equipos). El LOWER/TRIM es necesario porque el Excel original tenía inconsistencias de capitalización y espacios.
+
+En los endpoints de CRM y Kardex se usa COALESCE en tiempo de consulta:
+```sql
+COALESCE(
+    NULLIF(TRIM(inventario_equipos.ipv4), ''),
+    (SELECT ips.ip FROM inventario_ips_completo ips
+     WHERE LOWER(TRIM(ips.serie)) = LOWER(TRIM(inventario_equipos.cpu_serie))
+     LIMIT 1)
+) as ipv4_real
+```
 
 ### Empleado ↔ IP
-Similar: `inventario_ips_completo.id_empleado` puede ser NULL (IP libre) o apuntar a un empleado. La IP principal del equipo asignado queda reflejada también en `inventario_equipos.ipv4`.
+`inventario_ips_completo.id_empleado` puede ser NULL (IP libre) o apuntar a un empleado. Se pobló vía la cadena: `inventario_ips_completo.serie → inventario_equipos.cpu_serie → inventario_equipos.id_empleado`. 17 registros de IP quedaron vinculados.
 
-### Tickets ↔ Empleados (relación pendiente de implementar)
-Actualmente los tickets guardan el nombre y correo del solicitante como texto libre (herencia de IMJTickets original). La siguiente mejora lógica es agregar `id_empleado FK` a `tickets` para poder mostrar todos los tickets de un empleado en su panel lateral del CRM.
+### Tickets ↔ Empleados (relación pendiente)
+Los tickets guardan nombre y correo como texto libre (herencia de IMJTickets). La siguiente mejora es agregar `id_empleado FK` a `tickets` para conectar el historial de soporte al perfil del empleado en CRM.
 
 ---
 
 ## Migraciones — orden de ejecución
 
-Las migraciones deben correr en este orden por las dependencias FK:
-
 ```
-0001_01_01_000000  → users
+0001_01_01_000000  → users (Laravel base)
 0001_01_01_000001  → cache
 0001_01_01_000002  → jobs
-2025_01_01_000000  → users (agregar columna role)
+2025_01_01_000000  → users (columna role)
 2025_01_01_000001  → departamentos
-2025_01_01_000002  → empleados           (FK → departamentos)
-2025_01_01_000003  → telefonos           (FK → empleados)
-2025_01_01_000004  → inventario_equipos  (FK → empleados)
-2025_01_01_000005  → impresoras          (FK → empleados)
-2025_01_01_000006  → insumos + suministros (FK → insumos, departamentos)
+2025_01_01_000002  → empleados              (FK → departamentos)
+2025_01_01_000003  → telefonos              (FK → empleados)
+2025_01_01_000004  → inventario_equipos     (FK → empleados)
+2025_01_01_000005  → impresoras             (FK → empleados)
+2025_01_01_000006  → insumos + suministros  (FK → insumos, departamentos)
 2025_01_01_000007  → cat_rangos_ips + inventario_ips_completo (FK → empleados)
 2025_01_01_000010  → tickets + areas + tipos (FK → users)
+2026_07_09_000001  → inventario_equipos: agrega columna estado (nullable)
+2026_07_09_000002  → migración de datos (ver nota abajo)
 ```
 
-Ejecutar todo de una vez:
-```bash
-php artisan migrate:fresh --seed
-```
+> **Nota sobre `2026_07_09_000002`:** esta migración vincula FKs e IPs, pero depende de que los datos ya estén importados. Si se corre `migrate` en tablas vacías, no hace nada (sus WHERE incluyen `whereNull` y `EXISTS`). La lógica real se ejecuta dentro de `app:boot` justo después de importar los datos. **No es necesario correrla manualmente.**
 
-Ejecutar solo las nuevas (sin borrar datos):
+Comandos habituales:
+
 ```bash
+# Crear tablas (sin datos)
 php artisan migrate
+
+# Resetear BD completa y recrear
+php artisan migrate:fresh
+
+# Importar datos desde los respaldos legados (incluye vinculación de FKs)
+php artisan app:boot --force
+
+# Todo desde cero (setup limpio)
+php artisan migrate:fresh --force && php artisan db:seed && php artisan app:boot --force
 ```
 
 ---
 
-## Seeders — origen de los datos
+## Origen de los datos
 
-Los seeders leen directamente los archivos Excel en `../Base-de-Datos/`:
+Los datos vienen del comando `app:boot` que lee `DB_source/sistemitas.sql` (dump PostgreSQL del sistema de inventario original):
 
-| Seeder | Excel fuente | Hoja | Fila inicio |
-|---|---|---|---|
-| `DepartamentosSeeder` | `directorio_imjuve.xlsx` | Directorio | 2 |
-| `EmpleadosSeeder` | `directorio_imjuve.xlsx` | Directorio | 2 |
-| `InventarioEquiposSeeder` | `NUEVO INVENTARIO IMJUVE ABRIL 2026.1xlsx.xlsx` | laptop / PC Especializadas / PC Avanzadas | 4 |
-| `ImpressorasInsumoSeeder` | `SOLICITUDES TONER Y STOCK.xlsx` | Hoja2 | 4 (impresoras) / 20 (insumos) |
-| `InventarioIpsSeeder` | `Inventario IPS.xlsx` | RANGO + hojas por área | 4 / 3 |
-| `TicketsCatalogoSeeder` | (hardcoded) | — | — |
+| Tabla destino | Origen en sistemitas.sql | Registros |
+|---|---|---|
+| `departamentos` | tabla `departamentos` | 19 |
+| `empleados` | tabla `usuarios` | 127 |
+| `telefonos` | tabla `telefonos` | 19 |
+| `inventario_equipos` | tabla `inventario_equipos` | 180 |
+| `impresoras` | tabla `impresoras` | 11 |
+| `insumos` | tabla `insumos` | 3 |
+| `suministros` | tabla `suministros` | 4 |
+| `cat_rangos_ips` | tabla `cat_rangos_ips` | 11 |
+| `inventario_ips_completo` | tabla `inventario_ips_completo` | 490 |
 
-> Si los archivos Excel cambian, solo hay que volver a correr `php artisan db:seed` (sin `migrate:fresh` para no borrar otros datos).
+El seeder `db:seed` solo crea: usuario admin, catálogo de áreas y tipos de ticket.
+
+> Si el dump `sistemitas.sql` se actualiza, ejecuta `php artisan app:boot --force` para reimportar todo.

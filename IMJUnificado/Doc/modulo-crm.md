@@ -1,7 +1,7 @@
 # Módulo CRM — Directorio de Empleados
 
 **Ruta base:** `/crm`  
-**Estado:** ✅ Vista funcional — CRUD pendiente
+**Estado:** ✅ Funcional — CRUD completo, panel lateral con equipos e IPs reales
 
 ---
 
@@ -19,11 +19,11 @@ El panel lateral (derecho) permite ver el detalle completo de un empleado: sus a
 Modules/CRM/
 ├── app/
 │   └── Http/Controllers/
-│       └── CRMController.php    ← lógica (actualmente vacío — ver deuda técnica)
+│       └── CRMController.php    ← store, update, destroy, reactivar
 ├── resources/views/
-│   └── index.blade.php          ← tabla de empleados + panel lateral
+│   └── index.blade.php          ← tabla de empleados + panel lateral + modales
 └── routes/
-    └── web.php                  ← ⚠️ tiene queries en el archivo de rutas (ver convenciones.md)
+    └── web.php                  ← rutas (closures para GET, CRMController para escritura)
 ```
 
 ---
@@ -57,91 +57,112 @@ Modules/CRM/
 ## Rutas
 
 ```
-GET /crm   → CRMController@index   (solo auth)
+GET    /crm                          → tabla de empleados + KPIs (closure en routes/web.php)
+POST   /crm/empleados                → alta de nuevo empleado (CRMController@store)
+PATCH  /crm/empleados/{id}           → editar empleado (CRMController@update)
+DELETE /crm/empleados/{id}           → dar de baja (CRMController@destroy)
+PATCH  /crm/empleados/{id}/reactivar → reactivar empleado (CRMController@reactivar)
+GET    /crm/empleado/{id}/equipos    → JSON con equipos del empleado (AJAX para panel lateral)
 ```
-
-> **Deuda técnica:** actualmente la query está en `routes/web.php` en un closure. Debe moverse a `CRMController@index`. Ver [convenciones.md](convenciones.md).
 
 ---
 
-## Diagrama de Secuencia — Consultar directorio
+## Diagrama de Secuencia — Consultar directorio y panel lateral
 
 ```mermaid
 sequenceDiagram
     participant T as Técnico (Navegador)
     participant R as Router
-    participant C as CRMController (o closure en routes)
     participant BD as Base de Datos
     participant V as index.blade.php
 
     T->>R: GET /crm
-    R->>C: index()
-    C->>BD: SELECT empleados + JOIN departamentos + JOIN telefonos + COUNT equipos
-    BD-->>C: lista de empleados con datos agregados
-    C->>BD: COUNT empleados activos
-    C->>BD: COUNT departamentos
-    C->>BD: COUNT equipos totales
-    BD-->>C: métricas del encabezado
-    C-->>V: empleados, totalActivos, totalDeptos, totalEquipos, totalBajas
-    V-->>T: Tabla de empleados con KPIs en el header
+    R->>BD: SELECT empleados + JOIN departamentos + JOIN telefonos + COUNT equipos
+    BD-->>R: lista de empleados con datos agregados
+    R-->>V: empleados, KPIs, ticketsPorCorreo
+    V-->>T: Tabla de empleados
 
-    T->>V: Click en un empleado
-    V-->>T: Abre panel lateral con detalle (JS puro — sin nueva petición)
+    T->>V: Click en fila de empleado
+    V-->>T: Abre panel lateral con datos básicos (ya en el HTML)
+    V->>R: GET /crm/empleado/{id}/equipos  (fetch AJAX)
+    R->>BD: SELECT inventario_equipos WHERE id_empleado = {id}\n+ COALESCE subquery IP desde inventario_ips_completo
+    BD-->>R: JSON con N equipos del empleado
+    R-->>V: JSON
+    V-->>T: Tarjetas de equipos con tipo, serie, IP, MAC
 ```
 
 ---
 
 ## La consulta principal explicada
 
-Esta es la query que trae los datos de la tabla. Está en `routes/web.php` (deuda técnica — debería estar en el controlador):
+La query principal está en `routes/web.php` (closures — deuda técnica para mover a controlador):
 
 ```php
 $empleados = DB::table('empleados')
-    // Une la tabla de departamentos para obtener el nombre del depa
     ->leftJoin('departamentos', 'empleados.id_departamento', '=', 'departamentos.id_departamento')
-    // Une teléfonos para obtener la extensión
     ->leftJoin('telefonos', 'empleados.id_empleado', '=', 'telefonos.id_empleado')
-    // Une equipos para contar cuántos tiene asignados
     ->leftJoin('inventario_equipos', 'empleados.id_empleado', '=', 'inventario_equipos.id_empleado')
     ->select(
-        'empleados.*',                           // todos los campos del empleado
-        'departamentos.nombre as departamento_nombre',  // nombre del departamento
-        'telefonos.extension',                   // extensión telefónica
-        DB::raw('COUNT(inventario_equipos.id) as total_equipos')  // conteo de equipos
+        'empleados.*',
+        'departamentos.nombre as departamento_nombre',
+        'telefonos.extension',
+        DB::raw('COUNT(inventario_equipos.id) as total_equipos')
     )
     ->groupBy('empleados.id_empleado', 'departamentos.nombre', 'telefonos.extension')
     ->orderBy('empleados.nombre')
     ->get();
 ```
 
-`leftJoin` significa "une esta tabla, y si no hay coincidencia, pon `null` en esos campos". Es útil aquí porque un empleado puede no tener teléfono ni equipo asignado — con `leftJoin` igual aparece en la lista, con `extension = null` y `total_equipos = 0`.
+El JOIN con `inventario_equipos` funciona porque la migración `2026_07_09_000002` ya pobló `inventario_equipos.id_empleado` para 110 de 180 equipos. El `total_equipos` de esos empleados refleja el conteo real.
 
 ---
 
 ## Panel lateral — cómo funciona
 
-El panel lateral es JavaScript puro. No hace peticiones al servidor — los datos ya están en el HTML cargado inicialmente.
+El panel lateral tiene dos capas:
+
+1. **Datos básicos** (nombre, correo, departamento, extensión) — ya están en el HTML inicial, se inyectan con `data-*` attributes.
+
+2. **Sección de equipos** — se carga vía AJAX al abrir el panel:
 
 ```javascript
-// Cuando haces click en un empleado, JavaScript lee los atributos data-*
-// que están en el HTML de cada fila de la tabla y los inyecta en el panel
-function openEmployeePanel(id, nombre, correo, depa) {
-    document.getElementById('panel-nombre').innerText = nombre;
-    document.getElementById('panel-correo').innerText = correo;
-    // ... etc
-    document.getElementById('employee-panel').classList.remove('closed');
+async function openUserPanel(id) {
+    // Abre el panel con spinner
+    const equipos = await fetch(`/crm/empleado/${id}/equipos`).then(r => r.json());
+    renderEquiposPanel(equipos);
 }
 ```
 
-Los datos de los tabs "Recursos", "Historial" y "Tickets" son **placeholder actualmente** — se necesita conectar con peticiones reales (AJAX o Livewire) para cargar los datos de cada empleado al seleccionarlo.
+El endpoint `/crm/empleado/{id}/equipos` devuelve un JSON con todos los equipos del empleado. Para cada equipo incluye:
+- `tipo`, `cpu_marca`, `cpu_modelo`, `cpu_serie`
+- `ipv4` — resuelto via `COALESCE(inventario_equipos.ipv4, subquery inventario_ips_completo)`
+- `mac`
+- `match` — `'fk'` (vinculado por ID) o `'nombre'` (fallback por nombre_usuario)
+
+La función `renderEquiposPanel()` genera tarjetas visuales. Los equipos con `match='fk'` tienen borde verde + badge "VINCULADO"; los con `match='nombre'` tienen borde gris + badge "POR NOMBRE".
+
+---
+
+## CRUD implementado
+
+| Acción | Cómo | Resultado |
+|---|---|---|
+| Alta | Modal "Nuevo Empleado" con campos colapsables para teléfono y equipos | POST /crm/empleados |
+| Editar | Modal "Editar" que prellenan los datos actuales | PATCH /crm/empleados/{id} |
+| Baja | Botón en el panel lateral | DELETE /crm/empleados/{id} → `activo = false` |
+| Reactivar | Botón visible cuando el empleado está inactivo | PATCH /crm/empleados/{id}/reactivar → `activo = true` |
+
+---
+
+## Filtros de la tabla
+
+El campo de búsqueda y los selectores de departamento/estado son client-side: leen los atributos `data-nombre`, `data-correo`, `data-departamento`, `data-activo` de cada fila y ocultan/muestran con `classList.toggle('hidden')`.
 
 ---
 
 ## Pendiente / Lo que falta
 
-- [ ] Mover la query de `routes/web.php` a `CRMController@index`
-- [ ] Conectar tabs del panel lateral con datos reales (equipos, tickets del empleado)
-- [ ] Formulario de alta de nuevo empleado
-- [ ] Formulario de baja (marcar `activo = false`)
-- [ ] Formulario de edición de datos del empleado
-- [ ] Buscar empleado por nombre (el input de búsqueda ya existe en la UI, falta conectarlo)
+- [ ] Mover queries de `routes/web.php` a `CRMController`
+- [ ] Tab "Historial" del panel lateral (actualmente placeholder)
+- [ ] Tab "Tickets" del panel lateral conectado con datos reales
+- [ ] Importación masiva de empleados desde Excel

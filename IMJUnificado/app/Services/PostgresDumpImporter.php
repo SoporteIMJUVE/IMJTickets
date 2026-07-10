@@ -155,6 +155,33 @@ class PostgresDumpImporter
         }
 
         $this->log[] = "✅ empleados (desde usuarios): {$insertados} nuevos, {$actualizados} actualizados";
+
+        // Para empleados sin correo en el dump, generar uno temporal marcado con "test"
+        $sinCorreo = DB::table('empleados')
+            ->where(fn($q) => $q->whereNull('correo')->orWhere('correo', ''))
+            ->get(['id_empleado', 'nombre', 'apellido_paterno']);
+
+        $usados = DB::table('empleados')
+            ->whereNotNull('correo')->where('correo', '!=', '')
+            ->pluck('correo')->flip()->all();
+
+        foreach ($sinCorreo as $emp) {
+            $nombre = iconv('UTF-8', 'ASCII//TRANSLIT', preg_replace('/\s+/', '.', trim(explode(' ', trim($emp->nombre))[0])));
+            $ap     = iconv('UTF-8', 'ASCII//TRANSLIT', trim($emp->apellido_paterno ?? 'imjuventud'));
+            $base   = strtolower($nombre . '.' . $ap . 'test');
+            $correo = $base . '@imjuventud.gob.mx';
+            $suffix = 1;
+            while (isset($usados[$correo])) {
+                $correo = $base . $suffix . '@imjuventud.gob.mx';
+                $suffix++;
+            }
+            $usados[$correo] = true;
+            DB::table('empleados')->where('id_empleado', $emp->id_empleado)->update(['correo' => $correo]);
+        }
+
+        if ($sinCorreo->count() > 0) {
+            $this->log[] = "✅ correos temporales generados: {$sinCorreo->count()} (marcados con 'test', dominio @imjuventud.gob.mx)";
+        }
     }
 
     private function importarTelefonos(string $content): void

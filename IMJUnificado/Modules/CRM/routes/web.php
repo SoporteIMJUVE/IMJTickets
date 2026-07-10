@@ -8,6 +8,10 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
     Route::delete('/empleados/{id}',        [CRMController::class, 'destroy'])->name('empleados.destroy');
     Route::patch('/empleados/{id}/reactivar', [CRMController::class, 'reactivar'])->name('empleados.reactivar');
 
+    Route::get('/exportar', function (\Illuminate\Http\Request $request) {
+        return (new \App\Exports\EmpleadosExporter())->download($request->all());
+    })->name('exportar');
+
     Route::get('/', function () {
         $empleados = \DB::table('empleados')
             ->leftJoin('departamentos', 'empleados.id_departamento', '=', 'departamentos.id_departamento')
@@ -50,4 +54,71 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
             'ticketsPorCorreo'  => $ticketsPorCorreo,
         ]);
     })->name('index');
+
+    // JSON: equipos asignados a un empleado (para panel lateral)
+    Route::get('/empleado/{id}/equipos', function ($id) {
+        $empleado = \DB::table('empleados')->where('id_empleado', $id)->first();
+        if (!$empleado) return response()->json([]);
+
+        // ipv4 real: usa el campo populado; si está vacío busca en inventario_ips_completo vía serie
+        $selectBase = [
+            'inventario_equipos.id',
+            'inventario_equipos.tipo',
+            'inventario_equipos.num_inventario',
+            'inventario_equipos.nombre_equipo',
+            'inventario_equipos.cpu_marca',
+            'inventario_equipos.cpu_modelo',
+            'inventario_equipos.cpu_serie',
+            'inventario_equipos.teclado_serie',
+            'inventario_equipos.mouse_serie',
+            'inventario_equipos.monitor_marca',
+            'inventario_equipos.monitor_modelo',
+            'inventario_equipos.monitor_serie',
+            'inventario_equipos.nobreak_marca',
+            'inventario_equipos.nobreak_modelo',
+            'inventario_equipos.nobreak_serie',
+            'inventario_equipos.cargador_serie',
+            'inventario_equipos.docking_marca',
+            'inventario_equipos.docking_modelo',
+            'inventario_equipos.docking_serie',
+            'inventario_equipos.candado',
+            'inventario_equipos.mac',
+            'inventario_equipos.ipv4_actual',
+            'inventario_equipos.check_entrega',
+            'inventario_equipos.observaciones',
+            'inventario_equipos.area',
+            'inventario_equipos.id_empleado',
+            \DB::raw("COALESCE(
+                NULLIF(TRIM(inventario_equipos.ipv4), ''),
+                (SELECT ips.ip FROM inventario_ips_completo ips
+                 WHERE LOWER(TRIM(ips.serie)) = LOWER(TRIM(inventario_equipos.cpu_serie))
+                   AND ips.ip IS NOT NULL LIMIT 1)
+            ) as ipv4"),
+        ];
+
+        // 1. Ligados por FK (vinculación formal)
+        $porFk = \DB::table('inventario_equipos')
+            ->where('inventario_equipos.id_empleado', $id)
+            ->select($selectBase)
+            ->orderBy('tipo')->orderBy('consecutivo')
+            ->get()
+            ->map(fn($e) => array_merge((array)$e, ['match' => 'fk']));
+
+        // 2. Fallback: equipos sin FK cuyo nombre_usuario coincide con este empleado
+        $nombre   = trim($empleado->nombre ?? '');
+        $apellido = trim($empleado->apellido_paterno ?? '');
+        $porNombre = collect();
+        if ($nombre && $apellido) {
+            $porNombre = \DB::table('inventario_equipos')
+                ->whereNull('inventario_equipos.id_empleado')
+                ->where('inventario_equipos.nombre_usuario', 'like', "%{$nombre}%")
+                ->where('inventario_equipos.nombre_usuario', 'like', "%{$apellido}%")
+                ->select($selectBase)
+                ->orderBy('tipo')->orderBy('consecutivo')
+                ->get()
+                ->map(fn($e) => array_merge((array)$e, ['match' => 'nombre']));
+        }
+
+        return response()->json($porFk->concat($porNombre)->values());
+    })->name('empleado.equipos');
 });

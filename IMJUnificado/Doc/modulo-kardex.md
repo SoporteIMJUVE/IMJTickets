@@ -1,7 +1,7 @@
 # Módulo Kardex — Inventario de Equipos e Insumos
 
 **Ruta base:** `/kardex`  
-**Estado:** ✅ Vista funcional — operaciones de escritura pendientes
+**Estado:** ✅ Funcional — lecturas y panel de detalle operativos; alta de equipo y movimientos de insumos pendientes
 
 ---
 
@@ -9,9 +9,9 @@
 
 Maneja el inventario físico del departamento de TI. Tiene tres secciones (tabs):
 
-1. **Equipos** — inventario de laptops, PCs y equipos especializados con su responsable asignado
-2. **Insumos** — stock de consumibles (tóner, cartuchos, cables, etc.)
-3. **Resguardos** — qué equipos tiene asignado cada empleado (para generar el documento de resguardo oficial)
+1. **Equipos** — inventario de laptops, PCs y equipos especializados con responsable, estado y filtros
+2. **Insumos** — stock de consumibles (tóner, cartuchos, cables, etc.) con alertas de stock crítico
+3. **Resguardos** — todos los equipos con indicador de PDF de resguardo adjunto
 
 ---
 
@@ -21,11 +21,16 @@ Maneja el inventario físico del departamento de TI. Tiene tres secciones (tabs)
 Modules/Kardex/
 ├── app/
 │   └── Http/Controllers/
-│       └── KardexController.php    ← actualmente vacío (deuda técnica)
+│       └── KardexController.php     ← extracción y guardado de resguardos PDF
+├── database/migrations/
+│   ├── 2026_07_09_000001_...        ← agrega columna estado a inventario_equipos
+│   └── 2026_07_09_000002_...        ← vincula FKs e IPs (corre después de app:boot)
 ├── resources/views/
-│   └── index.blade.php             ← tres tabs: Equipos, Insumos, Resguardos
+│   ├── index.blade.php              ← tres tabs + panel lateral AJAX
+│   ├── resguardo-subir.blade.php    ← formulario de subida de PDF
+│   └── resguardo-preview.blade.php  ← previsualización antes de guardar
 └── routes/
-    └── web.php                     ← ⚠️ queries en el archivo de rutas (deuda técnica)
+    └── web.php                      ← todas las rutas (closures + KardexController)
 ```
 
 ---
@@ -37,21 +42,38 @@ Modules/Kardex/
 | `inventario_equipos` | Un registro por equipo físico |
 | `insumos` | Stock de consumibles |
 | `empleados` | Para relacionar equipo ↔ responsable |
+| `inventario_ips_completo` | Para obtener la IP real via `serie = cpu_serie` |
 
-### Esquema de `inventario_equipos`
+### Esquema de `inventario_equipos` (columnas clave)
 
 | Columna | Tipo | Descripción |
 |---|---|---|
 | `id` | entero auto | Identificador único |
 | `tipo` | texto | `'Laptop'`, `'PC Avanzada'`, `'PC Especializada'` |
-| `consecutivo` | entero | Número de inventario institucional |
-| `num_inventario` | texto | Código completo ej: `LAP-001` |
-| `nombre_equipo` | texto | Marca y modelo ej: `Dell Latitude 5420` |
-| `id_empleado` | entero FK | Referencia a `empleados` (null = en almacén) |
-| `num_serie` | texto | Número de serie del fabricante |
-| `procesador` | texto | Especificación del CPU |
-| `ram` | texto | Memoria RAM |
-| `almacenamiento` | texto | Disco duro/SSD |
+| `consecutivo` | entero | Número de secuencia dentro del tipo |
+| `num_inventario` | texto | Código institucional ej: `LAP-001` |
+| `nombre_usuario` | texto | Nombre libre del responsable (campo de texto del Excel original) |
+| `area` | string | Área donde está físicamente el equipo |
+| `cpu_marca` / `cpu_modelo` | texto | Fabricante y referencia del equipo |
+| `cpu_serie` | texto | **Número de serie del fabricante** — clave para vincular con `inventario_ips_completo` |
+| `ipv4` | texto | IP asignada — se pobló desde `inventario_ips_completo.ip` via `serie = cpu_serie` |
+| `mac` | texto | Dirección MAC |
+| `id_empleado` | entero FK | Referencia a `empleados` (null = en almacén). Poblado por migración de datos. |
+| `estado` | texto nullable | `null` = derivado (Asignado/Almacén), `'mantenimiento'`, `'baja'` |
+| `pdf_resguardo` | texto | Ruta relativa dentro de `storage/app/` al PDF adjunto |
+
+### Lógica de estado visible
+
+El `estado` que se muestra en la tabla es derivado en el servidor:
+
+```php
+$estadoDisplay = match(true) {
+    $eq->estado === 'mantenimiento' => 'Mantenimiento',   // marcado explícitamente
+    $eq->estado === 'baja'          => 'Baja',            // marcado explícitamente
+    !is_null($eq->id_empleado)      => 'Asignado',        // tiene FK a empleado
+    default                         => 'Almacén',          // sin asignación
+};
+```
 
 ### Esquema de `insumos`
 
@@ -61,17 +83,23 @@ Modules/Kardex/
 | `numero_parte` | texto | Código del fabricante |
 | `nombre_insumo` | texto | Descripción del consumible |
 | `stock_actual` | entero | Cantidad disponible en almacén |
-| `stock_minimo` | entero | Cantidad mínima antes de alertar |
+| `stock_minimo` | entero | Umbral de alerta crítica |
 
 ---
 
 ## Rutas
 
 ```
-GET /kardex   → KardexController@index   (solo auth)
+GET  /kardex                       → carga la vista principal (closure en routes/web.php)
+GET  /kardex/equipo/{id}           → JSON con detalle completo del equipo (panel lateral)
+POST /kardex/equipo/{id}/estado    → cambia la columna estado del equipo
+GET  /kardex/equipo/{id}/pdf       → descarga el PDF de resguardo desde storage local
+GET  /kardex/resguardo/subir       → formulario para subir PDF
+POST /kardex/resguardo/extraer     → extrae datos del PDF y guarda temporal en session
+GET  /kardex/resguardo/preview     → previsualización antes de confirmar
+POST /kardex/resguardo/guardar     → guarda el equipo en BD y mueve el PDF a su lugar
+GET  /kardex/resguardo/ip          → sugiere IP libre para un área (AJAX)
 ```
-
-> **Deuda técnica:** la query está en `routes/web.php`. Debe moverse a `KardexController@index`.
 
 ---
 
@@ -81,86 +109,141 @@ GET /kardex   → KardexController@index   (solo auth)
 sequenceDiagram
     participant T as Técnico (Navegador)
     participant R as Router
-    participant C as KardexController (o closure en routes)
     participant BD as Base de Datos
     participant V as index.blade.php
 
     T->>R: GET /kardex
-    R->>C: index()
-    C->>BD: SELECT inventario_equipos LEFT JOIN empleados
-    BD-->>C: 183 equipos con nombre de responsable
-    C->>BD: SELECT insumos ORDER BY nombre
-    BD-->>C: 8 insumos con stock
-    C->>BD: SELECT empleados JOIN inventario_equipos GROUP BY empleado (HAVING count > 0)
-    BD-->>C: empleados con al menos 1 equipo asignado
-    C-->>V: equipos, insumos, resguardos + estadísticas
-    V-->>T: Vista con 3 tabs activos
+    R->>BD: SELECT inventario_equipos LEFT JOIN empleados (180 equipos)
+    R->>BD: SELECT insumos ORDER BY nombre
+    BD-->>R: datos
+    R-->>V: equipos, insumos + KPIs calculados
+    V-->>T: Vista con 3 tabs
 
-    T->>V: Click en tab "Resguardos"
-    V-->>T: Tabla de empleados con sus equipos (JS — datos ya cargados)
+    T->>V: Click en fila de equipo
+    V->>R: GET /kardex/equipo/{id}  (fetch AJAX)
+    R->>BD: SELECT ... LEFT JOIN empleados + subquery ip_real desde inventario_ips_completo
+    BD-->>R: JSON con todos los campos del equipo
+    R-->>V: JSON
+    V-->>T: Panel lateral deslizable con detalle completo
 
-    T->>V: Click "Ver resguardo" de un empleado
-    V-->>T: Abre panel lateral con detalle del empleado y sus equipos
+    T->>V: Cambia estado a "Mantenimiento" → Guardar
+    V->>R: POST /kardex/equipo/{id}/estado  (fetch AJAX)
+    R->>BD: UPDATE inventario_equipos SET estado = 'mantenimiento'
+    BD-->>R: OK
+    R-->>V: {ok: true}
+    V-->>T: Badge actualizado sin recargar la página
 ```
 
 ---
 
-## Lógica de estados de equipos
+## Panel lateral AJAX
+
+El panel lateral (`id="equipo-panel"`) se abre al hacer clic en cualquier fila de la tabla de equipos. Usa `fetch()` para pedir el JSON del equipo:
+
+```javascript
+async function abrirPanelEquipo(id) {
+    const eq = await fetch(`/kardex/equipo/${id}`).then(r => r.json());
+    // eq.ipv4_real: IP desde inventario_ips_completo via serie (COALESCE)
+    // eq.mac_real:  MAC desde inventario_ips_completo via serie
+    // eq.empleado_nombre: nombre completo del empleado (JOIN a empleados)
+    // eq.estado: 'mantenimiento' | 'baja' | null
+}
+```
+
+El JSON incluye `ipv4_real` y `mac_real` que son subqueries COALESCE:
+- Primero usa `inventario_equipos.ipv4` (si está poblado)
+- Si no, busca en `inventario_ips_completo` donde `LOWER(TRIM(serie)) = LOWER(TRIM(cpu_serie))`
+
+---
+
+## Filtros de la tabla de equipos
+
+Los filtros son client-side. Cada `<tr>` tiene atributos `data-*`:
+
+```html
+<tr data-tipo="Laptop"
+    data-estado="Asignado"
+    data-texto="dell latitude 3420 jessica sigales">
+```
+
+La función `filtrarEquipos()` en JavaScript oculta/muestra filas comparando esos atributos con los valores de los selects y el input de búsqueda. No hace nuevas peticiones al servidor.
+
+---
+
+## Flujo de registro vía PDF de resguardo
 
 ```mermaid
-flowchart LR
-    A([Equipo recibido]) --> B{¿Asignado?}
-    B -- id_empleado IS NULL --> C[🟡 En Almacén]
-    B -- id_empleado IS NOT NULL --> D[🟢 Asignado]
-    D --> E{¿En mantenimiento?}
-    E -- Sí --> F[🔴 Mantenimiento]
-    E -- No --> D
+flowchart TD
+    A([Técnico sube PDF del resguardo]) --> B{¿PDF tiene texto nativo?\nmb_strlen > 80}
 
-    style C fill:#FEF3C7,stroke:#D97706
-    style D fill:#DCFCE7,stroke:#166534
-    style F fill:#FEE2E2,stroke:#DC2626
+    B -- Sí --> C[smalot/pdfparser extrae texto\nregex mapea campos]
+    B -- No / escaneado --> D[Formulario vacío con banner amarillo\nTécnico captura manualmente]
+
+    C --> E[Previsualización con datos extraídos]
+    D --> E
+
+    E --> F{¿Técnico confirma?}
+    F -- No --> G[Técnico corrige campos en el form]
+    G --> F
+    F -- Sí --> H{¿El usuario ya existe en empleados?}
+
+    H -- Sí --> I[Vincular al empleado existente]
+    H -- No encontrado --> J[Guardar sin id_empleado\nnombre_usuario como texto]
+
+    I --> K[Guardar equipo en inventario_equipos]
+    J --> K
+    K --> L[Mover PDF a storage/app/resguardos/{id}.pdf]
+    L --> M[Actualizar pdf_resguardo en BD]
+    M --> N([Registro completo])
 ```
 
-> **Nota:** el estado "Mantenimiento" aún no está implementado en la base de datos. Actualmente el conteo de mantenimiento es hardcodeado en `0`. Se necesita agregar una columna `en_mantenimiento` booleana o una tabla `reportes_mantenimiento`.
+> **Importante:** el sistema NO usa Gemini API ni ningún LLM para leer PDFs escaneados. Los PDFs escaneados se aceptan, se muestra el formulario vacío y el técnico captura los datos manualmente.
 
 ---
 
-## Cómo se determina si un equipo está "en almacén"
+### Detección de PDF nativo vs escaneado
 
 ```php
-// En la query, si id_empleado es null, el equipo no tiene responsable = está en almacén
-$enAlmacen = $equipos->whereNull('id_empleado')->count();
+$texto   = $pdf->getText();
+$esNativo = mb_strlen(trim($texto)) > 80;  // true = tiene texto, false = imagen
+
+$datos = $esNativo
+    ? $this->extraerCampos($texto)   // regex sobre el texto
+    : array_fill_keys([...], null);  // formulario vacío
 ```
 
-En la vista, cada fila muestra el badge correspondiente:
-```blade
-@if($eq->id_empleado)
-    <span class="bg-green-100 text-green-800 ...">Asignado</span>
-@else
-    <span class="bg-yellow-100 text-yellow-800 ...">Almacén</span>
-@endif
-```
+---
+
+### Campos capturados por tipo de equipo
+
+| Campo | Laptop | PC Avanzada | PC Especializada |
+|---|:---:|:---:|:---:|
+| `cpu_marca` / `cpu_modelo` / `cpu_serie` | ✅ | ✅ | ✅ |
+| `cargador_serie` | ✅ | ❌ | ❌ |
+| `docking_marca` / `docking_serie` | opcional | ❌ | ❌ |
+| `monitor_marca` / `monitor_modelo` / `monitor_serie` | ❌ | ✅ | ✅ |
+| `teclado_serie` | ❌ | ✅ | ✅ |
+| `mouse_serie` | ❌ | ✅ | ✅ |
+| `nobreak_marca` / `nobreak_serie` | ❌ | ✅ | ✅ |
+| `ipv4` / `mac` | ✅ | ✅ | ✅ |
+| `observaciones` | ✅ | ✅ | ✅ |
 
 ---
 
 ## Stock crítico de insumos
 
-Un insumo es "crítico" cuando `stock_actual <= 2`. La lógica está en el controlador:
+Un insumo es crítico cuando `stock_actual <= stock_minimo`:
 
 ```php
-$criticos = $insumos->where('stock_actual', '<=', 2)->count();
+$criticos = $insumos->filter(fn($i) => $i->stock_actual <= $i->stock_minimo)->count();
 ```
-
-Actualmente el umbral está hardcodeado en `2`. A futuro debería compararse contra `insumos.stock_minimo`.
 
 ---
 
 ## Pendiente / Lo que falta
 
-- [ ] Mover queries de `routes/web.php` a `KardexController@index`
-- [ ] Generar PDF de resguardo (la función ya existe en el sistema Python — hay que portarla a `barryvdh/laravel-dompdf`)
-- [ ] Asignar / desasignar equipo a empleado (formulario)
-- [ ] Dar de alta nuevo equipo
+- [ ] Mover queries de `routes/web.php` a `KardexController`
+- [ ] Formulario de alta de nuevo equipo
 - [ ] Registrar entrada/salida de insumos (tabla `suministros` ya existe)
-- [ ] Implementar estado "En mantenimiento" correctamente
-- [ ] Usar `stock_minimo` de la BD para alertas de stock crítico
+- [ ] Generar PDF de resguardo desde el sistema (dompdf instalado, no implementado)
+- [ ] Asignar equipo a empleado desde la UI (actualizar `id_empleado`)

@@ -298,4 +298,4 @@ Estas cosas existen en el código actual y **no siguen las convenciones**. Son t
 | `Modules/Kardex/routes/web.php` | Query de DB en el archivo de rutas | Mover a `KardexController@index` |
 | `Modules/Network/routes/web.php` | Query de DB en el archivo de rutas | Mover a `NetworkController@index` |
 | `Modules/Core/routes/web.php` | Query de DB en el archivo de rutas | Mover a `CoreController@dashboard` |
-| Módulos Telefonos, Impresoras, Mantenimiento | Sin implementar — vistas placeholder | Ver `Doc/modulo-*.md` para cada uno |
+| Módulo Mantenimiento | Sin implementar — vista placeholder | Requiere reunión con cliente antes de desarrollar |

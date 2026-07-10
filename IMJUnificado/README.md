@@ -23,6 +23,7 @@ No asumimos que sabes PHP, ni Laravel, ni qué es un "entorno". Si sabes program
 | [Doc/stack.md](Doc/stack.md) | Cuando quieras entender qué tecnología hace qué |
 | [Doc/arquitectura.md](Doc/arquitectura.md) | Cuando necesites entender cómo está organizado el código |
 | [Doc/base-de-datos.md](Doc/base-de-datos.md) | Cuando necesites entender las tablas y sus relaciones |
+| [Doc/estandar-vistas.md](Doc/estandar-vistas.md) | ayuda para diseño de UI y UX |
 | [Doc/modulo-tickets.md](Doc/modulo-tickets.md) | Cuando vayas a tocar el módulo de tickets |
 | [Doc/modulo-crm.md](Doc/modulo-crm.md) | Cuando vayas a tocar el directorio de empleados |
 | [Doc/modulo-kardex.md](Doc/modulo-kardex.md) | Cuando vayas a tocar equipos o insumos |
@@ -124,9 +125,7 @@ IMJUnificado/
 │   ├── CRM/              ← directorio de empleados
 │   ├── Kardex/           ← inventario de equipos e insumos
 │   ├── Network/          ← IPs y direccionamiento de red
-│   ├── Telefonos/        ← extensiones telefónicas (placeholder)
-│   ├── Impresoras/       ← inventario de impresoras (placeholder)
-│   └── Mantenimiento/    ← reportes de mantenimiento (placeholder)
+│   └── Mantenimiento/    ← reportes de mantenimiento (stub, requiere reunión con cliente)
 │
 ├── app/                  ← código base de Laravel (modelos compartidos)
 │   └── Models/User.php   ← el modelo del técnico/admin
@@ -195,13 +194,11 @@ Este diagrama aplica a **todos** los módulos. El router siempre consulta el mid
 | Login / Logout | `/login` | ✅ Completo |
 | Dashboard | `/dashboard` | ✅ Completo |
 | Tickets — formulario público | `/tickets/create` | ✅ Completo |
-| Tickets — gestión interna | `/tickets` | 🔧 Vista lista — datos placeholder |
-| CRM (empleados) | `/crm` | 🔧 Vista lista — CRUD pendiente |
-| Kardex (equipos e insumos) | `/kardex` | 🔧 Vista lista — escritura pendiente |
+| Tickets — gestión interna | `/tickets` | ✅ Kanban + lista + panel lateral con comentarios |
+| CRM (empleados) | `/crm` | ✅ CRUD completo + panel lateral con equipos e IPs reales |
+| Kardex (equipos e insumos) | `/kardex` | ✅ Lectura + filtros + panel detalle AJAX + subida de resguardos PDF |
 | Network (IPs) | `/network` | 🔧 Vista lista — edición pendiente |
-| Teléfonos | `/telefonos` | ⏳ Placeholder |
-| Impresoras | `/impresoras` | ⏳ Placeholder |
-| Mantenimiento | `/mantenimiento` | ⏳ Placeholder |
+| Mantenimiento | `/mantenimiento` | ⏳ Stub — requiere definición de alcance |
 
 ---
 
@@ -209,17 +206,19 @@ Este diagrama aplica a **todos** los módulos. El router siempre consulta el mid
 
 Por orden de impacto:
 
-1. **Mover queries a controladores** — CRM, Kardex y Network tienen las consultas de BD en el archivo de rutas, lo que va contra las convenciones del proyecto. Ver [Doc/convenciones.md](Doc/convenciones.md).
+1. **Mover queries a controladores** — CRM, Kardex y Network aún tienen consultas de BD en `routes/web.php`. Ver [Doc/convenciones.md](Doc/convenciones.md).
 
-2. **Conectar Kanban de tickets con datos reales** — la vista de gestión de tickets muestra columnas vacías. Los tickets ya están en la BD, solo falta la query.
+2. **Alta y movimiento de insumos en Kardex** — la tabla `suministros` existe, falta el formulario de entrada/salida de stock.
 
-3. **Panel lateral de CRM con datos reales** — los tabs "Recursos", "Historial" y "Tickets" del panel de empleados son placeholder. Necesitan AJAX o Livewire para cargar datos del empleado seleccionado.
+3. **Alta de nuevo equipo en Kardex** — formulario para registrar un equipo sin PDF de resguardo.
 
-4. **Generar PDF de resguardo** — la funcionalidad existe en el sistema Python. Hay que portarla a `barryvdh/laravel-dompdf`.
+4. **Generar PDF de resguardo desde el sistema** — imprimir el documento oficial desde el panel lateral del equipo (`barryvdh/laravel-dompdf` ya instalado).
 
-5. **CRUD de empleados** — alta, baja y edición de empleados en el módulo CRM.
+5. **Tabs "Historial" y "Tickets" del panel lateral de CRM** — actualmente son placeholder.
 
-6. **Poblar `id_empleado` en IPs** — cruzar la tabla `inventario_ips_completo` con `empleados` para habilitar el panel de detalle en Network.
+6. **Módulo Network — edición de IPs** — asignar/desasignar IP a empleado desde la UI.
+
+7. **Control de roles** — la columna `role` en `users` existe pero no hay middleware que la use.
 
 ---
 

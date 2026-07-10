@@ -17,6 +17,9 @@
         "vite": "^8.0.0"
     },
     "dependencies": {
+        "@fontsource/inter": "^5.2.8",
+        "@fontsource/jetbrains-mono": "^5.2.8",
+        "material-symbols": "^0.45.6",
         "sortablejs": "^1.15.7"
     }
 }

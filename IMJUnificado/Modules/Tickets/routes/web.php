@@ -9,6 +9,10 @@ Route::post('/tickets',        [TicketsController::class, 'store'])->name('ticke
 
 // Vista de gestión + API interna — solo personal autenticado
 Route::middleware(['auth'])->prefix('tickets')->name('tickets.')->group(function () {
+    Route::get('/exportar', function (\Illuminate\Http\Request $request) {
+        return (new \App\Exports\TicketsExporter())->download($request->all());
+    })->name('exportar');
+
     Route::get('/',                        [TicketsController::class, 'index'])->name('index');
     Route::patch('/{id}/estado',           [TicketsController::class, 'cambiarEstado'])->name('estado');
     Route::post('/{id}/estado',            [TicketsController::class, 'cambiarEstado'])->name('estado.post');
