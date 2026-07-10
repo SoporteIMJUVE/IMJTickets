@@ -44,4 +44,19 @@ fi
 
 echo ">>> Iniciando Streamlit..."
 cd "$SCRIPT_DIR"
-streamlit run app.py
+
+# Buscar streamlit en el venv local, luego en el PATH
+STREAMLIT_BIN=""
+for candidate in "$SCRIPT_DIR/.venv/bin/streamlit" "$SCRIPT_DIR/venv/bin/streamlit" "$(which streamlit 2>/dev/null)"; do
+    if [ -x "$candidate" ]; then
+        STREAMLIT_BIN="$candidate"
+        break
+    fi
+done
+
+if [ -z "$STREAMLIT_BIN" ]; then
+    echo "ERROR: No se encontró streamlit. Activa el venv o instala con: pip install streamlit"
+    exit 1
+fi
+
+"$STREAMLIT_BIN" run app.py

@@ -101,7 +101,7 @@
                     {{-- Botón cambiar al sistema de inventario --}}
                     @if(env('INVENTARIO_URL'))
                     <a href="{{ env('INVENTARIO_URL') }}" target="_blank"
-                       class="btn btn-outline btn-sm tooltip tooltip-bottom"
+                       class="btn btn-imjuve tooltip tooltip-bottom"
                        data-tip="Abrir sistema de inventario (Streamlit)">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
