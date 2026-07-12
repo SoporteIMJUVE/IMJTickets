@@ -12,9 +12,15 @@ class FirstBootCommand extends Command
     protected $signature   = 'app:boot {--force : Forzar reimportación aunque no sea el primer arranque}';
     protected $description = 'Detecta primer arranque e importa datos desde los sistemas legados';
 
-    // Rutas de los respaldos de los sistemas legados
-    private const POSTGRES_DUMP = '/home/robute/Documentos/codes/IPMJ_proyect/DB_source/sistemitas.sql';
-    private const MYSQL_DUMP    = '/home/robute/Documentos/codes/IPMJ_proyect/DB_source/imjtickets.sql';
+    private function postgresDump(): string
+    {
+        return env('POSTGRES_DUMP_PATH', base_path('../DB_source/sistemitas.sql'));
+    }
+
+    private function mysqlDump(): string
+    {
+        return env('MYSQL_DUMP_PATH', base_path('../DB_source/imjtickets.sql'));
+    }
 
     // Archivo donde se persiste el estado de arranque (sobrevive reinicios)
     private const STATE_FILE = 'boot_state.json';
@@ -59,8 +65,8 @@ class FirstBootCommand extends Command
         // ── 5. Guardar estado ─────────────────────────────────────────────────
         $state['ultima_importacion'] = now()->toIso8601String();
         $state['fuentes']            = [
-            'postgres' => file_exists(self::POSTGRES_DUMP),
-            'mysql'    => file_exists(self::MYSQL_DUMP),
+            'postgres' => file_exists($this->postgresDump()),
+            'mysql'    => file_exists($this->mysqlDump()),
         ];
 
         $this->incrementarContador($state);
@@ -78,14 +84,14 @@ class FirstBootCommand extends Command
     {
         $this->line('  <fg=blue>▶ Fuente 1: Sistema Inventario (PostgreSQL)</fg=blue>');
 
-        if (!file_exists(self::POSTGRES_DUMP)) {
-            $this->warn('    Archivo no encontrado: ' . self::POSTGRES_DUMP);
+        if (!file_exists($this->postgresDump())) {
+            $this->warn('    Archivo no encontrado: ' . $this->postgresDump());
             $this->warn('    Coloca el dump de sistemitas en DB_source/sistemitas.sql');
             return;
         }
 
         try {
-            $importer = new PostgresDumpImporter(self::POSTGRES_DUMP);
+            $importer = new PostgresDumpImporter($this->postgresDump());
             $log      = $importer->run();
 
             foreach ($log as $linea) {
@@ -104,15 +110,15 @@ class FirstBootCommand extends Command
         $this->line('');
         $this->line('  <fg=blue>▶ Fuente 2: IMJTickets (MySQL)</fg=blue>');
 
-        if (!file_exists(self::MYSQL_DUMP)) {
-            $this->warn('    Archivo no encontrado: ' . self::MYSQL_DUMP);
+        if (!file_exists($this->mysqlDump())) {
+            $this->warn('    Archivo no encontrado: ' . $this->mysqlDump());
             $this->warn('    Cuando tengas el dump, colócalo en DB_source/imjtickets.sql');
             $this->line('    (se importará al ejecutar php artisan app:boot --force)');
             return;
         }
 
         try {
-            $this->importarTicketsDesdeMySQL(self::MYSQL_DUMP);
+            $this->importarTicketsDesdeMySQL($this->mysqlDump());
         } catch (\Throwable $e) {
             $this->error('    Error durante la importación MySQL:');
             $this->error('    ' . $e->getMessage());
