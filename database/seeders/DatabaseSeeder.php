@@ -1,16 +1,33 @@
 <?php
 
 namespace Database\Seeders;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+
+use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // Admin del sistema
+        User::firstOrCreate(
+            ['email' => 'admin@imjuventud.gob.mx'],
+            [
+                'name'     => 'Administrador TI',
+                'password' => Hash::make('admin123'),
+                'role'     => 'admin',
+            ]
+        );
+
+        // Catálogos (sin dependencias externas — van primero)
+        $this->call(TicketsCatalogoSeeder::class);
+
+        // Datos del inventario (orden por dependencias FK)
+        $this->call(DepartamentosSeeder::class);    // departamentos
+        $this->call(EmpleadosSeeder::class);        // empleados + telefonos
+        $this->call(InventarioEquiposSeeder::class); // inventario_equipos
+        $this->call(ImpressorasInsumoSeeder::class); // impresoras + insumos
+        $this->call(InventarioIpsSeeder::class);     // cat_rangos_ips + inventario_ips_completo
     }
 }

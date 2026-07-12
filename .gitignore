@@ -1,41 +1,27 @@
-# ─── Laravel / PHP ──────────────────────────────────────
-/vendor/
-node_modules/
-npm-debug.log
-yarn-error.log
-
-bootstrap/compiled.php
-app/storage/
-public/storage
-public/hot
-public_html/storage
-public_html/hot
-storage/*.key
-/public/build
-/storage/pail
-.phpunit.result.cache
-.phpactor.json
-auth.json
-
-# ─── Python / Streamlit (Base-de-Datos) ────────────────
-__pycache__/
-*.pyc
-.vscode/
-.streamlit/secrets.toml
-iniciodeSesion.txt
-app_local_backup.py
-
-# ─── Credenciales y configuración local ─────────────────
+*.log
+.DS_Store
 .env
 .env.backup
 .env.production
-Homestead.yaml
+.phpactor.json
+.phpunit.result.cache
+/.codex
+/.cursor/
+/.idea
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/auth.json
+/node_modules
+/public/build
+/public/fonts-manifest.dev.json
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/vendor
+_ide_helper.php
 Homestead.json
-/.vagrant
-
-# ─── Backups de base de datos ──────────��────────────────
-*.dump
-*.sql
-
-# ─── SQLite local ───────────────────────────────────────
-/IMJUnificado/database/database.sqlite
+Homestead.yaml
+Thumbs.db
