@@ -1,0 +1,11 @@
+[server]
+port = 8501
+headless = true        # Obligatorio en servidor (sin navegador local)
+enableCORS = false
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "dark"
