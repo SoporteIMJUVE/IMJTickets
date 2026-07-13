@@ -109,11 +109,7 @@ class TicketsController extends Controller
         $ip  = $this->clientIp($request);
         $mac = $this->macFromIp($ip);
 
-        $autofillCorreo = null;
-        if (Auth::check()) {
-            $emp = DB::table('empleados')->where('correo', Auth::user()->email)->first();
-            $autofillCorreo = $emp ? $emp->correo : Auth::user()->email;
-        }
+        $autofillCorreo = Auth::check() ? Auth::user()->email : null;
 
         $view = $autofillCorreo ? 'tickets::create-internal' : 'tickets::create';
 
@@ -126,7 +122,7 @@ class TicketsController extends Controller
         $mac = $this->macFromIp($ip);
 
         $validated = $request->validate([
-            'correo'      => ['required', 'email', 'exists:empleados,correo'],
+            'correo'      => ['required', 'email', 'exists:users,email'],
             'tipo'        => ['required', 'exists:tipos,nombre'],
             'area'        => ['required', 'exists:areas,nombre'],
             'descripcion' => [
@@ -155,10 +151,10 @@ class TicketsController extends Controller
             'descripcion.min'      => 'La descripción debe tener al menos :min caracteres.',
         ]);
 
-        $empleado = DB::table('empleados')->where('correo', $validated['correo'])->first();
+        $empleado = DB::table('users')->where('email', $validated['correo'])->first();
 
         Ticket::create([
-            'nombre'      => trim($empleado->nombre . ' ' . $empleado->apellido_paterno . ' ' . $empleado->apellido_materno),
+            'nombre'      => trim($empleado->name . ' ' . $empleado->apellido_paterno . ' ' . $empleado->apellido_materno),
             'correo'      => $validated['correo'],
             'ip'          => $ip,
             'mac'         => $mac,

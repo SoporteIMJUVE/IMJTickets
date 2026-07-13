@@ -7,8 +7,8 @@ use Modules\Tickets\Http\Controllers\TicketsController;
 Route::get('/tickets/create',  [TicketsController::class, 'create'])->name('tickets.create');
 Route::post('/tickets',        [TicketsController::class, 'store'])->name('tickets.store');
 
-// Vista de gestión + API interna — solo personal autenticado
-Route::middleware(['auth'])->prefix('tickets')->name('tickets.')->group(function () {
+// Vista de gestión + API interna — solo administradores
+Route::middleware(['auth', 'admin'])->prefix('tickets')->name('tickets.')->group(function () {
     Route::get('/exportar', function (\Illuminate\Http\Request $request) {
         return (new \App\Exports\TicketsExporter())->download($request->all());
     })->name('exportar');

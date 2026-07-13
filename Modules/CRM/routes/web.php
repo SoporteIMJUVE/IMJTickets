@@ -2,7 +2,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\CRM\Http\Controllers\CRMController;
 
-Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
+Route::middleware(['auth', 'admin'])->prefix('crm')->name('crm.')->group(function () {
     Route::post('/empleados',               [CRMController::class, 'store'])->name('empleados.store');
     Route::patch('/empleados/{id}',         [CRMController::class, 'update'])->name('empleados.update');
     Route::delete('/empleados/{id}',        [CRMController::class, 'destroy'])->name('empleados.destroy');
@@ -13,18 +13,28 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
     })->name('exportar');
 
     Route::get('/', function () {
-        $empleados = \DB::table('empleados')
-            ->leftJoin('departamentos', 'empleados.id_departamento', '=', 'departamentos.id_departamento')
-            ->leftJoin('telefonos', 'empleados.id_empleado', '=', 'telefonos.id_empleado')
-            ->leftJoin('inventario_equipos', 'empleados.id_empleado', '=', 'inventario_equipos.id_empleado')
+        $empleados = \DB::table('users')
+            ->leftJoin('departamentos', 'users.id_departamento', '=', 'departamentos.id_departamento')
+            ->leftJoin('telefonos', 'users.id', '=', 'telefonos.user_id')
+            ->leftJoin('inventario_equipos', 'users.id', '=', 'inventario_equipos.user_id')
             ->select(
-                'empleados.*',
+                'users.id as id_empleado',
+                'users.name as nombre',
+                'users.apellido_paterno',
+                'users.apellido_materno',
+                'users.puesto',
+                'users.email as correo',
+                'users.id_departamento',
+                'users.activo',
+                'users.fecha_alta',
+                'users.fecha_baja',
                 'departamentos.nombre as departamento_nombre',
                 'telefonos.extension',
                 \DB::raw('COUNT(inventario_equipos.id) as total_equipos')
             )
-            ->groupBy('empleados.id_empleado', 'departamentos.nombre', 'telefonos.extension')
-            ->orderBy('empleados.nombre')
+            ->where('users.role', 'user')
+            ->groupBy('users.id', 'departamentos.nombre', 'telefonos.extension')
+            ->orderBy('users.name')
             ->get();
 
         // Patrón inter-módulo: DB::table('tickets') sin importar nada del módulo Tickets
@@ -57,8 +67,9 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
 
     // JSON: equipos asignados a un empleado (para panel lateral)
     Route::get('/empleado/{id}/equipos', function ($id) {
-        $empleado = \DB::table('empleados')->where('id_empleado', $id)->first();
+        $empleado = \DB::table('users')->where('id', $id)->first();
         if (!$empleado) return response()->json([]);
+        $empleado->nombre = $empleado->name;
 
         // ipv4 real: usa el campo populado; si está vacío busca en inventario_ips_completo vía serie
         $selectBase = [
@@ -87,7 +98,7 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
             'inventario_equipos.check_entrega',
             'inventario_equipos.observaciones',
             'inventario_equipos.area',
-            'inventario_equipos.id_empleado',
+            'inventario_equipos.user_id as id_empleado',
             \DB::raw("COALESCE(
                 NULLIF(TRIM(inventario_equipos.ipv4), ''),
                 (SELECT ips.ip FROM inventario_ips_completo ips
@@ -98,7 +109,7 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
 
         // 1. Ligados por FK (vinculación formal)
         $porFk = \DB::table('inventario_equipos')
-            ->where('inventario_equipos.id_empleado', $id)
+            ->where('inventario_equipos.user_id', $id)
             ->select($selectBase)
             ->orderBy('tipo')->orderBy('consecutivo')
             ->get()
@@ -110,7 +121,7 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
         $porNombre = collect();
         if ($nombre && $apellido) {
             $porNombre = \DB::table('inventario_equipos')
-                ->whereNull('inventario_equipos.id_empleado')
+                ->whereNull('inventario_equipos.user_id')
                 ->where('inventario_equipos.nombre_usuario', 'like', "%{$nombre}%")
                 ->where('inventario_equipos.nombre_usuario', 'like', "%{$apellido}%")
                 ->select($selectBase)

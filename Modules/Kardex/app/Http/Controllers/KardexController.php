@@ -3,13 +3,99 @@
 namespace Modules\Kardex\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Support\DepartamentoResolver;
+use App\Support\IpAssigner;
+use App\Support\NewAccountProvisioner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Smalot\PdfParser\Parser;
 
 class KardexController extends Controller
 {
+    // ─── Vista principal: Equipos / Insumos / Resguardos / Impresoras ────────
+
+    public function index()
+    {
+        $equipos = DB::table('inventario_equipos')
+            ->leftJoin('users', 'inventario_equipos.user_id', '=', 'users.id')
+            ->select(
+                'inventario_equipos.*',
+                DB::raw("NULLIF(TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'')), '') as empleado_nombre"),
+                'users.email as empleado_correo'
+            )
+            ->orderBy('inventario_equipos.tipo')
+            ->orderBy('inventario_equipos.consecutivo')
+            ->get();
+
+        // Resguardos: mismas filas de inventario_equipos, pero solo las que
+        // realmente tienen el PDF de resguardo guardado — el punto en común
+        // sigue siendo cpu_serie, no hace falta ningún join nuevo.
+        $resguardos = $equipos->filter(fn ($e) => !empty($e->pdf_resguardo))->values();
+
+        $insumos = DB::table('insumos')->orderBy('nombre_insumo')->get();
+
+        $impresoras = DB::table('impresoras')
+            ->leftJoin('users', 'impresoras.user_id', '=', 'users.id')
+            ->select(
+                'impresoras.*',
+                'users.name as responsable_nombre',
+                'users.email as responsable_correo'
+            )
+            ->orderBy('impresoras.area')
+            ->get();
+
+        return view('kardex::index', [
+            'equipos'       => $equipos,
+            'resguardos'    => $resguardos,
+            'insumos'       => $insumos,
+            'impresoras'    => $impresoras,
+            'totalEquipos'  => $equipos->count(),
+            'enAlmacen'     => $equipos->filter(fn($e) => !$e->user_id && $e->estado !== 'mantenimiento' && $e->estado !== 'baja')->count(),
+            'mantenimiento' => $equipos->where('estado', 'mantenimiento')->count(),
+            'criticos'      => $insumos->filter(fn($i) => $i->stock_actual <= $i->stock_minimo)->count(),
+            'totalInsumos'  => $insumos->sum('stock_actual'),
+            'stockCritico'  => $insumos->filter(fn($i) => $i->stock_actual <= $i->stock_minimo)->count(),
+        ]);
+    }
+
+    // ─── POST: cambia el estado de un equipo ─────────────────────────────────
+
+    public function cambiarEstadoEquipo(Request $request, $id)
+    {
+        $estado = $request->estado ?: null;
+
+        // "almacen": regresa el equipo a almacén desvinculando al
+        // responsable actual, pero SIN liberar su IP (se queda con el
+        // equipo). No es un valor persistido en la columna `estado` — se
+        // guarda como null, igual que "Automático", y el responsable vacío
+        // hace que la vista lo calcule como "Almacén" de todos modos.
+        if ($estado === 'almacen') {
+            DB::table('inventario_equipos')->where('id', $id)->update([
+                'estado'            => null,
+                'user_id'           => null,
+                'usuario_actual_id' => null,
+                'updated_at'        => now(),
+            ]);
+
+            return response()->json(['ok' => true]);
+        }
+
+        DB::table('inventario_equipos')->where('id', $id)->update([
+            'estado'     => $estado,
+            'updated_at' => now(),
+        ]);
+
+        // Fuera de servicio (mantenimiento/baja) → ya no está en uso activo,
+        // su IP se libera automáticamente (mismo helper que usa Network).
+        if (in_array($estado, ['mantenimiento', 'baja'], true)) {
+            IpAssigner::liberarEquipo((int) $id);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     // ─── Vista: formulario de carga ──────────────────────────────────────────
 
     public function subirResguardo()
@@ -52,21 +138,25 @@ class KardexController extends Controller
             $partes   = preg_split('/\s+/', trim($datos['nombre_usuario']));
             $nombre   = $partes[0] ?? '';
             $apellido = $partes[1] ?? '';
-            $candidatos = DB::table('empleados')
-                ->leftJoin('departamentos', 'empleados.id_departamento', '=', 'departamentos.id_departamento')
-                ->where('empleados.activo', 1)
+            $candidatos = DB::table('users')
+                ->leftJoin('departamentos', 'users.id_departamento', '=', 'departamentos.id_departamento')
+                ->where('users.activo', 1)
                 ->where(function ($q) use ($nombre, $apellido) {
-                    $q->where('empleados.nombre', 'like', "%{$nombre}%")
-                      ->orWhere('empleados.apellido_paterno', 'like', "%{$apellido}%")
-                      ->orWhere('empleados.apellido_materno', 'like', "%{$apellido}%");
+                    $q->where('users.name', 'like', "%{$nombre}%")
+                      ->orWhere('users.apellido_paterno', 'like', "%{$apellido}%")
+                      ->orWhere('users.apellido_materno', 'like', "%{$apellido}%");
                 })
                 ->select(
-                    'empleados.id_empleado',
-                    'empleados.nombre',
-                    'empleados.apellido_paterno',
-                    'empleados.apellido_materno',
-                    'empleados.correo',
-                    'departamentos.nombre as departamento'
+                    'users.id as id_empleado',
+                    'users.name as nombre',
+                    'users.apellido_paterno',
+                    'users.apellido_materno',
+                    'users.email as correo',
+                    'departamentos.nombre as departamento',
+                    DB::raw("(SELECT ip.ip FROM inventario_equipos ie
+                              JOIN inventario_ips_completo ip ON ip.id = ie.ip_id
+                              WHERE ie.user_id = users.id AND ie.ip_id IS NOT NULL
+                              ORDER BY ie.updated_at DESC LIMIT 1) as ip_actual")
                 )
                 ->limit(5)
                 ->get();
@@ -95,10 +185,29 @@ class KardexController extends Controller
                 ->withErrors(['pdf' => 'La sesión expiró. Vuelve a subir el PDF.']);
         }
 
+        $directores = DB::table('users')
+            ->leftJoin('departamentos', 'users.id_departamento', '=', 'departamentos.id_departamento')
+            ->where('users.activo', true)
+            ->where('users.puesto', 'like', '%Director%')
+            ->select(
+                'users.id as id_empleado',
+                'users.name as nombre',
+                'users.apellido_paterno',
+                'users.email as correo',
+                'departamentos.nombre as departamento',
+                DB::raw("(SELECT ip.ip FROM inventario_equipos ie
+                          JOIN inventario_ips_completo ip ON ip.id = ie.ip_id
+                          WHERE ie.user_id = users.id AND ie.ip_id IS NOT NULL
+                          ORDER BY ie.updated_at DESC LIMIT 1) as ip_actual")
+            )
+            ->orderBy('users.name')
+            ->get();
+
         return view('kardex::resguardo-preview', [
             'datos'      => session('resguardo.datos'),
             'textoRaw'   => session('resguardo.textoRaw'),
             'candidatos' => collect(session('resguardo.candidatos', []))->map(fn($e) => (object) $e),
+            'directores' => $directores,
             'tmpPdf'     => session('resguardo.tmpPdf'),
             'esNativo'   => session('resguardo.esNativo', true),
         ]);
@@ -112,11 +221,26 @@ class KardexController extends Controller
             'tipo'          => 'required|in:Laptop,PC Avanzada,PC Especializada',
             'cpu_serie'     => 'nullable|string|max:100',
             'tmp_pdf'       => 'required|string',
-            'id_empleado'   => 'nullable|exists:empleados,id_empleado',
+            'id_empleado'   => 'nullable|string',
             'ipv4'          => 'nullable|ip',
+            'nuevo_nombre'           => 'required_if:id_empleado,__nuevo__|string|max:80',
+            'nuevo_apellido_paterno' => 'required_if:id_empleado,__nuevo__|string|max:80',
+            'nuevo_apellido_materno' => 'nullable|string|max:80',
+            'nuevo_correo'           => 'nullable|email|max:120|unique:users,email',
+            'nuevo_puesto'           => 'nullable|string|max:120',
         ], [
-            'tipo.required' => 'El tipo de equipo es obligatorio.',
+            'tipo.required'                  => 'El tipo de equipo es obligatorio.',
+            'nuevo_nombre.required_if'           => 'El nombre es obligatorio para crear una persona nueva.',
+            'nuevo_apellido_paterno.required_if' => 'El apellido paterno es obligatorio para crear una persona nueva.',
+            'nuevo_correo.unique'                => 'Ese correo ya está registrado en otra cuenta.',
         ]);
+
+        if ($request->id_empleado && $request->id_empleado !== '__nuevo__'
+            && !DB::table('users')->where('id', $request->id_empleado)->exists()) {
+            return redirect()->route('kardex.resguardo.preview')->withInput()->withErrors([
+                'id_empleado' => 'La persona seleccionada ya no existe.',
+            ]);
+        }
 
         // Verificar serie duplicada
         $existente = DB::table('inventario_equipos')
@@ -127,6 +251,58 @@ class KardexController extends Controller
             return redirect()->route('kardex.resguardo.preview')->withInput()->withErrors([
                 'cpu_serie' => "Ya existe un equipo con la serie {$request->cpu_serie} (ID: {$existente->id}).",
             ]);
+        }
+
+        // Responsable: id existente, persona nueva creada aquí mismo, o ninguno.
+        $userId = null;
+        if ($request->id_empleado === '__nuevo__') {
+            $correoNuevo = $request->nuevo_correo ?: NewAccountProvisioner::placeholderEmail(Str::random(8));
+
+            // El área capturada en el resguardo es el departamento donde va
+            // a trabajar esta persona nueva — se resuelve/crea en departamentos.
+            $idDepartamento = $request->area ? DepartamentoResolver::resolveId($request->area) : null;
+
+            $userId = DB::table('users')->insertGetId([
+                'name'             => trim($request->nuevo_nombre),
+                'apellido_paterno' => trim($request->nuevo_apellido_paterno),
+                'apellido_materno' => trim($request->nuevo_apellido_materno ?? ''),
+                'email'            => $correoNuevo,
+                'password'         => NewAccountProvisioner::tempPasswordHash(),
+                'role'             => 'user',
+                'puesto'           => $request->nuevo_puesto ?: null,
+                'id_departamento'  => $idDepartamento,
+                'activo'           => true,
+                'fecha_alta'       => now(),
+                'created_at'       => now(),
+                'updated_at'       => now(),
+            ]);
+        } elseif ($request->id_empleado) {
+            $userId = (int) $request->id_empleado;
+        }
+
+        // Resolver la IP contra el registro maestro. Si ya la tiene asignada
+        // ESTA MISMA persona en otro equipo, se libera de ahí (switcheo). Si
+        // es de alguien más (u otro dispositivo), se bloquea.
+        $ipId = null;
+        $switcheo = false;
+        if ($request->ipv4) {
+            $ipId = IpAssigner::resolveId($request->ipv4);
+            $ocupante = IpAssigner::findOccupant($ipId);
+
+            if ($ocupante && (int) $ocupante->user_id !== $userId) {
+                return redirect()->route('kardex.resguardo.preview')->withInput()->withErrors([
+                    'ipv4' => "La IP {$request->ipv4} ya está asignada a otro dispositivo.",
+                ]);
+            }
+
+            if ($ocupante && $ocupante->tabla === 'inventario_equipos') {
+                DB::table('inventario_equipos')->where('id', $ocupante->id)->update([
+                    'ip_id'      => null,
+                    'ipv4'       => null,
+                    'updated_at' => now(),
+                ]);
+                $switcheo = true;
+            }
         }
 
         $idEquipo = DB::table('inventario_equipos')->insertGetId([
@@ -152,8 +328,10 @@ class KardexController extends Controller
             'nobreak_modelo' => $request->nobreak_modelo ?: null,
             'nobreak_serie'  => $request->nobreak_serie ?: null,
             'ipv4'           => $request->ipv4 ?: null,
+            'ip_id'          => $ipId,
             'observaciones'  => $request->observaciones ?: null,
-            'id_empleado'    => $request->id_empleado ?: null,
+            'user_id'           => $userId,
+            'usuario_actual_id' => $userId,
             'created_at'     => now(),
             'updated_at'     => now(),
         ]);
@@ -166,8 +344,12 @@ class KardexController extends Controller
             DB::table('inventario_equipos')->where('id', $idEquipo)->update(['pdf_resguardo' => $pdfPath]);
         }
 
-        return redirect()->route('kardex.index')
-            ->with('success', "Equipo registrado (ID {$idEquipo}). PDF guardado en el sistema.");
+        $mensaje = "Equipo registrado (ID {$idEquipo}). PDF guardado en el sistema.";
+        if ($switcheo) {
+            $mensaje .= ' Se liberó la IP de su equipo anterior y se reasignó a este (switcheo).';
+        }
+
+        return redirect()->route('kardex.index')->with('success', $mensaje);
     }
 
     // ─── Privado: extrae campos del texto del PDF ─────────────────────────────
@@ -240,9 +422,12 @@ class KardexController extends Controller
 
         if (!$rango) return response()->json(['ip' => null, 'mensaje' => 'Sin rango para esa área']);
 
-        $usadas = DB::table('inventario_equipos')
-            ->whereNotNull('ipv4')
-            ->pluck('ipv4')
+        // Fuente de verdad: el estatus del registro maestro, no lo que haya
+        // escrito cada equipo. Una IP sin fila registrada se sigue tratando
+        // como libre.
+        $usadas = DB::table('inventario_ips_completo')
+            ->where('estatus', '<>', 'Libre')
+            ->pluck('ip')
             ->flip()
             ->all();
 

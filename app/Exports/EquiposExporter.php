@@ -23,10 +23,10 @@ class EquiposExporter extends BaseExporter
     public function rows(array $filters): array
     {
         $query = DB::table('inventario_equipos')
-            ->leftJoin('empleados', 'inventario_equipos.id_empleado', '=', 'empleados.id_empleado')
+            ->leftJoin('users', 'inventario_equipos.user_id', '=', 'users.id')
             ->select(
                 'inventario_equipos.*',
-                DB::raw("NULLIF(TRIM(COALESCE(empleados.nombre,'') || ' ' || COALESCE(empleados.apellido_paterno,'')), '') as empleado_nombre")
+                DB::raw("NULLIF(TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'')), '') as empleado_nombre")
             )
             ->orderBy('inventario_equipos.tipo')
             ->orderBy('inventario_equipos.consecutivo');
@@ -45,7 +45,7 @@ class EquiposExporter extends BaseExporter
                 $w->where(DB::raw('LOWER(inventario_equipos.area)'), 'like', '%' . strtolower($q) . '%')
                   ->orWhere(DB::raw('LOWER(inventario_equipos.nombre_usuario)'), 'like', '%' . strtolower($q) . '%')
                   ->orWhere(DB::raw('LOWER(inventario_equipos.cpu_serie)'), 'like', '%' . strtolower($q) . '%')
-                  ->orWhere(DB::raw('LOWER(empleados.nombre)'), 'like', '%' . strtolower($q) . '%');
+                  ->orWhere(DB::raw('LOWER(users.name)'), 'like', '%' . strtolower($q) . '%');
             });
         }
 
@@ -88,10 +88,10 @@ class EquiposExporter extends BaseExporter
     private function aplicarFiltroEstado($query, string $estado): void
     {
         match ($estado) {
-            'Almacén'      => $query->whereNull('inventario_equipos.id_empleado')
+            'Almacén'      => $query->whereNull('inventario_equipos.user_id')
                                     ->whereNotIn('inventario_equipos.estado', ['mantenimiento', 'baja'])
                                     ->orWhereNull('inventario_equipos.estado'),
-            'Asignado'     => $query->whereNotNull('inventario_equipos.id_empleado'),
+            'Asignado'     => $query->whereNotNull('inventario_equipos.user_id'),
             'Mantenimiento'=> $query->where('inventario_equipos.estado', 'mantenimiento'),
             'Baja'         => $query->where('inventario_equipos.estado', 'baja'),
             default        => null,
@@ -103,7 +103,7 @@ class EquiposExporter extends BaseExporter
         return match (true) {
             $eq->estado === 'mantenimiento' => 'Mantenimiento',
             $eq->estado === 'baja'          => 'Baja',
-            !is_null($eq->id_empleado)      => 'Asignado',
+            !is_null($eq->user_id)          => 'Asignado',
             default                         => 'Almacén',
         };
     }

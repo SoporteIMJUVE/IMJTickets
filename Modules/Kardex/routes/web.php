@@ -2,7 +2,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Kardex\Http\Controllers\KardexController;
 
-Route::middleware(['auth'])->prefix('kardex')->name('kardex.')->group(function () {
+Route::middleware(['auth', 'admin'])->prefix('kardex')->name('kardex.')->group(function () {
     Route::get('/exportar/{tipo}', function (string $tipo, \Illuminate\Http\Request $request) {
         $exporter = match ($tipo) {
             'equipos'    => new \App\Exports\EquiposExporter(),
@@ -13,40 +13,16 @@ Route::middleware(['auth'])->prefix('kardex')->name('kardex.')->group(function (
         return $exporter->download($request->all());
     })->name('exportar');
 
-    Route::get('/', function () {
-        $equipos = \DB::table('inventario_equipos')
-            ->leftJoin('empleados', 'inventario_equipos.id_empleado', '=', 'empleados.id_empleado')
-            ->select(
-                'inventario_equipos.*',
-                \DB::raw("NULLIF(TRIM(COALESCE(empleados.nombre,'') || ' ' || COALESCE(empleados.apellido_paterno,'')), '') as empleado_nombre"),
-                'empleados.correo as empleado_correo'
-            )
-            ->orderBy('inventario_equipos.tipo')
-            ->orderBy('inventario_equipos.consecutivo')
-            ->get();
-
-        $insumos = \DB::table('insumos')->orderBy('nombre_insumo')->get();
-
-        return view('kardex::index', [
-            'equipos'       => $equipos,
-            'insumos'       => $insumos,
-            'totalEquipos'  => $equipos->count(),
-            'enAlmacen'     => $equipos->filter(fn($e) => !$e->id_empleado && $e->estado !== 'mantenimiento' && $e->estado !== 'baja')->count(),
-            'mantenimiento' => $equipos->where('estado', 'mantenimiento')->count(),
-            'criticos'      => $insumos->filter(fn($i) => $i->stock_actual <= $i->stock_minimo)->count(),
-            'totalInsumos'  => $insumos->sum('stock_actual'),
-            'stockCritico'  => $insumos->filter(fn($i) => $i->stock_actual <= $i->stock_minimo)->count(),
-        ]);
-    })->name('index');
+    Route::get('/', [KardexController::class, 'index'])->name('index');
 
     // JSON: detalle de un equipo (para panel lateral)
     Route::get('/equipo/{id}', function ($id) {
         $eq = \DB::table('inventario_equipos')
-            ->leftJoin('empleados', 'inventario_equipos.id_empleado', '=', 'empleados.id_empleado')
+            ->leftJoin('users', 'inventario_equipos.user_id', '=', 'users.id')
             ->select(
                 'inventario_equipos.*',
-                \DB::raw("NULLIF(TRIM(COALESCE(empleados.nombre,'') || ' ' || COALESCE(empleados.apellido_paterno,'')), '') as empleado_nombre"),
-                'empleados.correo as empleado_correo',
+                \DB::raw("NULLIF(TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'')), '') as empleado_nombre"),
+                'users.email as empleado_correo',
                 \DB::raw("COALESCE(
                     NULLIF(TRIM(inventario_equipos.ipv4), ''),
                     (SELECT ips.ip FROM inventario_ips_completo ips
@@ -65,12 +41,7 @@ Route::middleware(['auth'])->prefix('kardex')->name('kardex.')->group(function (
     })->name('equipo.detalle');
 
     // POST: cambia estado de un equipo
-    Route::post('/equipo/{id}/estado', function ($id, \Illuminate\Http\Request $request) {
-        \DB::table('inventario_equipos')
-            ->where('id', $id)
-            ->update(['estado' => $request->estado ?: null, 'updated_at' => now()]);
-        return response()->json(['ok' => true]);
-    })->name('equipo.estado');
+    Route::post('/equipo/{id}/estado', [KardexController::class, 'cambiarEstadoEquipo'])->name('equipo.estado');
 
     // GET: descarga el PDF de resguardo (guardado en disco local)
     Route::get('/equipo/{id}/pdf', function ($id) {

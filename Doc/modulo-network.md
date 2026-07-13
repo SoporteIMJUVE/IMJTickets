@@ -7,6 +7,11 @@
 
 ## ¿Qué hace este módulo?
 
+> `NetworkController::liberarPorEstado()` ahora comparte el mismo helper
+> (`App\Support\IpAssigner::liberarEquipo()`) que usa Kardex para liberar
+> la IP de un equipo al cambiar su estado — ver
+> `Doc/estados-equipo-y-baja-usuario.md` §1.
+
 Muestra el inventario de direcciones IP de toda la red institucional. Tiene dos tabs:
 
 1. **Rangos** — cada área del instituto tiene un rango de IPs asignado. Muestra cuántas IPs están ocupadas vs disponibles con una barra de capacidad, y alerta cuando un segmento está al 90% o más.

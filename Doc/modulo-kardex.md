@@ -7,11 +7,18 @@
 
 ## ¿Qué hace este módulo?
 
-Maneja el inventario físico del departamento de TI. Tiene tres secciones (tabs):
+Maneja el inventario físico del departamento de TI. Tiene cuatro secciones (tabs):
 
 1. **Equipos** — inventario de laptops, PCs y equipos especializados con responsable, estado y filtros
 2. **Insumos** — stock de consumibles (tóner, cartuchos, cables, etc.) con alertas de stock crítico
-3. **Resguardos** — todos los equipos con indicador de PDF de resguardo adjunto
+3. **Resguardos** — solo los equipos que tienen PDF de resguardo adjunto, filtrables por Estado
+4. **Impresoras** — inventario de impresoras con vista de detalle y enlace a su IP en el módulo Network
+
+> Para el detalle de los 4 estados de un equipo (Automático/Almacén/
+> Mantenimiento/Baja) y qué le pasa a la IP y al responsable en cada uno,
+> ver `Doc/estados-equipo-y-baja-usuario.md`. Las secciones de abajo sobre
+> `estado` y la pestaña Resguardos quedaron desactualizadas por esos
+> cambios.
 
 ---
 

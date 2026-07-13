@@ -3,7 +3,11 @@
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return auth()->check()
+    if (!auth()->check()) {
+        return redirect()->route('login');
+    }
+
+    return auth()->user()->isAdmin()
         ? redirect()->route('dashboard')
-        : redirect()->route('login');
+        : redirect()->route('perfil');
 });

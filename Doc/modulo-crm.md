@@ -9,6 +9,10 @@
 
 Es el directorio de personal del instituto. Muestra todos los empleados con su departamento, extensión telefónica y cantidad de equipos asignados. Desde aquí un técnico puede consultar rápidamente quién tiene qué equipo, a qué área pertenece y cómo contactarlo.
 
+> Para el detalle de qué pasa exactamente al dar de baja a alguien
+> (contraseña, código de recuperación, equipos vinculados) ver
+> `Doc/estados-equipo-y-baja-usuario.md` §5.
+
 El panel lateral (derecho) permite ver el detalle completo de un empleado: sus activos, historial de tickets y datos de contacto.
 
 ---

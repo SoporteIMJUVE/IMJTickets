@@ -19,7 +19,9 @@
     "dependencies": {
         "@fontsource/inter": "^5.2.8",
         "@fontsource/jetbrains-mono": "^5.2.8",
+        "jspdf": "^4.2.1",
         "material-symbols": "^0.45.6",
+        "qrcode": "^1.5.4",
         "sortablejs": "^1.15.7"
     }
 }

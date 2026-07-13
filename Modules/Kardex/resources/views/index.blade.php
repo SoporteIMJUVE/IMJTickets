@@ -4,7 +4,7 @@
     {{-- Header --}}
     <div class="flex justify-between items-end mb-8">
         <div>
-            <h2 class="text-[32px] font-bold leading-10 tracking-tight text-brand">Kardex de Insumos y Resguardos</h2>
+            <h2 class="text-[32px] font-bold leading-10 tracking-tight text-brand">Inventario de Insumos y Resguardos</h2>
             <p class="text-muted text-sm mt-1">Control de inventario técnico y asignación institucional de recursos.</p>
         </div>
         <div class="flex items-center gap-3">
@@ -20,6 +20,10 @@
                 <button id="tab-btn-resguardos" onclick="switchKardexTab('resguardos', this)"
                         class="px-6 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high">
                     Resguardos
+                </button>
+                <button id="tab-btn-impresoras" onclick="switchKardexTab('impresoras', this)"
+                        class="px-6 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high">
+                    Impresoras
                 </button>
             </div>
         </div>
@@ -101,12 +105,13 @@
                         $estadoDisplay = match(true) {
                             $eq->estado === 'mantenimiento' => 'Mantenimiento',
                             $eq->estado === 'baja'          => 'Baja',
-                            !is_null($eq->id_empleado)      => 'Asignado',
+                            !is_null($eq->user_id)          => 'Asignado',
                             default                         => 'Almacén',
                         };
                         $responsable = $eq->empleado_nombre ?? $eq->nombre_usuario ?? '—';
                     @endphp
                     <tr class="hover:bg-gold/5 transition-colors cursor-pointer eq-row"
+                        data-id="{{ $eq->id }}"
                         data-tipo="{{ $eq->tipo }}"
                         data-estado="{{ $estadoDisplay }}"
                         data-texto="{{ strtolower(($eq->area ?? '') . ' ' . $responsable . ' ' . ($eq->cpu_serie ?? '')) }}"
@@ -128,7 +133,7 @@
                         </td>
                         <td class="px-4 py-3 font-mono text-sm text-brand whitespace-nowrap">{{ $eq->cpu_serie ?? '—' }}</td>
                         <td class="px-4 py-3 text-sm text-muted max-w-[160px] truncate" title="{{ $eq->area }}">{{ $eq->area ?? '—' }}</td>
-                        <td class="px-4 py-3 text-sm max-w-[160px] truncate" title="{{ $responsable }}">{{ $responsable }}</td>
+                        <td class="px-4 py-3 text-sm max-w-[160px] truncate" title="{{ $responsable }}" id="responsable-cell-{{ $eq->id }}">{{ $responsable }}</td>
                         <td class="px-4 py-3">
                             @php $estadoColors = [
                                 'Asignado'      => 'bg-status-active/10 text-status-active',
@@ -269,12 +274,14 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">PDF</label>
-                        <select id="f-rsg-pdf" onchange="filtrarResguardos()"
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Estado</label>
+                        <select id="f-rsg-estado" onchange="filtrarResguardos()"
                                 class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
                             <option value="">Todos</option>
-                            <option value="si">Con PDF</option>
-                            <option value="no">Sin PDF</option>
+                            <option>Almacén</option>
+                            <option>Asignado</option>
+                            <option>Mantenimiento</option>
+                            <option>Baja</option>
                         </select>
                     </div>
                     <div>
@@ -295,20 +302,32 @@
                         <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">No. Serie</th>
                         <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Responsable</th>
                         <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Área</th>
-                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">PDF</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Estado</th>
                         <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Registrado</th>
                         <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted text-right">Detalle</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border" id="tbody-resguardos">
-                    @forelse($equipos as $eq)
+                    @forelse($resguardos as $eq)
                     @php
                         $responsable = $eq->empleado_nombre ?? $eq->nombre_usuario ?? '—';
-                        $tienePdf    = !empty($eq->pdf_resguardo);
+                        $estadoDisplay = match(true) {
+                            $eq->estado === 'mantenimiento' => 'Mantenimiento',
+                            $eq->estado === 'baja'          => 'Baja',
+                            !is_null($eq->user_id)          => 'Asignado',
+                            default                         => 'Almacén',
+                        };
+                        $estadoColors = [
+                            'Asignado'      => 'bg-status-active/10 text-status-active',
+                            'Almacén'       => 'bg-status-free/10 text-status-free',
+                            'Mantenimiento' => 'bg-status-low/10 text-status-low',
+                            'Baja'          => 'bg-muted/10 text-muted',
+                        ];
                     @endphp
                     <tr class="hover:bg-gold/5 transition-colors cursor-pointer rsg-row"
+                        data-id="{{ $eq->id }}"
                         data-tipo="{{ $eq->tipo }}"
-                        data-pdf="{{ $tienePdf ? 'si' : 'no' }}"
+                        data-estado="{{ $estadoDisplay }}"
                         data-texto="{{ strtolower(($eq->area ?? '') . ' ' . $responsable) }}"
                         onclick="abrirPanelEquipo({{ $eq->id }})">
                         <td class="px-4 py-3 font-mono text-xs text-muted">#{{ $eq->id }}</td>
@@ -323,16 +342,13 @@
                             <span class="text-muted"> {{ $eq->cpu_modelo }}</span>
                         </td>
                         <td class="px-4 py-3 font-mono text-sm text-brand">{{ $eq->cpu_serie ?? '—' }}</td>
-                        <td class="px-4 py-3 text-sm max-w-[150px] truncate" title="{{ $responsable }}">{{ $responsable }}</td>
+                        <td class="px-4 py-3 text-sm max-w-[150px] truncate" title="{{ $responsable }}" id="responsable-cell-rsg-{{ $eq->id }}">{{ $responsable }}</td>
                         <td class="px-4 py-3 text-sm text-muted max-w-[150px] truncate" title="{{ $eq->area }}">{{ $eq->area ?? '—' }}</td>
                         <td class="px-4 py-3">
-                            @if($tienePdf)
-                            <span class="flex items-center gap-1 text-status-active text-xs font-bold">
-                                <span class="material-symbols-outlined" style="font-size:16px">picture_as_pdf</span> PDF
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase {{ $estadoColors[$estadoDisplay] ?? '' }}"
+                                  id="estado-badge-rsg-{{ $eq->id }}">
+                                {{ $estadoDisplay }}
                             </span>
-                            @else
-                            <span class="text-muted text-xs">—</span>
-                            @endif
                         </td>
                         <td class="px-4 py-3 text-xs text-muted">
                             {{ $eq->created_at ? \Carbon\Carbon::parse($eq->created_at)->format('d/m/Y') : '—' }}
@@ -346,7 +362,73 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="9" class="px-6 py-10 text-center text-muted text-sm">Sin equipos registrados</td>
+                        <td colspan="9" class="px-6 py-10 text-center text-muted text-sm">Sin resguardos con PDF registrados</td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+
+    {{-- ---- TAB: IMPRESORAS (solo lectura) ---- --}}
+    <div id="tab-impresoras" class="hidden">
+        <div class="bg-canvas border border-border rounded-xl overflow-hidden shadow-sm">
+            <x-tabla-encabezado titulo="Inventario de Impresoras" tab="impresoras">
+                <x-slot:filtros>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Buscar</label>
+                        <input id="f-imp-texto" oninput="filtrarImpresoras()" type="text" placeholder="Área, marca, serie, IP..."
+                               class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand w-56">
+                    </div>
+                </x-slot:filtros>
+            </x-tabla-encabezado>
+
+            <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-wash border-b border-border">
+                    <tr>
+                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Área</th>
+                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Marca / Modelo</th>
+                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">No. Serie</th>
+                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">IP</th>
+                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Responsable</th>
+                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted text-right">Detalle</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border" id="tbody-impresoras">
+                    @forelse($impresoras as $imp)
+                    <tr class="imp-row hover:bg-gold/5 transition-colors cursor-pointer"
+                        data-texto="{{ strtolower(($imp->area ?? '') . ' ' . ($imp->marca ?? '') . ' ' . ($imp->modelo ?? '') . ' ' . ($imp->serie ?? '') . ' ' . ($imp->ip_address ?? '')) }}"
+                        data-area="{{ $imp->area ?? '' }}"
+                        data-marca-modelo="{{ trim(($imp->marca ?? '') . ' ' . ($imp->modelo ?? '')) }}"
+                        data-serie="{{ $imp->serie ?? '' }}"
+                        data-ip="{{ $imp->ip_address ?? '' }}"
+                        data-responsable="{{ $imp->responsable_nombre ?? '' }}"
+                        data-correo="{{ $imp->responsable_correo ?? '' }}"
+                        onclick="abrirDetalleImpresora(this)">
+                        <td class="px-6 py-3 text-sm">{{ $imp->area ?? '—' }}</td>
+                        <td class="px-6 py-3 text-sm">{{ trim(($imp->marca ?? '') . ' ' . ($imp->modelo ?? '')) ?: '—' }}</td>
+                        <td class="px-6 py-3 font-mono text-sm">{{ $imp->serie ?? '—' }}</td>
+                        <td class="px-6 py-3 font-mono text-sm">{{ $imp->ip_address ?? '—' }}</td>
+                        <td class="px-6 py-3 text-sm">
+                            @if($imp->responsable_nombre)
+                                {{ $imp->responsable_nombre }}
+                                <span class="block text-[11px] text-muted">{{ $imp->responsable_correo }}</span>
+                            @else
+                                <span class="text-muted italic">Sin asignar</span>
+                            @endif
+                        </td>
+                        <td class="px-6 py-3 text-right">
+                            <button onclick="event.stopPropagation(); abrirDetalleImpresora(this.closest('tr'))"
+                                    class="p-1.5 hover:bg-wash rounded text-muted hover:text-brand">
+                                <span class="material-symbols-outlined text-sm">open_in_new</span>
+                            </button>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="6" class="px-6 py-10 text-center text-muted text-sm">Sin impresoras registradas</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -394,6 +476,48 @@
 <div class="fixed inset-0 bg-black/20 backdrop-blur-sm z-[55] hidden" id="kardex-backdrop"
      onclick="cerrarPanelEquipo()"></div>
 
+{{-- ══ Modal: Detalle de impresora ══ --}}
+<div id="modal-impresora-detalle" class="fixed inset-0 z-[70] hidden items-center justify-center" style="background:rgba(0,0,0,.35)">
+    <div class="bg-canvas rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div class="px-6 py-5 border-b border-border flex items-center justify-between">
+            <h3 class="font-bold text-base text-ink">Detalle de impresora</h3>
+            <button type="button" onclick="cerrarModal('modal-impresora-detalle')" class="text-muted hover:text-brand p-1">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="px-6 py-5 space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="detail-field">
+                    <span class="detail-label">Área</span>
+                    <span class="detail-value" id="imp-detalle-area">—</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">No. Serie</span>
+                    <span class="detail-value mono" id="imp-detalle-serie">—</span>
+                </div>
+                <div class="detail-field col-span-2">
+                    <span class="detail-label">Marca / Modelo</span>
+                    <span class="detail-value" id="imp-detalle-marca-modelo">—</span>
+                </div>
+                <div class="detail-field col-span-2">
+                    <span class="detail-label">Responsable</span>
+                    <span class="detail-value" id="imp-detalle-responsable">—</span>
+                </div>
+                <div class="detail-field col-span-2">
+                    <span class="detail-label">Dirección IP</span>
+                    <span class="detail-value" id="imp-detalle-ip-wrap">
+                        <span class="text-muted">Sin IP asignada</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-border flex justify-end">
+            <button type="button" onclick="cerrarModal('modal-impresora-detalle')"
+                    class="px-4 py-2 border border-border rounded-lg text-sm font-bold text-muted hover:bg-wash transition-colors">Cerrar</button>
+        </div>
+    </div>
+</div>
+
 <style>
 .detail-field { display: flex; flex-direction: column; gap: 2px; }
 .detail-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-muted); }
@@ -402,12 +526,13 @@
 </style>
 
 <script>
+const NETWORK_URL = "{{ route('network.index') }}";
 const ACTIVE_TAB  = 'px-6 py-2 rounded-md text-sm font-bold transition-all bg-canvas text-brand shadow-sm';
 const INACTIVE_TAB= 'px-6 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high';
 let currentTab    = 'equipos';
 
 function switchKardexTab(tab, btn) {
-    ['equipos', 'insumos', 'resguardos'].forEach(t => {
+    ['equipos', 'insumos', 'resguardos', 'impresoras'].forEach(t => {
         document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
         document.getElementById('tab-btn-' + t).className = t === tab ? ACTIVE_TAB : INACTIVE_TAB;
     });
@@ -447,15 +572,60 @@ function filtrarInsumos() {
     if (count) count.textContent = `${vis} resultado${vis !== 1 ? 's' : ''}`;
 }
 
+function filtrarImpresoras() {
+    const texto = document.getElementById('f-imp-texto').value.toLowerCase();
+    let vis = 0;
+    document.querySelectorAll('.imp-row').forEach(row => {
+        const ok = !texto || row.dataset.texto.includes(texto);
+        row.classList.toggle('hidden', !ok);
+        if (ok) vis++;
+    });
+    const count = document.getElementById('f-imp-count');
+    if (count) count.textContent = `${vis} resultado${vis !== 1 ? 's' : ''}`;
+}
+
+function cerrarModal(idModal) {
+    document.getElementById(idModal).classList.add('hidden');
+    document.getElementById(idModal).classList.remove('flex');
+}
+
+function abrirModal(idModal) {
+    document.getElementById(idModal).classList.remove('hidden');
+    document.getElementById(idModal).classList.add('flex');
+}
+
+// ── Modal: detalle de impresora ──────────────────────────────────────
+function abrirDetalleImpresora(row) {
+    const d = row.dataset;
+
+    document.getElementById('imp-detalle-area').textContent = d.area || '—';
+    document.getElementById('imp-detalle-serie').textContent = d.serie || '—';
+    document.getElementById('imp-detalle-marcaModelo').textContent = d.marcaModelo || '—';
+    document.getElementById('imp-detalle-responsable').textContent =
+        d.responsable ? `${d.responsable}${d.correo ? ' <' + d.correo + '>' : ''}` : 'Sin asignar';
+
+    const ipWrap = document.getElementById('imp-detalle-ip-wrap');
+    if (d.ip) {
+        const url = `${NETWORK_URL}?open=${encodeURIComponent(d.ip)}`;
+        ipWrap.innerHTML = `<a href="${url}" target="_blank" class="font-mono text-brand hover:underline flex items-center gap-1">
+            ${d.ip} <span class="material-symbols-outlined" style="font-size:15px">open_in_new</span>
+        </a>`;
+    } else {
+        ipWrap.innerHTML = '<span class="text-muted">Sin IP asignada</span>';
+    }
+
+    abrirModal('modal-impresora-detalle');
+}
+
 function filtrarResguardos() {
-    const tipo  = document.getElementById('f-rsg-tipo').value;
-    const pdf   = document.getElementById('f-rsg-pdf').value;
-    const texto = document.getElementById('f-rsg-texto').value.toLowerCase();
+    const tipo   = document.getElementById('f-rsg-tipo').value;
+    const estado = document.getElementById('f-rsg-estado').value;
+    const texto  = document.getElementById('f-rsg-texto').value.toLowerCase();
     let vis = 0;
     document.querySelectorAll('.rsg-row').forEach(row => {
-        const ok = (!tipo  || row.dataset.tipo  === tipo)
-                && (!pdf   || row.dataset.pdf   === pdf)
-                && (!texto || row.dataset.texto.includes(texto));
+        const ok = (!tipo   || row.dataset.tipo   === tipo)
+                && (!estado || row.dataset.estado  === estado)
+                && (!texto  || row.dataset.texto.includes(texto));
         row.classList.toggle('hidden', !ok);
         if (ok) vis++;
     });
@@ -465,6 +635,14 @@ function filtrarResguardos() {
 
 // ── Panel lateral: detalle de equipo ─────────────────────────────────
 let panelEquipoId = null;
+let panelEquipoUserId = null;
+
+const ESTADO_BADGE_CLASSES = {
+    'Asignado':      'bg-status-active/10 text-status-active',
+    'Almacén':       'bg-status-free/10 text-status-free',
+    'Mantenimiento': 'bg-status-low/10 text-status-low',
+    'Baja':          'bg-muted/10 text-muted',
+};
 
 async function abrirPanelEquipo(id) {
     panelEquipoId = id;
@@ -478,6 +656,7 @@ async function abrirPanelEquipo(id) {
     document.getElementById('panel-pdf-link').classList.add('hidden');
 
     const eq = await fetch(`/kardex/equipo/${id}`).then(r => r.json());
+    panelEquipoUserId = eq.user_id;
 
     // Header
     document.getElementById('panel-tipo-badge').textContent    = eq.tipo ?? '—';
@@ -494,7 +673,7 @@ async function abrirPanelEquipo(id) {
     // Calcular estado display
     const estadoDisplay = eq.estado === 'mantenimiento' ? 'Mantenimiento'
         : eq.estado === 'baja' ? 'Baja'
-        : eq.id_empleado ? 'Asignado'
+        : eq.user_id ? 'Asignado'
         : 'Almacén';
 
     // Construir cuerpo
@@ -573,6 +752,7 @@ async function abrirPanelEquipo(id) {
                     <select id="select-estado-panel" class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand"
                             onchange="">
                         <option value="" ${!eq.estado ? 'selected' : ''}>Automático (${estadoDisplay})</option>
+                        <option value="almacen">Almacén (desvincula responsable)</option>
                         <option value="mantenimiento" ${eq.estado === 'mantenimiento' ? 'selected' : ''}>Mantenimiento</option>
                         <option value="baja" ${eq.estado === 'baja' ? 'selected' : ''}>Baja</option>
                     </select>
@@ -617,12 +797,40 @@ async function guardarEstado(id) {
         body: JSON.stringify({ estado: nuevoEstado }),
     });
     if (r.ok) {
-        // Actualizar badge en la tabla
-        const badge = document.getElementById(`estado-badge-${id}`);
-        if (badge) {
-            const labelMap = { mantenimiento: 'Mantenimiento', baja: 'Baja', '': null };
-            badge.textContent = labelMap[nuevoEstado] ?? badge.textContent;
+        // "almacen" desvincula al responsable → el estado real pasa a
+        // Almacén independientemente de qué tuviera panelEquipoUserId antes.
+        if (nuevoEstado === 'almacen') panelEquipoUserId = null;
+
+        const labelMap = { mantenimiento: 'Mantenimiento', baja: 'Baja', almacen: 'Almacén' };
+        const estadoDisplay = labelMap[nuevoEstado] ?? (panelEquipoUserId ? 'Asignado' : 'Almacén');
+        const badgeClass = ESTADO_BADGE_CLASSES[estadoDisplay] ?? '';
+
+        // Actualizar badge + dataset en ambas tablas (Equipos y Resguardos)
+        ['estado-badge-' + id, 'estado-badge-rsg-' + id].forEach(badgeId => {
+            const badge = document.getElementById(badgeId);
+            if (badge) {
+                badge.textContent = estadoDisplay;
+                badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ' + badgeClass;
+            }
+        });
+        document.querySelectorAll(`.eq-row[data-id="${id}"], .rsg-row[data-id="${id}"]`).forEach(row => {
+            row.dataset.estado = estadoDisplay;
+        });
+
+        if (nuevoEstado === 'almacen') {
+            ['responsable-cell-' + id, 'responsable-cell-rsg-' + id].forEach(cellId => {
+                const cell = document.getElementById(cellId);
+                if (cell) { cell.textContent = '—'; cell.removeAttribute('title'); }
+            });
         }
+
+        // El estado dejó de ser "Asignado" (o cambió) → su IP pudo liberarse
+        // en el servidor, o se desvinculó al responsable; refrescamos el
+        // panel para reflejar el estado real que quedó en la BD.
+        if (nuevoEstado === 'mantenimiento' || nuevoEstado === 'baja' || nuevoEstado === 'almacen') {
+            abrirPanelEquipo(id);
+        }
+
         select.closest('.detail-field')?.querySelector('button')?.classList.add('opacity-50');
         setTimeout(() => select.closest('.detail-field')?.querySelector('button')?.classList.remove('opacity-50'), 1000);
     }

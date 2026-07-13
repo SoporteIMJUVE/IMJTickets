@@ -59,10 +59,10 @@ class ResguardosExporter extends BaseExporter
     private function getEquipos(array $filters): \Illuminate\Support\Collection
     {
         $query = DB::table('inventario_equipos')
-            ->leftJoin('empleados', 'inventario_equipos.id_empleado', '=', 'empleados.id_empleado')
+            ->leftJoin('users', 'inventario_equipos.user_id', '=', 'users.id')
             ->select(
                 'inventario_equipos.*',
-                DB::raw("NULLIF(TRIM(COALESCE(empleados.nombre,'') || ' ' || COALESCE(empleados.apellido_paterno,'')), '') as empleado_nombre")
+                DB::raw("NULLIF(TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'')), '') as empleado_nombre")
             )
             ->orderBy('inventario_equipos.tipo')
             ->orderBy('inventario_equipos.consecutivo');
@@ -84,7 +84,7 @@ class ResguardosExporter extends BaseExporter
             $query->where(function ($w) use ($q) {
                 $w->where(DB::raw('LOWER(inventario_equipos.area)'), 'like', '%' . strtolower($q) . '%')
                   ->orWhere(DB::raw('LOWER(inventario_equipos.nombre_usuario)'), 'like', '%' . strtolower($q) . '%')
-                  ->orWhere(DB::raw('LOWER(empleados.nombre)'), 'like', '%' . strtolower($q) . '%');
+                  ->orWhere(DB::raw('LOWER(users.name)'), 'like', '%' . strtolower($q) . '%');
             });
         }
 
@@ -97,7 +97,7 @@ class ResguardosExporter extends BaseExporter
         $estado      = match (true) {
             $eq->estado === 'mantenimiento' => 'Mantenimiento',
             $eq->estado === 'baja'          => 'Baja',
-            !is_null($eq->id_empleado)      => 'Asignado',
+            !is_null($eq->user_id)          => 'Asignado',
             default                         => 'Almacén',
         };
 

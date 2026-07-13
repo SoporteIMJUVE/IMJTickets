@@ -17,10 +17,10 @@ class IpsExporter extends BaseExporter
     public function rows(array $filters): array
     {
         $query = DB::table('inventario_ips_completo')
-            ->leftJoin('empleados', 'inventario_ips_completo.id_empleado', '=', 'empleados.id_empleado')
+            ->leftJoin('users', 'inventario_ips_completo.user_id', '=', 'users.id')
             ->select(
                 'inventario_ips_completo.*',
-                DB::raw("NULLIF(TRIM(COALESCE(empleados.nombre,'') || ' ' || COALESCE(empleados.apellido_paterno,'')), '') as empleado_nombre")
+                DB::raw("NULLIF(TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'')), '') as empleado_nombre")
             )
             ->orderBy('inventario_ips_completo.departamento_pestana')
             ->orderBy('inventario_ips_completo.ip');
