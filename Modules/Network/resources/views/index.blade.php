@@ -121,6 +121,12 @@
             <x-tabla-encabezado titulo="Inventario de IPs" tab="ips" exportUrl="{{ route('network.exportar') }}">
                 <x-slot:filtros>
                     <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Usuario o IP</label>
+                        <input id="net-filter-texto" oninput="filterIpTable()" type="text"
+                               placeholder="Nombre asignado o IP..."
+                               class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand w-56">
+                    </div>
+                    <div>
                         <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Estado</label>
                         <select id="net-filter-estatus" onchange="filterIpTable()"
                                 class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
@@ -159,9 +165,10 @@
                     @forelse($ipsAll as $ip)
                     <tr class="hover:bg-gold/5 transition-colors cursor-pointer"
                         data-ip="{{ $ip->ip }}"
+                        data-usuario="{{ strtolower($ip->usuario ?? '') }}"
                         data-area="{{ strtolower($ip->departamento_pestana ?? '') }}"
                         data-estatus="{{ strtolower($ip->estatus ?? 'libre') }}"
-                        onclick="openIpPanel('{{ $ip->ip }}', '{{ addslashes($ip->usuario ?? '—') }}', '{{ addslashes($ip->area_excel ?? $ip->departamento_pestana ?? '—') }}')">
+                        onclick="abrirPanelIp({{ $ip->id }})">
                         <td class="px-6 py-3 font-mono text-sm text-brand">{{ $ip->ip }}</td>
                         <td class="px-6 py-3 text-sm">{{ $ip->usuario ?: '—' }}</td>
                         <td class="px-6 py-3 text-sm text-muted">{{ $ip->tipo_equipo ?: '—' }}
@@ -218,9 +225,9 @@
                 </div>
                 <div class="space-y-1">
                     <p class="text-[10px] text-muted font-medium">Tipo Conexión</p>
-                    <p class="text-sm flex items-center gap-1">
-                        <span class="material-symbols-outlined text-sm">settings_ethernet</span>
-                        Ethernet
+                    <p class="text-sm flex items-center gap-1" id="panel-tipo-conexion">
+                        <span class="material-symbols-outlined text-sm">help</span>
+                        —
                     </p>
                 </div>
                 <div class="space-y-1">
@@ -238,25 +245,9 @@
         <section>
             <div class="flex items-center justify-between mb-4 pb-2 border-b border-border">
                 <h4 class="text-[11px] font-bold uppercase tracking-wider text-muted">Permisos de Navegación</h4>
-                <span class="text-[10px] bg-gold/20 text-brand px-2 py-0.5 font-bold rounded">Perfil: Estándar</span>
             </div>
-            <div class="grid grid-cols-3 gap-3">
-                @php $perms = [
-                    ['icon'=>'account_balance', 'label'=>'Sitios Gov',  'ok'=>true],
-                    ['icon'=>'newspaper',       'label'=>'Noticias',    'ok'=>true],
-                    ['icon'=>'smart_display',   'label'=>'YouTube',     'ok'=>false],
-                    ['icon'=>'share',           'label'=>'Social',      'ok'=>false],
-                    ['icon'=>'mail',            'label'=>'Webmail',     'ok'=>true],
-                    ['icon'=>'public',          'label'=>'Intranet',    'ok'=>true],
-                ]; @endphp
-                @foreach($perms as $p)
-                <div class="p-3 bg-surface border border-border rounded flex flex-col items-center gap-1 text-center {{ !$p['ok'] ? 'grayscale opacity-60' : '' }}">
-                    <span class="material-symbols-outlined {{ $p['ok'] ? 'text-status-active' : 'text-status-critical' }}">{{ $p['icon'] }}</span>
-                    <span class="text-[10px] font-medium leading-tight">{{ $p['label'] }}</span>
-                    <span class="material-symbols-outlined text-xs {{ $p['ok'] ? 'text-status-active' : 'text-status-critical' }}"
-                          style="font-variation-settings:'FILL' 1">{{ $p['ok'] ? 'check_circle' : 'cancel' }}</span>
-                </div>
-                @endforeach
+            <div class="grid grid-cols-3 gap-3" id="panel-permisos-grid">
+                <p class="col-span-3 text-xs text-muted italic">Cargando…</p>
             </div>
         </section>
 
@@ -271,13 +262,99 @@
     </div>
 
     <div class="p-6 border-t border-border bg-wash flex gap-3">
-        <button class="flex-1 py-3 bg-brand text-white font-bold rounded-lg text-sm hover:opacity-90 transition-opacity">Editar Configuración</button>
-        <button class="flex-1 py-3 bg-canvas border border-gold text-brand font-bold rounded-lg text-sm hover:bg-gold/10 transition-colors">Liberar IP</button>
+        <button onclick="abrirModalConfig()"
+                class="flex-1 py-3 bg-brand text-white font-bold rounded-lg text-sm hover:opacity-90 transition-opacity">Editar Configuración</button>
+        <button id="btn-liberar-ip" onclick="abrirModalLiberar()"
+                class="flex-1 py-3 bg-canvas border border-gold text-brand font-bold rounded-lg text-sm hover:bg-gold/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">Liberar IP</button>
     </div>
 </div>
 
 {{-- Backdrop --}}
 <div class="fixed inset-0 bg-black/20 backdrop-blur-sm z-[55] hidden" id="ip-backdrop" onclick="closeIpPanel()"></div>
+
+{{-- Modal: Editar Configuración --}}
+<div id="modal-config" class="fixed inset-0 z-[70] hidden items-center justify-center" style="background:rgba(0,0,0,.35)">
+    <div class="bg-canvas rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden max-h-[90vh] flex flex-col">
+        <div class="px-6 py-5 border-b border-border flex items-center justify-between">
+            <h3 class="font-bold text-base text-ink">Editar configuración — <span id="config-ip-label" class="font-mono"></span></h3>
+        </div>
+        <div class="px-6 py-5 space-y-4 overflow-y-auto">
+            <div id="config-errores" class="hidden rounded-lg px-4 py-3 text-sm font-semibold" style="background:var(--color-error-container);color:var(--color-error)"></div>
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-muted mb-1">MAC Address</label>
+                <input type="text" id="config-mac"
+                       class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-brand font-mono">
+            </div>
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-muted mb-1">Tipo de conexión</label>
+                <div class="flex gap-3">
+                    <label class="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="radio" name="config-tipo-conexion" value="ALÁMBRICO"> Ethernet
+                    </label>
+                    <label class="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="radio" name="config-tipo-conexion" value="INALÁMBRICO"> WiFi
+                    </label>
+                </div>
+            </div>
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Permisos de navegación</label>
+                <div class="grid grid-cols-2 gap-2" id="config-permisos-grid"></div>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-border flex justify-end gap-3">
+            <button type="button" onclick="cerrarModal('modal-config')"
+                    class="px-4 py-2 border border-border rounded-lg text-sm font-bold text-muted hover:bg-wash transition-colors">Cancelar</button>
+            <button type="button" onclick="guardarConfig()"
+                    class="px-4 py-2 bg-brand text-white rounded-lg text-sm font-bold hover:opacity-90 transition-colors">Guardar</button>
+        </div>
+    </div>
+</div>
+
+{{-- Modal: Liberar IP --}}
+<div id="modal-liberar" class="fixed inset-0 z-[70] hidden items-center justify-center" style="background:rgba(0,0,0,.35)">
+    <div class="bg-canvas rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div class="px-6 py-5 border-b border-border">
+            <h3 class="font-bold text-base text-ink">Liberar IP — <span id="liberar-ip-label" class="font-mono"></span></h3>
+            <p class="text-xs text-muted mt-1">Ocupada actualmente por: <span id="liberar-ocupante" class="font-semibold"></span></p>
+        </div>
+        <div class="px-6 py-5 space-y-4">
+            <div id="liberar-errores" class="hidden rounded-lg px-4 py-3 text-sm font-semibold" style="background:var(--color-error-container);color:var(--color-error)"></div>
+
+            <label class="flex items-start gap-2 p-2 rounded-lg hover:bg-surface-low cursor-pointer">
+                <input type="radio" name="liberar-modo" value="estado" checked onchange="cambiarModoLiberar()" class="mt-0.5">
+                <div>
+                    <p class="text-sm font-semibold text-ink">Dar de baja / mantenimiento al equipo actual</p>
+                    <p class="text-[11px] text-muted">El equipo se queda sin IP.</p>
+                </div>
+            </label>
+            <div id="liberar-sub-estado" class="pl-6">
+                <select id="liberar-estado-select"
+                        class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-brand">
+                    <option value="mantenimiento">Mantenimiento</option>
+                    <option value="baja">Baja</option>
+                </select>
+            </div>
+
+            <label class="flex items-start gap-2 p-2 rounded-lg hover:bg-surface-low cursor-pointer">
+                <input type="radio" name="liberar-modo" value="switch" onchange="cambiarModoLiberar()" class="mt-0.5">
+                <div>
+                    <p class="text-sm font-semibold text-ink">Cambiar esta IP a otro equipo</p>
+                    <p class="text-[11px] text-muted">Switcheo — igual que en el formulario de resguardo.</p>
+                </div>
+            </label>
+            <div id="liberar-sub-switch" class="pl-6 hidden">
+                <select id="liberar-equipo-select"
+                        class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-brand"></select>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t border-border flex justify-end gap-3">
+            <button type="button" onclick="cerrarModal('modal-liberar')"
+                    class="px-4 py-2 border border-border rounded-lg text-sm font-bold text-muted hover:bg-wash transition-colors">Cancelar</button>
+            <button type="button" onclick="confirmarLiberar()"
+                    class="px-4 py-2 bg-brand text-white rounded-lg text-sm font-bold hover:opacity-90 transition-colors">Confirmar</button>
+        </div>
+    </div>
+</div>
 
 <script>
 function switchNetTab(tab) {
@@ -291,12 +368,61 @@ function switchNetTab(tab) {
     document.getElementById('nav-inventario').className = !isRangos ? activeClass : inactiveClass;
 }
 
-function openIpPanel(ip, user, area) {
-    document.getElementById('panel-ip-addr').innerText = ip || '—';
-    document.getElementById('panel-ip-user').innerText = user || '—';
-    document.getElementById('panel-ip-area').innerText = area || '—';
+const PERMISOS_INFO = {
+    youtube:          { icon: 'smart_display', label: 'YouTube' },
+    vimeo:            { icon: 'movie',          label: 'Vimeo' },
+    spotify:          { icon: 'music_note',     label: 'Spotify' },
+    otros_streaming:  { icon: 'live_tv',        label: 'Otro streaming' },
+    facebook:         { icon: 'thumb_up',       label: 'Facebook' },
+    tiktok:           { icon: 'music_video',    label: 'TikTok' },
+    instagram:        { icon: 'photo_camera',   label: 'Instagram' },
+    whatsapp_web:     { icon: 'chat',           label: 'WhatsApp Web' },
+    otra_red_social:  { icon: 'share',          label: 'Otra red social' },
+    sitios_gub:       { icon: 'account_balance',label: 'Sitios Gob' },
+    noticias:         { icon: 'newspaper',      label: 'Noticias' },
+    otro_permiso:     { icon: 'more_horiz',     label: 'Otro' },
+};
+
+let ipActual = null; // último detalle cargado, lo usan los modales
+
+function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]').content;
+}
+
+async function abrirPanelIp(id) {
     document.getElementById('ip-panel').classList.remove('closed');
     document.getElementById('ip-backdrop').classList.remove('hidden');
+
+    const resp = await fetch(`{{ url('/network/ip') }}/${id}/detalle`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    ipActual = data;
+
+    document.getElementById('panel-ip-addr').innerText = data.ip || '—';
+    document.getElementById('panel-ip-user').innerText = data.usuario || '—';
+    document.getElementById('panel-ip-area').innerText = data.area || '—';
+    document.getElementById('panel-mac').innerText = data.mac || '—';
+
+    const esWifi = data.tipo_conexion === 'INALÁMBRICO';
+    document.getElementById('panel-tipo-conexion').innerHTML =
+        `<span class="material-symbols-outlined text-sm">${esWifi ? 'wifi' : 'settings_ethernet'}</span> ${esWifi ? 'WiFi' : 'Ethernet'}`;
+
+    const grid = document.getElementById('panel-permisos-grid');
+    grid.innerHTML = '';
+    for (const campo in PERMISOS_INFO) {
+        const ok = !!data.permisos[campo];
+        const info = PERMISOS_INFO[campo];
+        grid.innerHTML += `
+            <div class="p-3 bg-surface border border-border rounded flex flex-col items-center gap-1 text-center ${!ok ? 'grayscale opacity-60' : ''}">
+                <span class="material-symbols-outlined ${ok ? 'text-status-active' : 'text-status-critical'}">${info.icon}</span>
+                <span class="text-[10px] font-medium leading-tight">${info.label}</span>
+                <span class="material-symbols-outlined text-xs ${ok ? 'text-status-active' : 'text-status-critical'}"
+                      style="font-variation-settings:'FILL' 1">${ok ? 'check_circle' : 'cancel'}</span>
+            </div>`;
+    }
+
+    const btnLiberar = document.getElementById('btn-liberar-ip');
+    btnLiberar.disabled = data.estatus !== 'Ocupada';
 }
 
 function closeIpPanel() {
@@ -306,15 +432,128 @@ function closeIpPanel() {
 
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeIpPanel(); });
 
+function cerrarModal(idModal) {
+    document.getElementById(idModal).classList.add('hidden');
+    document.getElementById(idModal).classList.remove('flex');
+}
+
+function abrirModal(idModal) {
+    document.getElementById(idModal).classList.remove('hidden');
+    document.getElementById(idModal).classList.add('flex');
+}
+
+// ── Modal: Editar Configuración ─────────────────────────────────────────
+function abrirModalConfig() {
+    if (!ipActual) return;
+    document.getElementById('config-ip-label').innerText = ipActual.ip;
+    document.getElementById('config-mac').value = ipActual.mac || '';
+    document.getElementById('config-errores').classList.add('hidden');
+
+    document.querySelectorAll('input[name="config-tipo-conexion"]').forEach(r => {
+        r.checked = r.value === (ipActual.tipo_conexion || 'ALÁMBRICO');
+    });
+
+    const grid = document.getElementById('config-permisos-grid');
+    grid.innerHTML = '';
+    for (const campo in PERMISOS_INFO) {
+        const checked = ipActual.permisos[campo] ? 'checked' : '';
+        grid.innerHTML += `
+            <label class="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" value="${campo}" class="config-permiso-check accent-brand" ${checked}>
+                ${PERMISOS_INFO[campo].label}
+            </label>`;
+    }
+
+    abrirModal('modal-config');
+}
+
+async function guardarConfig() {
+    const tipoConexion = document.querySelector('input[name="config-tipo-conexion"]:checked')?.value;
+    const permisos = Array.from(document.querySelectorAll('.config-permiso-check:checked')).map(el => el.value);
+
+    const resp = await fetch(`{{ url('/network/ip') }}/${ipActual.id}/configuracion`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
+        body: JSON.stringify({ mac: document.getElementById('config-mac').value, tipo_conexion: tipoConexion, permisos }),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+        const box = document.getElementById('config-errores');
+        box.textContent = Object.values(data.errors ?? {}).flat().join(' ') || 'Ocurrió un error.';
+        box.classList.remove('hidden');
+        return;
+    }
+
+    cerrarModal('modal-config');
+    abrirPanelIp(ipActual.id);
+}
+
+// ── Modal: Liberar IP ────────────────────────────────────────────────────
+function abrirModalLiberar() {
+    if (!ipActual || ipActual.estatus !== 'Ocupada') return;
+    document.getElementById('liberar-ip-label').innerText = ipActual.ip;
+    document.getElementById('liberar-ocupante').innerText =
+        `${ipActual.ocupante?.descripcion ?? '—'}${ipActual.ocupante?.responsable ? ' · ' + ipActual.ocupante.responsable : ''}`;
+    document.getElementById('liberar-errores').classList.add('hidden');
+
+    const select = document.getElementById('liberar-equipo-select');
+    select.innerHTML = ipActual.equipos.map(eq =>
+        `<option value="${eq.id}">${eq.tipo} — ${eq.cpu_serie || 'sin serie'}${eq.nombre_usuario ? ' — ' + eq.nombre_usuario : ''}</option>`
+    ).join('');
+
+    document.querySelector('input[name="liberar-modo"][value="estado"]').checked = true;
+    cambiarModoLiberar();
+    abrirModal('modal-liberar');
+}
+
+function cambiarModoLiberar() {
+    const modo = document.querySelector('input[name="liberar-modo"]:checked').value;
+    document.getElementById('liberar-sub-estado').classList.toggle('hidden', modo !== 'estado');
+    document.getElementById('liberar-sub-switch').classList.toggle('hidden', modo !== 'switch');
+}
+
+async function confirmarLiberar() {
+    const modo = document.querySelector('input[name="liberar-modo"]:checked').value;
+    const url = modo === 'estado'
+        ? `{{ url('/network/ip') }}/${ipActual.id}/liberar-estado`
+        : `{{ url('/network/ip') }}/${ipActual.id}/liberar-switch`;
+    const body = modo === 'estado'
+        ? { estado: document.getElementById('liberar-estado-select').value }
+        : { equipo_id: document.getElementById('liberar-equipo-select').value };
+
+    const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken() },
+        body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+        const box = document.getElementById('liberar-errores');
+        box.textContent = Object.values(data.errors ?? {}).flat().join(' ') || 'Ocurrió un error.';
+        box.classList.remove('hidden');
+        return;
+    }
+
+    cerrarModal('modal-liberar');
+    closeIpPanel();
+    window.location.reload();
+}
+
 function filterIpTable() {
     const area = document.getElementById('net-filter-area').value.toLowerCase();
     const estatus = document.getElementById('net-filter-estatus')?.value.toLowerCase() || '';
+    const texto = (document.getElementById('net-filter-texto')?.value || '').trim().toLowerCase();
     document.querySelectorAll('#ip-tbody tr').forEach(row => {
-        const rowArea  = (row.dataset.area || '').toLowerCase();
-        const rowStat  = (row.dataset.estatus || '').toLowerCase();
+        const rowArea    = (row.dataset.area || '').toLowerCase();
+        const rowStat    = (row.dataset.estatus || '').toLowerCase();
+        const rowIp      = (row.dataset.ip || '').toLowerCase();
+        const rowUsuario = (row.dataset.usuario || '').toLowerCase();
         const areaOk   = !area   || rowArea.includes(area);
         const statOk   = !estatus || rowStat.includes(estatus);
-        row.style.display = (areaOk && statOk) ? '' : 'none';
+        const textoOk  = !texto || rowIp.includes(texto) || rowUsuario.includes(texto);
+        row.style.display = (areaOk && statOk && textoOk) ? '' : 'none';
     });
 }
 

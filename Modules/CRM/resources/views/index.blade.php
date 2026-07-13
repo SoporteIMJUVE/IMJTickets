@@ -536,7 +536,7 @@ function openNuevoModal() {
     document.getElementById('modal-usr-titulo').textContent    = 'Nuevo Usuario';
     document.getElementById('modal-usr-icon').textContent      = 'person_add';
     document.getElementById('btn-guardar-usuario').textContent = 'Dar de Alta';
-    document.getElementById('section-baja').classList.add('hidden');
+    document.getElementById('section-baja')?.classList.add('hidden');
     document.getElementById('section-extras-tel').classList.remove('hidden');
     document.getElementById('section-extras-eq').classList.remove('hidden');
     document.getElementById('modal-usuario').classList.remove('hidden');
@@ -559,18 +559,20 @@ function openEditModal() {
     for (const opt of sel.options) opt.selected = opt.value === String(e.depaId);
 
     const btnBaja = document.getElementById('btn-baja-toggle');
-    if (e.activo) {
-        btnBaja.textContent = 'Dar de Baja';
-        btnBaja.className   = 'w-full py-2.5 border border-status-critical text-status-critical font-bold rounded-lg hover:bg-red-50 transition-colors text-sm';
-    } else {
-        btnBaja.textContent = 'Reactivar Usuario';
-        btnBaja.className   = 'w-full py-2.5 border border-status-active text-status-active font-bold rounded-lg hover:bg-green-50 transition-colors text-sm';
+    if (btnBaja) {
+        if (e.activo) {
+            btnBaja.textContent = 'Dar de Baja';
+            btnBaja.className   = 'w-full py-2.5 border border-status-critical text-status-critical font-bold rounded-lg hover:bg-red-50 transition-colors text-sm';
+        } else {
+            btnBaja.textContent = 'Reactivar Usuario';
+            btnBaja.className   = 'w-full py-2.5 border border-status-active text-status-active font-bold rounded-lg hover:bg-green-50 transition-colors text-sm';
+        }
     }
 
     document.getElementById('modal-usr-titulo').textContent    = 'Editar Usuario';
     document.getElementById('modal-usr-icon').textContent      = 'manage_accounts';
     document.getElementById('btn-guardar-usuario').textContent = 'Guardar cambios';
-    document.getElementById('section-baja').classList.remove('hidden');
+    document.getElementById('section-baja')?.classList.remove('hidden');
     document.getElementById('section-extras-tel').classList.add('hidden');
 
     // Poblar equipos existentes en el formulario
@@ -976,7 +978,8 @@ document.getElementById('form-nuevo-usuario')?.addEventListener('submit', async 
                 </div>
             </section>
 
-            {{-- Estado — solo visible en modo editar --}}
+            {{-- Estado — solo visible en modo editar, y solo para administradores --}}
+            @if(auth()->user()->isAdmin())
             <div id="section-baja" class="hidden border-t border-border pt-4">
                 <p class="text-xs font-bold uppercase tracking-wider text-muted mb-2">Estado del usuario</p>
                 <button type="button" id="btn-baja-toggle"
@@ -984,6 +987,7 @@ document.getElementById('form-nuevo-usuario')?.addEventListener('submit', async 
                     Dar de Baja
                 </button>
             </div>
+            @endif
 
             {{-- Teléfono — solo visible en modo nuevo --}}
             <details id="section-extras-tel" class="border border-border rounded-xl overflow-hidden">

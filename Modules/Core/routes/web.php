@@ -4,8 +4,19 @@ use Illuminate\Support\Facades\Route;
 use Modules\Core\Http\Controllers\CoreController;
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/', fn() => redirect()->route('dashboard'))->name('home');
+    Route::get('/', fn() => auth()->user()->isAdmin()
+        ? redirect()->route('dashboard')
+        : redirect()->route('perfil')
+    )->name('home');
 
+    Route::get('/perfil', [CoreController::class, 'perfil'])->name('perfil');
+    Route::post('/perfil/completar-acceso', [CoreController::class, 'completarPrimerAcceso'])->name('perfil.completar');
+    Route::post('/perfil/cambiar-password', [CoreController::class, 'cambiarPassword'])->name('perfil.password');
+
+    Route::post('/logout', [CoreController::class, 'logout'])->name('logout');
+});
+
+Route::middleware(['auth', 'admin'])->group(function () {
     // ── Omnibuscador global ───────────────────────────────────────────────────
     Route::get('/search', function (\Illuminate\Http\Request $request) {
         $q = trim($request->input('q', ''));
@@ -16,16 +27,17 @@ Route::middleware(['auth'])->group(function () {
 
         // ── Empleados ─────────────────────────────────────────────────────────
         $condEmp = fn ($b) => $b
-            ->whereRaw("LOWER(nombre) LIKE LOWER(?)",                    [$like])
+            ->whereRaw("LOWER(name) LIKE LOWER(?)",                      [$like])
             ->orWhereRaw("LOWER(apellido_paterno) LIKE LOWER(?)",        [$like])
             ->orWhereRaw("LOWER(apellido_materno) LIKE LOWER(?)",        [$like])
             ->orWhereRaw("LOWER(COALESCE(puesto,'')) LIKE LOWER(?)",     [$like])
-            ->orWhereRaw("LOWER(COALESCE(correo,'')) LIKE LOWER(?)",     [$like]);
+            ->orWhereRaw("LOWER(COALESCE(email,'')) LIKE LOWER(?)",      [$like]);
 
-        $totalEmp = \DB::table('empleados')->where('activo', true)->where($condEmp)->count();
+        $baseEmpSearch = \DB::table('users')->where('role', 'user')->where('activo', true);
+        $totalEmp = (clone $baseEmpSearch)->where($condEmp)->count();
         if ($totalEmp > 0) {
-            $rows = \DB::table('empleados')->where('activo', true)->where($condEmp)
-                        ->select('nombre', 'apellido_paterno', 'puesto')->limit(4)->get();
+            $rows = (clone $baseEmpSearch)->where($condEmp)
+                        ->select('name as nombre', 'apellido_paterno', 'puesto')->limit(4)->get();
             $groups[] = [
                 'modulo' => 'Usuarios',
                 'icon'   => 'group',
@@ -67,7 +79,7 @@ Route::middleware(['auth'])->group(function () {
         // ── Red e IPs ─────────────────────────────────────────────────────────
         if (\Schema::hasTable('inventario_ips_completo')) {
             $condIp = fn ($b) => $b
-                ->whereRaw("ip::text ILIKE ?",                          [$like])
+                ->whereRaw("LOWER(ip) LIKE LOWER(?)",                    [$like])
                 ->orWhereRaw("LOWER(COALESCE(usuario,'')) LIKE LOWER(?)", [$like]);
 
             $totalIp = \DB::table('inventario_ips_completo')->where($condIp)->count();
@@ -94,7 +106,7 @@ Route::middleware(['auth'])->group(function () {
                 ->whereRaw("LOWER(COALESCE(descripcion,'')) LIKE LOWER(?)",    [$like])
                 ->orWhereRaw("LOWER(COALESCE(tipo,'')) LIKE LOWER(?)",         [$like])
                 ->orWhereRaw("LOWER(COALESCE(area,'')) LIKE LOWER(?)",         [$like])
-                ->orWhereRaw("LOWER(COALESCE(nombre_reporta,'')) LIKE LOWER(?)", [$like]);
+                ->orWhereRaw("LOWER(COALESCE(nombre,'')) LIKE LOWER(?)",         [$like]);
 
             $totalTk = \DB::table('tickets')->where($condTk)->count();
             if ($totalTk > 0) {
@@ -127,22 +139,23 @@ Route::middleware(['auth'])->group(function () {
 
             // Empleados — nombre, apellidos, puesto, correo, departamento y extensión
             $condEmp = fn ($b) => $b
-                ->whereRaw("LOWER(e.nombre) LIKE LOWER(?)",                       [$like])
+                ->whereRaw("LOWER(e.name) LIKE LOWER(?)",                         [$like])
                 ->orWhereRaw("LOWER(e.apellido_paterno) LIKE LOWER(?)",           [$like])
                 ->orWhereRaw("LOWER(e.apellido_materno) LIKE LOWER(?)",           [$like])
                 ->orWhereRaw("LOWER(COALESCE(e.puesto,'')) LIKE LOWER(?)",        [$like])
-                ->orWhereRaw("LOWER(COALESCE(e.correo,'')) LIKE LOWER(?)",        [$like])
+                ->orWhereRaw("LOWER(COALESCE(e.email,'')) LIKE LOWER(?)",         [$like])
                 ->orWhereRaw("LOWER(COALESCE(d.nombre,'')) LIKE LOWER(?)",        [$like])
                 ->orWhereRaw("t.extension LIKE ?",                                    [$like]);
-            $baseEmp = \DB::table('empleados as e')
+            $baseEmp = \DB::table('users as e')
                 ->leftJoin('departamentos as d', 'd.id_departamento', '=', 'e.id_departamento')
-                ->leftJoin('telefonos as t', 't.id_empleado', '=', 'e.id_empleado')
+                ->leftJoin('telefonos as t', 't.user_id', '=', 'e.id')
+                ->where('e.role', 'user')
                 ->where('e.activo', true)
                 ->distinct();
-            $totalEmp = (clone $baseEmp)->where($condEmp)->count('e.id_empleado');
+            $totalEmp = (clone $baseEmp)->where($condEmp)->count('e.id');
             if ($totalEmp > 0) {
                 $rows = (clone $baseEmp)->where($condEmp)
-                            ->select('e.id_empleado', 'e.nombre', 'e.apellido_paterno', 'e.puesto', 'd.nombre as departamento', 't.extension')
+                            ->select('e.id', 'e.name as nombre', 'e.apellido_paterno', 'e.puesto', 'd.nombre as departamento', 't.extension')
                             ->limit(4)->get();
                 $groups[] = [
                     'modulo' => 'Usuarios', 'icon' => 'group',
@@ -153,7 +166,7 @@ Route::middleware(['auth'])->group(function () {
                             $e->puesto ?: null,
                             $e->extension ? "Ext. {$e->extension}" : null,
                         ])) ?: ($e->departamento ?: null),
-                        'url'   => route('crm.index') . '?open=' . $e->id_empleado,
+                        'url'   => route('crm.index') . '?open=' . $e->id,
                     ])->all(),
                 ];
             }
@@ -248,7 +261,7 @@ Route::middleware(['auth'])->group(function () {
         }
 
         return view('core::dashboard', [
-            'totalEmpleados'  => \DB::table('empleados')->where('activo', true)->count(),
+            'totalEmpleados'  => \DB::table('users')->where('role', 'user')->where('activo', true)->count(),
             'totalActivos'    => \DB::table('inventario_equipos')->count(),
             'ticketsAbiertos' => \DB::table('tickets')->where('estado', 0)->count(),
             'ipsEnUso'        => \DB::table('inventario_ips_completo')->where('estatus', 'Ocupada')->count(),
@@ -257,10 +270,13 @@ Route::middleware(['auth'])->group(function () {
             'searchResults'   => $searchResults,
         ]);
     })->name('dashboard');
-    Route::post('/logout', [CoreController::class, 'logout'])->name('logout');
 });
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [CoreController::class, 'loginForm'])->name('login');
     Route::post('/login', [CoreController::class, 'login'])->name('login.post');
+    Route::get('/olvide-password', fn () => view('core::auth.olvide-password'))->name('olvide-password');
 });
+
+// Login por código de recuperación — pública, sin middleware de sesión previa.
+Route::get('/recuperar/{codigo}', [CoreController::class, 'loginPorCodigo'])->name('recuperar');

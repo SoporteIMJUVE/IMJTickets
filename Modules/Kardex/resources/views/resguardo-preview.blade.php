@@ -190,11 +190,33 @@
 
                     <input type="hidden" name="nombre_usuario" value="{{ $datos['nombre_usuario'] }}">
 
+                    @if($directores->count())
+                    <div class="mb-3">
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Acceso rápido: Directores</label>
+                        <select id="directores-quickpick"
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
+                            <option value="">Seleccionar director…</option>
+                            @foreach($directores as $dir)
+                            <option value="{{ $dir->id_empleado }}"
+                                    data-nombre="{{ $dir->nombre }} {{ $dir->apellido_paterno }}"
+                                    data-correo="{{ $dir->correo }}"
+                                    data-area="{{ $dir->departamento }}"
+                                    data-ip="{{ $dir->ip_actual }}">
+                                {{ $dir->nombre }} {{ $dir->apellido_paterno }}
+                            </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
+
                     @if($candidatos->count())
                     <p class="text-[11px] text-on-surface-variant mb-2 font-semibold">Coincidencias en el sistema:</p>
+                    @endif
+                    <div id="lista-candidatos">
                     @foreach($candidatos as $emp)
                     <label class="flex items-start gap-2 p-2 rounded-lg hover:bg-surface-low cursor-pointer mb-1">
-                        <input type="radio" name="id_empleado" value="{{ $emp->id_empleado }}" class="mt-0.5">
+                        <input type="radio" name="id_empleado" value="{{ $emp->id_empleado }}" class="mt-0.5"
+                               data-area="{{ $emp->departamento }}" data-ip="{{ $emp->ip_actual }}">
                         <div>
                             <p class="text-sm font-semibold text-on-surface">{{ $emp->nombre }} {{ $emp->apellido_paterno }}</p>
                             <p class="text-[11px] text-on-surface-variant">{{ $emp->departamento ?? '—' }}</p>
@@ -202,17 +224,56 @@
                         </div>
                     </label>
                     @endforeach
+                    </div>
+                    @if($candidatos->isEmpty())
+                    <p class="text-xs text-on-surface-variant italic mb-2">No se encontraron coincidencias en el PDF.</p>
+                    @endif
                     <label class="flex items-start gap-2 p-2 rounded-lg hover:bg-surface-low cursor-pointer mt-2 border-t border-border pt-3">
-                        <input type="radio" name="id_empleado" value="" checked class="mt-0.5">
+                        <input type="radio" name="id_empleado" value="" {{ $candidatos->isEmpty() ? 'checked' : '' }} class="mt-0.5">
                         <div>
                             <p class="text-sm font-semibold text-on-surface">Ninguno / Sin asignar</p>
                             <p class="text-[11px] text-on-surface-variant">El equipo quedará en almacén</p>
                         </div>
                     </label>
-                    @else
-                    <p class="text-xs text-on-surface-variant italic">No se encontraron coincidencias. El equipo quedará sin responsable asignado.</p>
-                    <input type="hidden" name="id_empleado" value="">
-                    @endif
+
+                    <label class="flex items-start gap-2 p-2 rounded-lg hover:bg-surface-low cursor-pointer border-t border-border pt-3">
+                        <input type="radio" name="id_empleado" value="__nuevo__" id="radio-nuevo-usuario" class="mt-0.5">
+                        <div>
+                            <p class="text-sm font-semibold text-on-surface">+ Crear nueva persona</p>
+                            <p class="text-[11px] text-on-surface-variant">Se le genera un correo de entrada temporal</p>
+                        </div>
+                    </label>
+
+                    <div id="form-nuevo-usuario" class="hidden mt-2 pl-6 space-y-2 border-l-2 border-border">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Nombre*</label>
+                            <input type="text" name="nuevo_nombre" value="{{ old('nuevo_nombre') }}"
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Apellido paterno*</label>
+                                <input type="text" name="nuevo_apellido_paterno" value="{{ old('nuevo_apellido_paterno') }}"
+                                    class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Apellido materno</label>
+                                <input type="text" name="nuevo_apellido_materno" value="{{ old('nuevo_apellido_materno') }}"
+                                    class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Correo (opcional)</label>
+                            <input type="email" name="nuevo_correo" value="{{ old('nuevo_correo') }}"
+                                placeholder="Si se deja vacío, se genera uno temporal"
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">Puesto (opcional)</label>
+                            <input type="text" name="nuevo_puesto" value="{{ old('nuevo_puesto') }}"
+                                class="w-full rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
+                        </div>
+                    </div>
                 </div>
 
                 {{-- Red --}}
@@ -273,6 +334,63 @@ if (tipoInicial) {
     document.getElementById('sec-laptop').classList.toggle('hidden', !esLaptop);
     document.getElementById('sec-pc').classList.toggle('hidden', esLaptop);
 }
+
+// Acceso rápido: Directores — marca el radio existente o inyecta uno nuevo
+const directoresQuickpick = document.getElementById('directores-quickpick');
+if (directoresQuickpick) {
+    directoresQuickpick.addEventListener('change', function () {
+        const id = this.value;
+        if (!id) return;
+
+        const existente = document.querySelector(`input[name="id_empleado"][value="${id}"]`);
+        if (existente) {
+            existente.checked = true;
+            existente.closest('label').scrollIntoView({ block: 'center', behavior: 'smooth' });
+            return;
+        }
+
+        const opt = this.selectedOptions[0];
+        const lista = document.getElementById('lista-candidatos');
+        const label = document.createElement('label');
+        label.className = 'flex items-start gap-2 p-2 rounded-lg hover:bg-surface-low cursor-pointer mb-1';
+        label.innerHTML = `
+            <input type="radio" name="id_empleado" value="${id}" checked class="mt-0.5"
+                   data-area="${opt.dataset.area ?? ''}" data-ip="${opt.dataset.ip ?? ''}">
+            <div>
+                <p class="text-sm font-semibold text-on-surface">${opt.dataset.nombre}</p>
+                <p class="text-[11px] text-on-surface-variant">Director</p>
+                <p class="text-[11px] text-on-surface-variant">${opt.dataset.correo}</p>
+            </div>
+        `;
+        lista.prepend(label);
+        label.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        label.querySelector('input').dispatchEvent(new Event('change', { bubbles: true }));
+    });
+}
+
+// Responsable: mostrar/ocultar el sub-formulario de "Crear nueva persona" y
+// autocompletar área/IP según la persona elegida (event delegation porque
+// algunos radios se inyectan dinámicamente, ej. desde el quick-pick de Directores).
+document.addEventListener('change', function (e) {
+    if (e.target.name !== 'id_empleado') return;
+
+    document.getElementById('form-nuevo-usuario').classList.toggle('hidden', e.target.value !== '__nuevo__');
+
+    const ipActual = e.target.dataset.ip;
+    const areaActual = e.target.dataset.area;
+    const campoIp = document.getElementById('campo-ip');
+    const campoArea = document.getElementById('campo-area');
+    const msg = document.getElementById('ip-msg');
+
+    if (ipActual) {
+        campoIp.value = ipActual;
+        msg.textContent = 'IP actual de este usuario — se reasignará a este equipo (switcheo).';
+        msg.classList.remove('hidden');
+    }
+    if (areaActual && !campoArea.value.trim()) {
+        campoArea.value = areaActual;
+    }
+});
 
 // Sugerir IP libre
 document.getElementById('btn-sugerir-ip').addEventListener('click', function () {

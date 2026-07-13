@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\EmpleadosToUsersMigrator;
 use App\Services\PostgresDumpImporter;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -62,7 +63,10 @@ class FirstBootCommand extends Command
         // ── 4. Recalcular contadores en cat_rangos_ips ────────────────────────
         $this->recalcularRangos();
 
-        // ── 5. Guardar estado ─────────────────────────────────────────────────
+        // ── 5. Fusionar empleados -> users (paso 1 de la reestructuración de BD) ─
+        $this->sincronizarEmpleadosUsers();
+
+        // ── 6. Guardar estado ─────────────────────────────────────────────────
         $state['ultima_importacion'] = now()->toIso8601String();
         $state['fuentes']            = [
             'postgres' => file_exists($this->postgresDump()),
@@ -324,6 +328,21 @@ class FirstBootCommand extends Command
             $conIp = DB::table('inventario_equipos')->whereNotNull('ipv4')->count();
             $this->line("    ✅ inventario_equipos.ipv4: {$conIp} registros con IP");
 
+            // Enlazar ip_id (FK real) ahora que ipv4 quedó sincronizado —
+            // protegido con try/catch: si el matching por serie produce una
+            // IP ya tomada por otro equipo, no debe tronar todo el arranque.
+            try {
+                DB::statement("
+                    UPDATE inventario_equipos
+                    SET ip_id = (SELECT id FROM inventario_ips_completo WHERE ip = inventario_equipos.ipv4)
+                    WHERE ipv4 IS NOT NULL AND ipv4 <> '' AND ip_id IS NULL
+                ");
+                $conIpId = DB::table('inventario_equipos')->whereNotNull('ip_id')->count();
+                $this->line("    ✅ inventario_equipos.ip_id: {$conIpId} registros enlazados al registro maestro");
+            } catch (\Throwable $e) {
+                $this->warn("    ⚠  No se pudo enlazar ip_id automáticamente: {$e->getMessage()}");
+            }
+
             // 3. inventario_ips_completo.id_empleado via la cadena serie→equipo→empleado
             DB::statement("
                 UPDATE inventario_ips_completo
@@ -343,6 +362,22 @@ class FirstBootCommand extends Command
 
             $ipsVinc = DB::table('inventario_ips_completo')->whereNotNull('id_empleado')->count();
             $this->line("    ✅ inventario_ips_completo.id_empleado: {$ipsVinc} registros vinculados");
+        }
+    }
+
+    // ─── Fusionar empleados -> users ──────────────────────────────────────────
+
+    private function sincronizarEmpleadosUsers(): void
+    {
+        $this->line('');
+        $this->line('  <fg=blue>▶ Fusionando empleados → users</fg=blue>');
+
+        try {
+            $stats = app(EmpleadosToUsersMigrator::class)->run();
+            $this->line("    ✅ Procesados: {$stats['procesados']}, nuevos: {$stats['nuevos']}, fusionados: {$stats['fusionados']}, placeholders: {$stats['placeholders']}");
+        } catch (\Throwable $e) {
+            $this->error('    Error durante la fusión empleados → users:');
+            $this->error('    ' . $e->getMessage());
         }
     }
 

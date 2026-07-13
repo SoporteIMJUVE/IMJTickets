@@ -3,8 +3,11 @@
 namespace Modules\CRM\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Support\IpAssigner;
+use App\Support\NewAccountProvisioner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CRMController extends Controller
 {
@@ -20,7 +23,7 @@ class CRMController extends Controller
             'apellido_paterno'  => 'required|string|max:80',
             'apellido_materno'  => 'nullable|string|max:80',
             'puesto'            => 'nullable|string|max:120',
-            'correo'            => 'nullable|email|max:120|unique:empleados,correo',
+            'correo'            => 'nullable|email|max:120|unique:users,email',
             'id_departamento'   => 'nullable|exists:departamentos,id_departamento',
             // Teléfono (opcional)
             'tel_numero'        => 'nullable|string|max:30',
@@ -59,12 +62,35 @@ class CRMController extends Controller
             'equipos.*.ipv4.ip'            => 'El formato de la IPv4 no es válido.',
         ]);
 
-        $idEmpleado = DB::table('empleados')->insertGetId([
-            'nombre'           => trim($validated['nombre']),
+        // Resolver las IPs de los equipos contra el registro maestro ANTES de
+        // crear nada, para no dejar altas a medias si alguna IP ya está tomada.
+        $ipsPorEquipo = [];
+        foreach ($validated['equipos'] ?? [] as $i => $equipo) {
+            if (empty($equipo['ipv4'])) continue;
+            $ipId = IpAssigner::resolveId($equipo['ipv4']);
+            if (IpAssigner::assignedElsewhere($ipId, 'inventario_equipos')) {
+                return back()->withInput()->withErrors([
+                    "equipos.{$i}.ipv4" => "La IP {$equipo['ipv4']} ya está asignada a otro dispositivo.",
+                ]);
+            }
+            $ipsPorEquipo[$i] = $ipId;
+        }
+
+        // Sin correo -> cuenta con email/placeholder temporal (mismo mecanismo que la
+        // migración masiva empleados->users; el acceso real llega con el paso 2).
+        $correo = $validated['correo'] ?? null;
+        if (!$correo) {
+            $correo = NewAccountProvisioner::placeholderEmail(Str::random(8));
+        }
+
+        $idEmpleado = DB::table('users')->insertGetId([
+            'name'             => trim($validated['nombre']),
             'apellido_paterno' => trim($validated['apellido_paterno']),
             'apellido_materno' => trim($validated['apellido_materno'] ?? ''),
+            'email'            => $correo,
+            'password'         => NewAccountProvisioner::tempPasswordHash(),
+            'role'             => 'user',
             'puesto'           => $validated['puesto'] ?? null,
-            'correo'           => $validated['correo'] ?? null,
             'id_departamento'  => $validated['id_departamento'] ?? null,
             'activo'           => true,
             'fecha_alta'       => now(),
@@ -76,13 +102,13 @@ class CRMController extends Controller
             DB::table('telefonos')->insert([
                 'numero_general' => $validated['tel_numero'] ?? null,
                 'extension'      => $validated['tel_extension'] ?? null,
-                'id_empleado'    => $idEmpleado,
+                'user_id'        => $idEmpleado,
                 'created_at'     => now(),
                 'updated_at'     => now(),
             ]);
         }
 
-        foreach ($validated['equipos'] ?? [] as $equipo) {
+        foreach ($validated['equipos'] ?? [] as $i => $equipo) {
             if (empty($equipo['tipo'])) continue;
             DB::table('inventario_equipos')->insert([
                 'tipo'           => $equipo['tipo'],
@@ -106,9 +132,11 @@ class CRMController extends Controller
                 'mac'            => $equipo['mac']            ?? null,
                 'ipv4'           => $equipo['ipv4']           ?? null,
                 'ipv4_actual'    => $equipo['ipv4_actual']    ?? null,
+                'ip_id'          => $ipsPorEquipo[$i] ?? null,
                 'check_entrega'  => $equipo['check_entrega']  ?? null,
                 'observaciones'  => $equipo['observaciones']  ?? null,
-                'id_empleado'    => $idEmpleado,
+                'user_id'           => $idEmpleado,
+                'usuario_actual_id' => $idEmpleado,
                 'created_at'     => now(),
                 'updated_at'     => now(),
             ]);
@@ -128,7 +156,7 @@ class CRMController extends Controller
             'apellido_paterno' => 'required|string|max:80',
             'apellido_materno' => 'nullable|string|max:80',
             'puesto'           => 'nullable|string|max:120',
-            'correo'           => "nullable|email|max:120|unique:empleados,correo,{$id},id_empleado",
+            'correo'           => "nullable|email|max:120|unique:users,email,{$id},id",
             'id_departamento'  => 'nullable|exists:departamentos,id_departamento',
             'equipos'                  => 'nullable|array|max:20',
             'equipos.*.id'             => 'nullable|integer',
@@ -162,18 +190,36 @@ class CRMController extends Controller
             'correo.email'              => 'El formato del correo no es válido.',
         ]);
 
-        DB::table('empleados')->where('id_empleado', $id)->update([
-            'nombre'           => trim($validated['nombre']),
+        $datosUsuario = [
+            'name'             => trim($validated['nombre']),
             'apellido_paterno' => trim($validated['apellido_paterno']),
             'apellido_materno' => trim($validated['apellido_materno'] ?? ''),
             'puesto'           => $validated['puesto'] ?? null,
-            'correo'           => $validated['correo'] ?? null,
             'id_departamento'  => $validated['id_departamento'] ?? null,
             'updated_at'       => now(),
-        ]);
+        ];
+
+        // 'email' es NOT NULL en users — solo se toca si el operador capturó un
+        // correo real; dejarlo en blanco no borra el correo/placeholder actual.
+        if (!empty($validated['correo'])) {
+            $datosUsuario['email'] = $validated['correo'];
+        }
+
+        DB::table('users')->where('id', $id)->update($datosUsuario);
 
         foreach ($validated['equipos'] ?? [] as $equipo) {
             if (empty($equipo['tipo'])) continue;
+
+            $ipId = null;
+            if (!empty($equipo['ipv4'])) {
+                $ipId = IpAssigner::resolveId($equipo['ipv4']);
+                if (IpAssigner::assignedElsewhere($ipId, 'inventario_equipos', $equipo['id'] ?? null)) {
+                    return back()->withInput()->withErrors([
+                        'equipos' => "La IP {$equipo['ipv4']} ya está asignada a otro dispositivo.",
+                    ]);
+                }
+            }
+
             $campos = [
                 'tipo'           => $equipo['tipo'],
                 'nombre_equipo'  => $equipo['nombre_equipo']  ?? null,
@@ -196,6 +242,7 @@ class CRMController extends Controller
                 'mac'            => $equipo['mac']             ?? null,
                 'ipv4'           => $equipo['ipv4']            ?? null,
                 'ipv4_actual'    => $equipo['ipv4_actual']     ?? null,
+                'ip_id'          => $ipId,
                 'check_entrega'  => $equipo['check_entrega']   ?? null,
                 'observaciones'  => $equipo['observaciones']   ?? null,
                 'updated_at'     => now(),
@@ -205,13 +252,14 @@ class CRMController extends Controller
                 // Equipo existente — solo actualizar si pertenece a este empleado
                 DB::table('inventario_equipos')
                     ->where('id', $equipo['id'])
-                    ->where('id_empleado', $id)
+                    ->where('user_id', $id)
                     ->update($campos);
             } else {
                 // Nuevo equipo agregado durante la edición
                 DB::table('inventario_equipos')->insert(array_merge($campos, [
-                    'id_empleado' => $id,
-                    'created_at'  => now(),
+                    'user_id'           => $id,
+                    'usuario_actual_id' => $id,
+                    'created_at'        => now(),
                 ]));
             }
         }
@@ -224,7 +272,7 @@ class CRMController extends Controller
 
     public function reactivar($id)
     {
-        DB::table('empleados')->where('id_empleado', $id)->update([
+        DB::table('users')->where('id', $id)->update([
             'activo'     => true,
             'fecha_baja' => null,
             'updated_at' => now(),
@@ -238,12 +286,30 @@ class CRMController extends Controller
 
     public function destroy($id)
     {
-        // Baja lógica — no elimina el registro
-        DB::table('empleados')->where('id_empleado', $id)->update([
-            'activo'     => false,
-            'fecha_baja' => now(),
-            'updated_at' => now(),
+        // Baja lógica — no elimina el registro. Se fuerza una contraseña
+        // aleatoria y se invalida el código de recuperación para que la
+        // cuenta quede realmente inaccesible (ninguno de los dos mecanismos
+        // de login — password o código — sigue funcionando).
+        DB::table('users')->where('id', $id)->update([
+            'activo'             => false,
+            'fecha_baja'         => now(),
+            'password'           => NewAccountProvisioner::tempPasswordHash(),
+            'recovery_code_hash' => null,
+            'updated_at'         => now(),
         ]);
+
+        // Todos los equipos donde esta persona era responsable o usuario
+        // actual regresan a Almacén: se desvincula, pero conservan su IP
+        // asignada (mismo comportamiento que "Regresar a Almacén" en Kardex).
+        DB::table('inventario_equipos')
+            ->where('user_id', $id)
+            ->orWhere('usuario_actual_id', $id)
+            ->update([
+                'estado'            => null,
+                'user_id'           => null,
+                'usuario_actual_id' => null,
+                'updated_at'        => now(),
+            ]);
 
         if (request()->expectsJson()) {
             return response()->json(['ok' => true]);

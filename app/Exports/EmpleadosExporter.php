@@ -16,23 +16,24 @@ class EmpleadosExporter extends BaseExporter
 
     public function rows(array $filters): array
     {
-        $query = DB::table('empleados')
-            ->leftJoin('departamentos', 'empleados.id_departamento', '=', 'departamentos.id_departamento')
+        $query = DB::table('users')
+            ->leftJoin('departamentos', 'users.id_departamento', '=', 'departamentos.id_departamento')
             ->select(
-                'empleados.id_empleado',
-                DB::raw("TRIM(COALESCE(empleados.nombre,'') || ' ' || COALESCE(empleados.apellido_paterno,'') || ' ' || COALESCE(empleados.apellido_materno,'')) as nombre_completo"),
-                'empleados.correo',
+                'users.id as id_empleado',
+                DB::raw("TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'') || ' ' || COALESCE(users.apellido_materno,'')) as nombre_completo"),
+                'users.email as correo',
                 'departamentos.nombre as departamento',
-                'empleados.activo'
+                'users.activo'
             )
-            ->orderBy('empleados.nombre');
+            ->where('users.role', 'user')
+            ->orderBy('users.name');
 
         if (!empty($filters['crm-search'])) {
             $q = $filters['crm-search'];
             $query->where(function ($w) use ($q) {
-                $w->where('empleados.nombre', 'like', "%{$q}%")
-                  ->orWhere('empleados.apellido_paterno', 'like', "%{$q}%")
-                  ->orWhere('empleados.correo', 'like', "%{$q}%");
+                $w->where('users.name', 'like', "%{$q}%")
+                  ->orWhere('users.apellido_paterno', 'like', "%{$q}%")
+                  ->orWhere('users.email', 'like', "%{$q}%");
             });
         }
 
@@ -41,16 +42,16 @@ class EmpleadosExporter extends BaseExporter
         }
 
         if (isset($filters['filter-estado']) && $filters['filter-estado'] !== '') {
-            $query->where('empleados.activo', (int) $filters['filter-estado']);
+            $query->where('users.activo', (int) $filters['filter-estado']);
         }
 
         $empleados = $query->get();
 
         $equiposPorEmpleado = DB::table('inventario_equipos')
-            ->whereNotNull('id_empleado')
-            ->select('id_empleado', 'num_inventario', 'tipo')
+            ->whereNotNull('user_id')
+            ->select('user_id', 'num_inventario', 'tipo')
             ->get()
-            ->groupBy('id_empleado');
+            ->groupBy('user_id');
 
         $rows = [];
         foreach ($empleados as $emp) {

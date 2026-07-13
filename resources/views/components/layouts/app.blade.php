@@ -44,44 +44,60 @@
 
     {{-- Navigation --}}
     <nav class="flex-1 space-y-1">
-        <a href="{{ route('dashboard') }}"
-           class="flex items-center gap-3 px-4 py-3 rounded text-sm transition-colors
-                  {{ request()->routeIs('dashboard') ? 'text-brand font-bold border-r-4 border-brand bg-surface-high' : 'text-muted hover:bg-wash' }}">
-            <span class="material-symbols-outlined">dashboard</span>
-            Dashboard
-        </a>
+        @if(auth()->user()?->isAdmin())
+            <a href="{{ route('dashboard') }}"
+               class="flex items-center gap-3 px-4 py-3 rounded text-sm transition-colors
+                      {{ request()->routeIs('dashboard') ? 'text-brand font-bold border-r-4 border-brand bg-surface-high' : 'text-muted hover:bg-wash' }}">
+                <span class="material-symbols-outlined">dashboard</span>
+                Dashboard
+            </a>
 
-        <a href="{{ route('crm.index') }}"
-           class="flex items-center gap-3 px-4 py-3 rounded text-sm transition-colors
-                  {{ request()->routeIs('crm.*') ? 'text-brand font-bold border-r-4 border-brand bg-surface-high' : 'text-muted hover:bg-wash' }}">
-            <span class="material-symbols-outlined">group</span>
-            Usuarios
-        </a>
+            <a href="{{ route('crm.index') }}"
+               class="flex items-center gap-3 px-4 py-3 rounded text-sm transition-colors
+                      {{ request()->routeIs('crm.*') ? 'text-brand font-bold border-r-4 border-brand bg-surface-high' : 'text-muted hover:bg-wash' }}">
+                <span class="material-symbols-outlined">group</span>
+                Usuarios
+            </a>
 
-        <a href="{{ route('network.index') }}"
-           class="flex items-center gap-3 px-4 py-3 rounded text-sm transition-colors
-                  {{ request()->routeIs('network.*') ? 'text-brand font-bold border-r-4 border-brand bg-surface-high' : 'text-muted hover:bg-wash' }}">
-            <span class="material-symbols-outlined">lan</span>
-            Red e IPs
-        </a>
+            <a href="{{ route('network.index') }}"
+               class="flex items-center gap-3 px-4 py-3 rounded text-sm transition-colors
+                      {{ request()->routeIs('network.*') ? 'text-brand font-bold border-r-4 border-brand bg-surface-high' : 'text-muted hover:bg-wash' }}">
+                <span class="material-symbols-outlined">lan</span>
+                Red e IPs
+            </a>
 
-        <a href="{{ route('kardex.index') }}"
-           class="flex items-center gap-3 px-4 py-3 rounded text-sm transition-colors
-                  {{ request()->routeIs('kardex.*') ? 'text-brand font-bold border-r-4 border-brand bg-surface-high' : 'text-muted hover:bg-wash' }}">
-            <span class="material-symbols-outlined">inventory_2</span>
-            Inventario
-        </a>
+            <a href="{{ route('kardex.index') }}"
+               class="flex items-center gap-3 px-4 py-3 rounded text-sm transition-colors
+                      {{ request()->routeIs('kardex.*') ? 'text-brand font-bold border-r-4 border-brand bg-surface-high' : 'text-muted hover:bg-wash' }}">
+                <span class="material-symbols-outlined">inventory_2</span>
+                Inventario
+            </a>
 
-        <a href="{{ route('tickets.index') }}"
-           class="flex items-center gap-3 px-4 py-3 rounded text-sm transition-colors
-                  {{ request()->routeIs('tickets.*') ? 'text-brand font-bold border-r-4 border-brand bg-surface-high' : 'text-muted hover:bg-wash' }}">
-            <span class="material-symbols-outlined">description</span>
-            Tickets
-            @php try { $open = \Modules\Tickets\Models\Ticket::where('estado', 0)->count(); } catch (\Throwable $e) { $open = 0; } @endphp
-            @if($open > 0)
-                <span class="ml-auto text-[10px] font-bold bg-brand text-white px-2 py-0.5 rounded-full">{{ $open }}</span>
-            @endif
-        </a>
+            <a href="{{ route('tickets.index') }}"
+               class="flex items-center gap-3 px-4 py-3 rounded text-sm transition-colors
+                      {{ request()->routeIs('tickets.*') ? 'text-brand font-bold border-r-4 border-brand bg-surface-high' : 'text-muted hover:bg-wash' }}">
+                <span class="material-symbols-outlined">description</span>
+                Tickets
+                @php try { $open = \Modules\Tickets\Models\Ticket::where('estado', 0)->count(); } catch (\Throwable $e) { $open = 0; } @endphp
+                @if($open > 0)
+                    <span class="ml-auto text-[10px] font-bold bg-brand text-white px-2 py-0.5 rounded-full">{{ $open }}</span>
+                @endif
+            </a>
+        @else
+            <a href="{{ route('perfil') }}"
+               class="flex items-center gap-3 px-4 py-3 rounded text-sm transition-colors
+                      {{ request()->routeIs('perfil') ? 'text-brand font-bold border-r-4 border-brand bg-surface-high' : 'text-muted hover:bg-wash' }}">
+                <span class="material-symbols-outlined">person</span>
+                Perfil
+            </a>
+
+            <a href="{{ route('tickets.create') }}"
+               class="flex items-center gap-3 px-4 py-3 rounded text-sm transition-colors
+                      {{ request()->routeIs('tickets.create') ? 'text-brand font-bold border-r-4 border-brand bg-surface-high' : 'text-muted hover:bg-wash' }}">
+                <span class="material-symbols-outlined">confirmation_number</span>
+                Nuevo Ticket
+            </a>
+        @endif
     </nav>
 
     {{-- Footer --}}
@@ -115,21 +131,23 @@
     {{-- TopBar --}}
     <header class="h-16 bg-canvas border-b border-border shadow-sm flex justify-between items-center px-8 z-40 sticky top-0">
         <div class="flex items-center flex-1 max-w-xl">
-            <form id="global-search-form" action="{{ route('dashboard') }}" method="GET"
-                  class="relative w-full" onsubmit="submitSearch(event)">
-                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none">search</span>
-                <input id="global-search"
-                       name="q"
-                       value="{{ request('q') }}"
-                       class="w-full bg-wash border border-transparent rounded-lg pl-10 pr-10 py-2 text-sm focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all"
-                       placeholder="Buscar en todo el sistema… (Enter)"
-                       type="text"
-                       autocomplete="off">
-                <button type="submit"
-                        class="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-brand transition-colors">
-                    <span class="material-symbols-outlined text-sm">arrow_forward</span>
-                </button>
-            </form>
+            @if(auth()->user()?->isAdmin())
+                <form id="global-search-form" action="{{ route('dashboard') }}" method="GET"
+                      class="relative w-full" onsubmit="submitSearch(event)">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none">search</span>
+                    <input id="global-search"
+                           name="q"
+                           value="{{ request('q') }}"
+                           class="w-full bg-wash border border-transparent rounded-lg pl-10 pr-10 py-2 text-sm focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all"
+                           placeholder="Buscar en todo el sistema… (Enter)"
+                           type="text"
+                           autocomplete="off">
+                    <button type="submit"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-brand transition-colors">
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    </button>
+                </form>
+            @endif
         </div>
         <div class="flex items-center gap-6 ml-6">
             <div class="flex items-center gap-4">

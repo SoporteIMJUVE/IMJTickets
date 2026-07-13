@@ -98,9 +98,14 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-ink mb-1.5">
-                        Contraseña
-                    </label>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block text-sm font-medium text-ink">
+                            Contraseña
+                        </label>
+                        <a href="{{ route('olvide-password') }}" class="text-xs text-brand hover:underline font-semibold">
+                            ¿Olvidaste tu contraseña?
+                        </a>
+                    </div>
                     <input type="password" name="password" required
                            class="w-full rounded-lg px-4 py-2.5 text-sm border outline-none transition-colors
                                   bg-wash border-border text-ink
