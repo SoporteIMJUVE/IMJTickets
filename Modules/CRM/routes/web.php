@@ -15,7 +15,6 @@ Route::middleware(['auth', 'admin'])->prefix('crm')->name('crm.')->group(functio
     Route::get('/', function () {
         $empleados = \DB::table('users')
             ->leftJoin('departamentos', 'users.id_departamento', '=', 'departamentos.id_departamento')
-            ->leftJoin('telefonos', 'users.id', '=', 'telefonos.user_id')
             ->leftJoin('inventario_equipos', 'users.id', '=', 'inventario_equipos.user_id')
             ->select(
                 'users.id as id_empleado',
@@ -29,11 +28,11 @@ Route::middleware(['auth', 'admin'])->prefix('crm')->name('crm.')->group(functio
                 'users.fecha_alta',
                 'users.fecha_baja',
                 'departamentos.nombre as departamento_nombre',
-                'telefonos.extension',
+                \DB::raw("(SELECT ie.extension FROM inventario_equipos ie WHERE ie.tipo = 'Telefono' AND ie.user_id = users.id LIMIT 1) as extension"),
                 \DB::raw('COUNT(inventario_equipos.id) as total_equipos')
             )
             ->where('users.role', 'user')
-            ->groupBy('users.id', 'departamentos.nombre', 'telefonos.extension')
+            ->groupBy('users.id', 'departamentos.nombre')
             ->orderBy('users.name')
             ->get();
 

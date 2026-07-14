@@ -5,6 +5,7 @@ namespace Modules\Kardex\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Support\DepartamentoResolver;
 use App\Support\IpAssigner;
+use App\Support\KardexMovimiento;
 use App\Support\NewAccountProvisioner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,11 +20,14 @@ class KardexController extends Controller
     public function index()
     {
         $equipos = DB::table('inventario_equipos')
-            ->leftJoin('users', 'inventario_equipos.user_id', '=', 'users.id')
+            ->leftJoin('users as resp', 'inventario_equipos.user_id',          '=', 'resp.id')
+            ->leftJoin('users as usu',  'inventario_equipos.usuario_actual_id', '=', 'usu.id')
             ->select(
                 'inventario_equipos.*',
-                DB::raw("NULLIF(TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'')), '') as empleado_nombre"),
-                'users.email as empleado_correo'
+                DB::raw("NULLIF(TRIM(COALESCE(resp.name,'') || ' ' || COALESCE(resp.apellido_paterno,'')), '') as empleado_nombre"),
+                'resp.email as empleado_correo',
+                DB::raw("NULLIF(TRIM(COALESCE(usu.name,'') || ' ' || COALESCE(usu.apellido_paterno,'')), '')  as usuario_nombre"),
+                'usu.email as usuario_correo',
             )
             ->orderBy('inventario_equipos.tipo')
             ->orderBy('inventario_equipos.consecutivo')
@@ -55,6 +59,7 @@ class KardexController extends Controller
             'pcAvanzadasAsignadas'     => $equipos->where('tipo', 'PC Avanzada')->whereNotNull('user_id')->count(),
             'pcEspecializadasAsignadas'=> $equipos->where('tipo', 'PC Especializada')->whereNotNull('user_id')->count(),
             'impresorasAsignadas'      => $impresoras->whereNotNull('user_id')->count(),
+            'telefonosAsignados'       => $equipos->where('tipo', 'Telefono')->whereNotNull('user_id')->count(),
         ]);
     }
 
@@ -64,11 +69,16 @@ class KardexController extends Controller
     {
         $estado = $request->estado ?: null;
 
-        // "almacen": regresa el equipo a almacén desvinculando al
-        // responsable actual, pero SIN liberar su IP (se queda con el
-        // equipo). No es un valor persistido en la columna `estado` — se
-        // guarda como null, igual que "Automático", y el responsable vacío
-        // hace que la vista lo calcule como "Almacén" de todos modos.
+        $equipo = DB::table('inventario_equipos')
+            ->leftJoin('users', 'inventario_equipos.user_id', '=', 'users.id')
+            ->select(
+                'inventario_equipos.user_id',
+                'inventario_equipos.estado as estado_actual',
+                DB::raw("NULLIF(TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'')), '') as responsable_nombre")
+            )
+            ->where('inventario_equipos.id', $id)
+            ->first();
+
         if ($estado === 'almacen') {
             DB::table('inventario_equipos')->where('id', $id)->update([
                 'estado'            => null,
@@ -76,6 +86,16 @@ class KardexController extends Controller
                 'usuario_actual_id' => null,
                 'updated_at'        => now(),
             ]);
+
+            KardexMovimiento::registrar(
+                tipo_activo:   'equipo',
+                activo_id:     (int) $id,
+                tipo_evento:   'Almacén',
+                origen:        $equipo->responsable_nombre ?? 'Sin responsable',
+                destino:       'Almacén',
+                user_from_id:  $equipo->user_id,
+                estado_equipo: 'Operativo',
+            );
 
             return response()->json(['ok' => true]);
         }
@@ -85,8 +105,26 @@ class KardexController extends Controller
             'updated_at' => now(),
         ]);
 
-        // Fuera de servicio (mantenimiento/baja) → ya no está en uso activo,
-        // su IP se libera automáticamente (mismo helper que usa Network).
+        $tipoEvento    = match($estado) {
+            'mantenimiento' => 'Mantenimiento',
+            'baja'          => 'Baja',
+            default         => 'Almacén',
+        };
+        $estadoEquipo  = match($estado) {
+            'mantenimiento' => 'En Reparación',
+            'baja'          => 'Obsoleto',
+            default         => 'Operativo',
+        };
+
+        KardexMovimiento::registrar(
+            tipo_activo:   'equipo',
+            activo_id:     (int) $id,
+            tipo_evento:   $tipoEvento,
+            origen:        $equipo->responsable_nombre ?? 'Sin responsable',
+            user_from_id:  $equipo->user_id,
+            estado_equipo: $estadoEquipo,
+        );
+
         if (in_array($estado, ['mantenimiento', 'baja'], true)) {
             IpAssigner::liberarEquipo((int) $id);
         }
@@ -100,12 +138,32 @@ class KardexController extends Controller
     {
         $estado = $request->estado ?: null;
 
+        $impresora = DB::table('impresoras')
+            ->leftJoin('users', 'impresoras.user_id', '=', 'users.id')
+            ->select(
+                'impresoras.user_id',
+                DB::raw("NULLIF(TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'')), '') as responsable_nombre")
+            )
+            ->where('impresoras.id_impresora', $id)
+            ->first();
+
         if ($estado === 'almacen') {
             DB::table('impresoras')->where('id_impresora', $id)->update([
                 'estado'     => null,
                 'user_id'    => null,
                 'updated_at' => now(),
             ]);
+
+            KardexMovimiento::registrar(
+                tipo_activo:  'impresora',
+                activo_id:    (int) $id,
+                tipo_evento:  'Almacén',
+                origen:       $impresora->responsable_nombre ?? 'Sin responsable',
+                destino:      'Almacén',
+                user_from_id: $impresora->user_id,
+                estado_equipo:'Operativo',
+            );
+
             return response()->json(['ok' => true]);
         }
 
@@ -114,7 +172,74 @@ class KardexController extends Controller
             'updated_at' => now(),
         ]);
 
+        $tipoEvento   = match($estado) {
+            'mantenimiento' => 'Mantenimiento',
+            'baja'          => 'Baja',
+            default         => 'Almacén',
+        };
+        $estadoEquipo = match($estado) {
+            'mantenimiento' => 'En Reparación',
+            'baja'          => 'Obsoleto',
+            default         => 'Operativo',
+        };
+
+        KardexMovimiento::registrar(
+            tipo_activo:  'impresora',
+            activo_id:    (int) $id,
+            tipo_evento:  $tipoEvento,
+            origen:       $impresora->responsable_nombre ?? 'Sin responsable',
+            user_from_id: $impresora->user_id,
+            estado_equipo:$estadoEquipo,
+        );
+
         return response()->json(['ok' => true]);
+    }
+
+    // ─── POST: cambia el usuario actual del equipo (quien lo usa físicamente) ──
+
+    public function cambiarUsuarioEquipo(Request $request, $id)
+    {
+        $request->validate(['usuario_id' => 'nullable|exists:users,id']);
+        $nuevoUsuarioId = $request->usuario_id ? (int) $request->usuario_id : null;
+
+        $equipo = DB::table('inventario_equipos')
+            ->leftJoin('users as usu', 'inventario_equipos.usuario_actual_id', '=', 'usu.id')
+            ->select(
+                'inventario_equipos.usuario_actual_id',
+                DB::raw("NULLIF(TRIM(COALESCE(usu.name,'') || ' ' || COALESCE(usu.apellido_paterno,'')), '') as usuario_anterior_nombre")
+            )
+            ->where('inventario_equipos.id', $id)
+            ->first();
+
+        DB::table('inventario_equipos')->where('id', $id)->update([
+            'usuario_actual_id' => $nuevoUsuarioId,
+            'updated_at'        => now(),
+        ]);
+
+        // Nombre del nuevo usuario para el historial
+        $nuevoNombre = null;
+        if ($nuevoUsuarioId) {
+            $nuevoNombre = DB::table('users')->where('id', $nuevoUsuarioId)
+                ->selectRaw("NULLIF(TRIM(COALESCE(name,'') || ' ' || COALESCE(apellido_paterno,'')), '') as nombre")
+                ->value('nombre');
+        }
+
+        KardexMovimiento::registrar(
+            tipo_activo:   'equipo',
+            activo_id:     (int) $id,
+            tipo_evento:   'Reasignación',
+            origen:        $equipo->usuario_anterior_nombre ?? 'Sin usuario',
+            destino:       $nuevoNombre ?? 'Sin usuario',
+            user_from_id:  $equipo->usuario_actual_id,
+            user_to_id:    $nuevoUsuarioId,
+            notas:         'Cambio de usuario físico del equipo.',
+        );
+
+        return response()->json([
+            'ok'            => true,
+            'usuario_nombre'=> $nuevoNombre,
+            'usuario_id'    => $nuevoUsuarioId,
+        ]);
     }
 
     // ─── Vista: formulario de carga ──────────────────────────────────────────
@@ -240,9 +365,11 @@ class KardexController extends Controller
     {
         $request->validate([
             'tipo'          => 'required|in:Laptop,PC Avanzada,PC Especializada',
-            'cpu_serie'     => 'nullable|string|max:100',
+            'cpu_serie'     => 'required|string|max:100',
+            'area'          => 'required|string|max:200',
             'tmp_pdf'       => 'required|string',
-            'id_empleado'   => 'nullable|string',
+            'id_empleado'   => 'required|string',
+            'nombre_pdf_detectado' => 'nullable|string|max:200',
             'ipv4'          => 'nullable|ip',
             'nuevo_nombre'           => 'required_if:id_empleado,__nuevo__|string|max:80',
             'nuevo_apellido_paterno' => 'required_if:id_empleado,__nuevo__|string|max:80',
@@ -250,7 +377,10 @@ class KardexController extends Controller
             'nuevo_correo'           => 'nullable|email|max:120|unique:users,email',
             'nuevo_puesto'           => 'nullable|string|max:120',
         ], [
-            'tipo.required'                  => 'El tipo de equipo es obligatorio.',
+            'tipo.required'                      => 'El tipo de equipo es obligatorio.',
+            'cpu_serie.required'                 => 'El número de serie del equipo es obligatorio.',
+            'area.required'                      => 'El área es obligatoria.',
+            'id_empleado.required'               => 'Todo resguardo debe tener un responsable asignado.',
             'nuevo_nombre.required_if'           => 'El nombre es obligatorio para crear una persona nueva.',
             'nuevo_apellido_paterno.required_if' => 'El apellido paterno es obligatorio para crear una persona nueva.',
             'nuevo_correo.unique'                => 'Ese correo ya está registrado en otra cuenta.',
@@ -364,6 +494,47 @@ class KardexController extends Controller
             Storage::disk('local')->move($request->tmp_pdf, $pdfPath);
             DB::table('inventario_equipos')->where('id', $idEquipo)->update(['pdf_resguardo' => $pdfPath]);
         }
+
+        // ── Ciclo de vida: ENTRADA → ASIGNACIÓN ─────────────────────────────
+        // Todo equipo nuevo llega primero a Subdirección de Sistemas (desde el proveedor),
+        // y de ahí se asigna al responsable. Ambos eventos siempre se registran.
+
+        KardexMovimiento::registrar(
+            tipo_activo:   'equipo',
+            activo_id:     $idEquipo,
+            tipo_evento:   'Entrada',
+            origen:        'Proveedor',
+            destino:       'Subdirección de Sistemas',
+            estado_equipo: 'Nuevo',
+        );
+
+        $nombreEmpleado = DB::table('users')->where('id', $userId)
+            ->selectRaw("NULLIF(TRIM(COALESCE(name,'') || ' ' || COALESCE(apellido_paterno,'')), '') as nombre")
+            ->value('nombre') ?? 'Empleado';
+
+        // Detectar si el nombre del PDF no coincide con el responsable asignado
+        $notaAsignacion = $request->observaciones;
+        $nombrePdf = trim($request->nombre_pdf_detectado ?? '');
+        if ($nombrePdf) {
+            $palabrasPdf = array_filter(explode(' ', mb_strtolower($nombrePdf)), fn($p) => mb_strlen($p) > 2);
+            $nombreNorm  = mb_strtolower($nombreEmpleado);
+            $coincide    = !empty($palabrasPdf) && collect($palabrasPdf)->some(fn($p) => str_contains($nombreNorm, $p));
+            if (!$coincide) {
+                $aviso = "⚠️ PDF menciona \"{$nombrePdf}\" — asignado a \"{$nombreEmpleado}\" por " . (\Auth::user()?->email ?? 'admin');
+                $notaAsignacion = $aviso . ($notaAsignacion ? ' | ' . $notaAsignacion : '');
+            }
+        }
+
+        KardexMovimiento::registrar(
+            tipo_activo:   'equipo',
+            activo_id:     $idEquipo,
+            tipo_evento:   'Asignación',
+            origen:        'Subdirección de Sistemas',
+            destino:       $nombreEmpleado,
+            user_to_id:    $userId,
+            estado_equipo: 'Operativo',
+            notas:         $notaAsignacion,
+        );
 
         $mensaje = "Equipo registrado (ID {$idEquipo}). PDF guardado en el sistema.";
         if ($switcheo) {
