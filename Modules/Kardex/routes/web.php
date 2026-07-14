@@ -41,7 +41,10 @@ Route::middleware(['auth', 'admin'])->prefix('kardex')->name('kardex.')->group(f
     })->name('equipo.detalle');
 
     // POST: cambia estado de un equipo
-    Route::post('/equipo/{id}/estado', [KardexController::class, 'cambiarEstadoEquipo'])->name('equipo.estado');
+    Route::post('/equipo/{id}/estado',     [KardexController::class, 'cambiarEstadoEquipo'])->name('equipo.estado');
+
+    // POST: cambia estado de una impresora
+    Route::post('/impresora/{id}/estado',  [KardexController::class, 'cambiarEstadoImpresora'])->name('impresora.estado');
 
     // GET: descarga el PDF de resguardo (guardado en disco local)
     Route::get('/equipo/{id}/pdf', function ($id) {

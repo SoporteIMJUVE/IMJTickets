@@ -94,7 +94,6 @@ Route::middleware(['auth', 'admin'])->prefix('crm')->name('crm.')->group(functio
             'inventario_equipos.docking_serie',
             'inventario_equipos.candado',
             'inventario_equipos.mac',
-            'inventario_equipos.ipv4_actual',
             'inventario_equipos.check_entrega',
             'inventario_equipos.observaciones',
             'inventario_equipos.area',

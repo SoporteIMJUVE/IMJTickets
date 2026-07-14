@@ -39,6 +39,48 @@
         </div>
     </div>
 
+    {{-- KPIs últimos 7 días --}}
+    @php
+    $kpis = [
+        [
+            'label' => 'Promedio resolución',
+            'sub'   => 'Últimos 7 días',
+            'value' => $promedioResolucion,
+            'icon'  => 'avg_pace',
+            'color' => 'var(--color-status-attend)',
+        ],
+        [
+            'label' => 'Área más activa',
+            'sub'   => ($areaTop ? $areaTop->total . ' tickets' : '—'),
+            'value' => $areaTop->area ?? 'Sin datos',
+            'icon'  => 'apartment',
+            'color' => 'var(--color-status-free)',
+        ],
+        [
+            'label' => 'Tipo más frecuente',
+            'sub'   => ($tipoTop ? $tipoTop->total . ' tickets' : '—'),
+            'value' => $tipoTop->tipo ?? 'Sin datos',
+            'icon'  => 'category',
+            'color' => 'var(--color-brand)',
+        ],
+    ];
+    @endphp
+    <div class="grid grid-cols-3 gap-4 mb-6">
+        @foreach($kpis as $k)
+        <div class="bg-canvas border border-border p-5 rounded-xl flex items-center gap-4">
+            <div class="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
+                 style="background:{{ $k['color'] }}1a; color:{{ $k['color'] }}">
+                <span class="material-symbols-outlined">{{ $k['icon'] }}</span>
+            </div>
+            <div class="min-w-0">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-muted">{{ $k['label'] }}</p>
+                <p class="text-xl font-bold leading-tight truncate" title="{{ $k['value'] }}">{{ $k['value'] }}</p>
+                <p class="text-[11px] text-muted mt-0.5">{{ $k['sub'] }}</p>
+            </div>
+        </div>
+        @endforeach
+    </div>
+
     {{-- Barra de filtros --}}
     <div class="bg-canvas border border-border rounded-xl overflow-hidden shadow-sm mb-6">
         <x-tabla-encabezado titulo="Gestión de Tickets" tab="tickets" exportUrl="{{ route('tickets.exportar') }}" :importar="false">
