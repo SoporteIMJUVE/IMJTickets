@@ -37,8 +37,39 @@ class TicketsController extends Controller
                 ->all()
             : [];
 
+        $hace7 = now()->subDays(7)->toDateTimeString();
+
+        // Promedio de resolución (tickets cerrados en los últimos 7 días)
+        $cerrados7 = DB::table('tickets')
+            ->whereNotNull('cerrado_at')
+            ->where('cerrado_at', '>=', $hace7)
+            ->selectRaw("AVG((julianday(cerrado_at) - julianday(created_at)) * 24) as avg_horas")
+            ->value('avg_horas');
+        $promedioResolucion = $cerrados7
+            ? ($cerrados7 < 1
+                ? round($cerrados7 * 60) . ' min'
+                : round($cerrados7, 1) . ' h')
+            : 'Sin datos';
+
+        // Área con más tickets en los últimos 7 días
+        $areaTop = DB::table('tickets')
+            ->where('created_at', '>=', $hace7)
+            ->selectRaw('area, COUNT(*) as total')
+            ->groupBy('area')
+            ->orderByDesc('total')
+            ->first();
+
+        // Tipo con más tickets en los últimos 7 días
+        $tipoTop = DB::table('tickets')
+            ->where('created_at', '>=', $hace7)
+            ->selectRaw('tipo, COUNT(*) as total')
+            ->groupBy('tipo')
+            ->orderByDesc('total')
+            ->first();
+
         return view('tickets::index', compact(
-            'tickets', 'porEstado', 'tecnicos', 'areas', 'comentariosPorTicket'
+            'tickets', 'porEstado', 'tecnicos', 'areas', 'comentariosPorTicket',
+            'promedioResolucion', 'areaTop', 'tipoTop'
         ));
     }
 
@@ -47,14 +78,11 @@ class TicketsController extends Controller
         $validated = $request->validate(['estado' => 'required|integer|in:0,1,2']);
         $estado    = $validated['estado'];
 
-        // Solo actualiza estado por ahora — atendido_at/cerrado_at pendientes de migración
-        DB::table('tickets')->where('id', $id)->update(['estado' => $estado]);
+        $extra = [];
+        if ($estado === 1) $extra = ['atendido_at' => now(), 'atendido_by' => Auth::user()->email];
+        if ($estado === 2) $extra = ['cerrado_at'  => now(), 'cerrado_by'  => Auth::user()->email];
 
-        // Vestigio — habilitar cuando existan las columnas:
-        // $extra = [];
-        // if ($estado === 1) $extra = ['atendido_at' => now(), 'atendido_by' => Auth::user()->email];
-        // if ($estado === 2) $extra = ['cerrado_at'  => now(), 'cerrado_by'  => Auth::user()->email];
-        // DB::table('tickets')->where('id', $id)->update(array_merge(['estado' => $estado], $extra));
+        DB::table('tickets')->where('id', $id)->update(array_merge(['estado' => $estado], $extra));
 
         return response()->json(['ok' => true, 'estado' => $estado]);
     }

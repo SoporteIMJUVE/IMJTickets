@@ -13,17 +13,9 @@
                         class="px-6 py-2 rounded-md text-sm font-bold transition-all bg-canvas text-brand shadow-sm">
                     Equipos
                 </button>
-                <button id="tab-btn-insumos" onclick="switchKardexTab('insumos', this)"
-                        class="px-6 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high">
-                    Insumos
-                </button>
                 <button id="tab-btn-resguardos" onclick="switchKardexTab('resguardos', this)"
                         class="px-6 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high">
                     Resguardos
-                </button>
-                <button id="tab-btn-impresoras" onclick="switchKardexTab('impresoras', this)"
-                        class="px-6 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high">
-                    Impresoras
                 </button>
             </div>
         </div>
@@ -31,14 +23,14 @@
 
     {{-- ---- TAB: EQUIPOS (activo por defecto) ---- --}}
     <div id="tab-equipos">
-        {{-- Stats --}}
+        {{-- Stats: equipos asignados por categoría --}}
+        @php $equipStats = [
+            ['label'=>'Laptops asignadas',       'value'=>$laptopsAsignadas,          'icon'=>'laptop',          'color'=>'var(--color-status-free)'],
+            ['label'=>'PC Avanzadas asignadas',   'value'=>$pcAvanzadasAsignadas,      'icon'=>'desktop_windows', 'color'=>'var(--color-status-active)'],
+            ['label'=>'PC Especializadas asig.',  'value'=>$pcEspecializadasAsignadas, 'icon'=>'computer',        'color'=>'var(--color-brand)'],
+            ['label'=>'Impresoras asignadas',     'value'=>$impresorasAsignadas,       'icon'=>'print',           'color'=>'var(--color-status-low)'],
+        ]; @endphp
         <div class="grid grid-cols-4 gap-4 mb-6">
-            @php $equipStats = [
-                ['label'=>'Total Equipos',    'value'=>$totalEquipos,  'icon'=>'computer',       'color'=>'var(--color-status-active)'],
-                ['label'=>'En Almacén',        'value'=>$enAlmacen,     'icon'=>'inventory',      'color'=>'var(--color-status-free)'],
-                ['label'=>'Mantenimiento',     'value'=>$mantenimiento, 'icon'=>'build',          'color'=>'var(--color-status-low)'],
-                ['label'=>'Insumos Críticos',  'value'=>$criticos,      'icon'=>'report_problem', 'color'=>'var(--color-status-critical)'],
-            ]; @endphp
             @foreach($equipStats as $s)
             <div class="bg-canvas border border-border p-5 rounded-xl flex items-center gap-4">
                 <div class="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style="background:{{ $s['color'] }}1a; color:{{ $s['color'] }}">
@@ -64,6 +56,7 @@
                             <option>Laptop</option>
                             <option>PC Avanzada</option>
                             <option>PC Especializada</option>
+                            <option>Impresora</option>
                         </select>
                     </div>
                     <div>
@@ -154,97 +147,57 @@
                         </td>
                     </tr>
                     @empty
+                    @if($impresoras->isEmpty())
                     <tr>
                         <td colspan="8" class="px-6 py-10 text-center text-muted text-sm">Sin equipos registrados</td>
                     </tr>
+                    @endif
                     @endforelse
-                </tbody>
-            </table>
-            </div>
-        </div>
-    </div>
-
-    {{-- ---- TAB: INSUMOS ---- --}}
-    <div id="tab-insumos" class="hidden">
-        <div class="grid grid-cols-4 gap-4 mb-6">
-            <div class="bg-canvas border border-border p-5 rounded-xl shadow-sm">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Total Items</p>
-                <p class="text-2xl font-bold">{{ $totalInsumos }}</p>
-                <div class="mt-3 flex items-center gap-1 text-status-active text-xs font-bold">
-                    <span class="material-symbols-outlined text-sm">trending_up</span> Actualizado
-                </div>
-            </div>
-            <div class="bg-canvas border border-border p-5 rounded-xl shadow-sm border-l-4 border-l-status-critical">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-status-critical mb-2">Stock Crítico</p>
-                <p class="text-2xl font-bold">{{ $stockCritico }}</p>
-                <p class="mt-3 text-xs text-muted">Requiere atención</p>
-            </div>
-            <div class="bg-canvas border border-border p-5 rounded-xl shadow-sm">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Salidas recientes</p>
-                <p class="text-2xl font-bold">—</p>
-                <p class="mt-3 text-xs text-muted">Últimas 24 horas</p>
-            </div>
-            <div class="bg-canvas border border-border p-5 rounded-xl shadow-sm">
-                <p class="text-[11px] font-bold uppercase tracking-wider text-muted mb-2">Valor en Almacén</p>
-                <p class="text-2xl font-bold">—</p>
-                <p class="mt-3 text-xs text-muted">Solo insumos</p>
-            </div>
-        </div>
-
-        <div class="bg-canvas border border-border rounded-xl overflow-hidden shadow-sm">
-            <x-tabla-encabezado titulo="Inventario de Insumos" tab="insumos" exportUrl="{{ route('kardex.exportar', 'insumos') }}">
-                <x-slot:filtros>
-                    <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Buscar</label>
-                        <input id="f-ins-texto" oninput="filtrarInsumos()" type="text" placeholder="Nombre o No. parte..."
-                               class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand w-56">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Stock</label>
-                        <select id="f-ins-stock" onchange="filtrarInsumos()"
-                                class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
-                            <option value="">Todos</option>
-                            <option value="ok">OK</option>
-                            <option value="critico">Crítico</option>
-                        </select>
-                    </div>
-                </x-slot:filtros>
-            </x-tabla-encabezado>
-
-            <div class="overflow-x-auto">
-            <table class="w-full text-left">
-                <thead class="bg-wash border-b border-border">
-                    <tr>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Part Number</th>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Descripción</th>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Stock Mín.</th>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Stock Actual</th>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Estado</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border" id="tbody-insumos">
-                    @forelse($insumos as $ins)
-                    @php $critico = $ins->stock_actual <= $ins->stock_minimo; @endphp
-                    <tr class="hover:bg-gold/5 transition-colors ins-row"
-                        data-texto="{{ strtolower($ins->nombre_insumo . ' ' . ($ins->numero_parte ?? '')) }}"
-                        data-stock="{{ $critico ? 'critico' : 'ok' }}">
-                        <td class="px-6 py-3 font-mono text-sm text-brand">{{ $ins->numero_parte ?? '—' }}</td>
-                        <td class="px-6 py-3 text-sm font-medium">{{ $ins->nombre_insumo }}</td>
-                        <td class="px-6 py-3 font-mono text-sm text-center">{{ $ins->stock_minimo }}</td>
-                        <td class="px-6 py-3 font-mono text-sm font-bold text-center">{{ $ins->stock_actual }}</td>
-                        <td class="px-6 py-3">
-                            @if(!$critico)
-                            <span class="bg-status-active/10 text-status-active px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">OK</span>
-                            @else
-                            <span class="bg-status-critical/10 text-status-critical px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Crítico</span>
-                            @endif
+                    {{-- Impresoras como categoría dentro de equipos --}}
+                    @foreach($impresoras as $imp)
+                    @php
+                        $impEstado = $imp->user_id ? 'Asignado' : 'Almacén';
+                        $impResponsable = $imp->responsable_nombre ?? '—';
+                    @endphp
+                    <tr class="hover:bg-gold/5 transition-colors cursor-pointer eq-row"
+                        data-id="{{ $imp->id_impresora }}"
+                        data-tipo="Impresora"
+                        data-estado="{{ $impEstado }}"
+                        data-estado-raw="{{ $imp->estado ?? '' }}"
+                        data-texto="{{ strtolower(($imp->area ?? '') . ' ' . $impResponsable . ' ' . ($imp->serie ?? '')) }}"
+                        data-area="{{ $imp->area ?? '' }}"
+                        data-serie="{{ $imp->serie ?? '' }}"
+                        data-marca-modelo="{{ trim(($imp->marca ?? '') . ' ' . ($imp->modelo ?? '') . ($imp->firmware ? ' / ' . $imp->firmware : '')) }}"
+                        data-responsable="{{ $impResponsable }}"
+                        data-correo="{{ $imp->responsable_correo ?? '' }}"
+                        data-ip="{{ $imp->ip_address ?? '' }}"
+                        onclick="abrirPanelImpresora(this)">
+                        <td class="px-4 py-3 font-mono text-sm text-brand">—</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-status-low/10 text-status-low">
+                                Impresora
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm">
+                            <span class="font-medium">{{ $imp->marca }}</span>
+                            <span class="text-muted"> {{ $imp->modelo }}</span>
+                        </td>
+                        <td class="px-4 py-3 font-mono text-sm text-brand whitespace-nowrap">{{ $imp->serie ?? '—' }}</td>
+                        <td class="px-4 py-3 text-sm text-muted max-w-[160px] truncate" title="{{ $imp->area }}">{{ $imp->area ?? '—' }}</td>
+                        <td class="px-4 py-3 text-sm max-w-[160px] truncate" title="{{ $impResponsable }}">{{ $impResponsable }}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase {{ $impEstado === 'Asignado' ? 'bg-status-active/10 text-status-active' : 'bg-status-free/10 text-status-free' }}">
+                                {{ $impEstado }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <button onclick="event.stopPropagation(); abrirPanelImpresora(this.closest('tr'))"
+                                    class="p-1.5 hover:bg-wash rounded text-muted hover:text-brand">
+                                <span class="material-symbols-outlined text-sm">open_in_new</span>
+                            </button>
                         </td>
                     </tr>
-                    @empty
-                    <tr>
-                        <td colspan="5" class="px-6 py-10 text-center text-muted text-sm">Sin insumos registrados</td>
-                    </tr>
-                    @endforelse
+                    @endforeach
                 </tbody>
             </table>
             </div>
@@ -371,77 +324,8 @@
         </div>
     </div>
 
-    {{-- ---- TAB: IMPRESORAS (solo lectura) ---- --}}
-    <div id="tab-impresoras" class="hidden">
-        <div class="bg-canvas border border-border rounded-xl overflow-hidden shadow-sm">
-            <x-tabla-encabezado titulo="Inventario de Impresoras" tab="impresoras">
-                <x-slot:filtros>
-                    <div>
-                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Buscar</label>
-                        <input id="f-imp-texto" oninput="filtrarImpresoras()" type="text" placeholder="Área, marca, serie, IP..."
-                               class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand w-56">
-                    </div>
-                </x-slot:filtros>
-            </x-tabla-encabezado>
-
-            <div class="overflow-x-auto">
-            <table class="w-full text-left">
-                <thead class="bg-wash border-b border-border">
-                    <tr>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Área</th>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Marca / Modelo</th>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">No. Serie</th>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">IP</th>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Responsable</th>
-                        <th class="px-6 py-3 text-[11px] font-bold uppercase tracking-wider text-muted text-right">Detalle</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border" id="tbody-impresoras">
-                    @forelse($impresoras as $imp)
-                    <tr class="imp-row hover:bg-gold/5 transition-colors cursor-pointer"
-                        data-texto="{{ strtolower(($imp->area ?? '') . ' ' . ($imp->marca ?? '') . ' ' . ($imp->modelo ?? '') . ' ' . ($imp->serie ?? '') . ' ' . ($imp->ip_address ?? '')) }}"
-                        data-area="{{ $imp->area ?? '' }}"
-                        data-marca-modelo="{{ trim(($imp->marca ?? '') . ' ' . ($imp->modelo ?? '')) }}"
-                        data-serie="{{ $imp->serie ?? '' }}"
-                        data-ip="{{ $imp->ip_address ?? '' }}"
-                        data-responsable="{{ $imp->responsable_nombre ?? '' }}"
-                        data-correo="{{ $imp->responsable_correo ?? '' }}"
-                        onclick="abrirDetalleImpresora(this)">
-                        <td class="px-6 py-3 text-sm">{{ $imp->area ?? '—' }}</td>
-                        <td class="px-6 py-3 text-sm">{{ trim(($imp->marca ?? '') . ' ' . ($imp->modelo ?? '')) ?: '—' }}</td>
-                        <td class="px-6 py-3 font-mono text-sm">{{ $imp->serie ?? '—' }}</td>
-                        <td class="px-6 py-3 font-mono text-sm">{{ $imp->ip_address ?? '—' }}</td>
-                        <td class="px-6 py-3 text-sm">
-                            @if($imp->responsable_nombre)
-                                {{ $imp->responsable_nombre }}
-                                <span class="block text-[11px] text-muted">{{ $imp->responsable_correo }}</span>
-                            @else
-                                <span class="text-muted italic">Sin asignar</span>
-                            @endif
-                        </td>
-                        <td class="px-6 py-3 text-right">
-                            <button onclick="event.stopPropagation(); abrirDetalleImpresora(this.closest('tr'))"
-                                    class="p-1.5 hover:bg-wash rounded text-muted hover:text-brand">
-                                <span class="material-symbols-outlined text-sm">open_in_new</span>
-                            </button>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="6" class="px-6 py-10 text-center text-muted text-sm">Sin impresoras registradas</td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
-            </div>
-        </div>
-    </div>
-
-</div>
-
-{{-- ══ Panel lateral: Detalle de equipo ══ --}}
+{{-- ══ Panel lateral: detalle de equipo ══ --}}
 <div class="fixed top-0 right-0 h-screen w-[440px] bg-canvas shadow-2xl border-l border-gold z-[60] flex flex-col translate-x-full transition-transform duration-300" id="equipo-panel">
-    {{-- Header del panel --}}
     <div class="p-5 border-b border-border bg-surface flex justify-between items-start shrink-0">
         <div>
             <p class="text-[11px] font-bold uppercase tracking-wider text-muted" id="panel-tipo-badge">—</p>
@@ -452,15 +336,11 @@
             <span class="material-symbols-outlined">close</span>
         </button>
     </div>
-
-    {{-- Cuerpo del panel --}}
     <div class="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar" id="panel-cuerpo">
         <div class="flex items-center justify-center py-16 text-muted">
             <span class="material-symbols-outlined text-4xl animate-spin">progress_activity</span>
         </div>
     </div>
-
-    {{-- Footer --}}
     <div class="p-5 border-t border-border shrink-0 flex gap-3 items-center" id="panel-footer">
         <a id="panel-pdf-link" href="#" target="_blank"
            class="flex-1 py-2.5 bg-brand text-white font-bold rounded text-sm flex items-center justify-center gap-2 hover:opacity-90 hidden">
@@ -472,51 +352,9 @@
         </button>
     </div>
 </div>
-
 <div class="fixed inset-0 bg-black/20 backdrop-blur-sm z-[55] hidden" id="kardex-backdrop"
      onclick="cerrarPanelEquipo()"></div>
 
-{{-- ══ Modal: Detalle de impresora ══ --}}
-<div id="modal-impresora-detalle" class="fixed inset-0 z-[70] hidden items-center justify-center" style="background:rgba(0,0,0,.35)">
-    <div class="bg-canvas rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
-        <div class="px-6 py-5 border-b border-border flex items-center justify-between">
-            <h3 class="font-bold text-base text-ink">Detalle de impresora</h3>
-            <button type="button" onclick="cerrarModal('modal-impresora-detalle')" class="text-muted hover:text-brand p-1">
-                <span class="material-symbols-outlined">close</span>
-            </button>
-        </div>
-        <div class="px-6 py-5 space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-                <div class="detail-field">
-                    <span class="detail-label">Área</span>
-                    <span class="detail-value" id="imp-detalle-area">—</span>
-                </div>
-                <div class="detail-field">
-                    <span class="detail-label">No. Serie</span>
-                    <span class="detail-value mono" id="imp-detalle-serie">—</span>
-                </div>
-                <div class="detail-field col-span-2">
-                    <span class="detail-label">Marca / Modelo</span>
-                    <span class="detail-value" id="imp-detalle-marca-modelo">—</span>
-                </div>
-                <div class="detail-field col-span-2">
-                    <span class="detail-label">Responsable</span>
-                    <span class="detail-value" id="imp-detalle-responsable">—</span>
-                </div>
-                <div class="detail-field col-span-2">
-                    <span class="detail-label">Dirección IP</span>
-                    <span class="detail-value" id="imp-detalle-ip-wrap">
-                        <span class="text-muted">Sin IP asignada</span>
-                    </span>
-                </div>
-            </div>
-        </div>
-        <div class="px-6 py-4 border-t border-border flex justify-end">
-            <button type="button" onclick="cerrarModal('modal-impresora-detalle')"
-                    class="px-4 py-2 border border-border rounded-lg text-sm font-bold text-muted hover:bg-wash transition-colors">Cerrar</button>
-        </div>
-    </div>
-</div>
 
 <style>
 .detail-field { display: flex; flex-direction: column; gap: 2px; }
@@ -532,7 +370,7 @@ const INACTIVE_TAB= 'px-6 py-2 rounded-md text-sm font-bold transition-all text-
 let currentTab    = 'equipos';
 
 function switchKardexTab(tab, btn) {
-    ['equipos', 'insumos', 'resguardos', 'impresoras'].forEach(t => {
+    ['equipos', 'resguardos'].forEach(t => {
         document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
         document.getElementById('tab-btn-' + t).className = t === tab ? ACTIVE_TAB : INACTIVE_TAB;
     });
@@ -558,63 +396,121 @@ function filtrarEquipos() {
     if (count) count.textContent = `${vis} resultado${vis !== 1 ? 's' : ''}`;
 }
 
-function filtrarInsumos() {
-    const texto = document.getElementById('f-ins-texto').value.toLowerCase();
-    const stock = document.getElementById('f-ins-stock').value;
-    let vis = 0;
-    document.querySelectorAll('.ins-row').forEach(row => {
-        const ok = (!texto || row.dataset.texto.includes(texto))
-                && (!stock || row.dataset.stock === stock);
-        row.classList.toggle('hidden', !ok);
-        if (ok) vis++;
-    });
-    const count = document.getElementById('f-ins-count');
-    if (count) count.textContent = `${vis} resultado${vis !== 1 ? 's' : ''}`;
-}
 
-function filtrarImpresoras() {
-    const texto = document.getElementById('f-imp-texto').value.toLowerCase();
-    let vis = 0;
-    document.querySelectorAll('.imp-row').forEach(row => {
-        const ok = !texto || row.dataset.texto.includes(texto);
-        row.classList.toggle('hidden', !ok);
-        if (ok) vis++;
-    });
-    const count = document.getElementById('f-imp-count');
-    if (count) count.textContent = `${vis} resultado${vis !== 1 ? 's' : ''}`;
-}
+// ── Panel lateral: impresora (datos ya en data-* del row) ────────────
+let panelImpresoraId = null;
 
-function cerrarModal(idModal) {
-    document.getElementById(idModal).classList.add('hidden');
-    document.getElementById(idModal).classList.remove('flex');
-}
-
-function abrirModal(idModal) {
-    document.getElementById(idModal).classList.remove('hidden');
-    document.getElementById(idModal).classList.add('flex');
-}
-
-// ── Modal: detalle de impresora ──────────────────────────────────────
-function abrirDetalleImpresora(row) {
+function abrirPanelImpresora(row) {
     const d = row.dataset;
+    panelImpresoraId  = d.id;
+    panelEquipoId     = null;
+    panelEquipoUserId = null;
 
-    document.getElementById('imp-detalle-area').textContent = d.area || '—';
-    document.getElementById('imp-detalle-serie').textContent = d.serie || '—';
-    document.getElementById('imp-detalle-marcaModelo').textContent = d.marcaModelo || '—';
-    document.getElementById('imp-detalle-responsable').textContent =
-        d.responsable ? `${d.responsable}${d.correo ? ' <' + d.correo + '>' : ''}` : 'Sin asignar';
+    document.getElementById('equipo-panel').classList.remove('translate-x-full');
+    document.getElementById('kardex-backdrop').classList.remove('hidden');
+    document.getElementById('panel-tipo-badge').textContent    = 'Impresora';
+    document.getElementById('panel-serie').textContent         = d.serie || 'Sin serie';
+    document.getElementById('panel-marca-modelo').textContent  = d.marcaModelo || '—';
+    document.getElementById('panel-pdf-link').classList.add('hidden');
 
-    const ipWrap = document.getElementById('imp-detalle-ip-wrap');
-    if (d.ip) {
-        const url = `${NETWORK_URL}?open=${encodeURIComponent(d.ip)}`;
-        ipWrap.innerHTML = `<a href="${url}" target="_blank" class="font-mono text-brand hover:underline flex items-center gap-1">
-            ${d.ip} <span class="material-symbols-outlined" style="font-size:15px">open_in_new</span>
-        </a>`;
-    } else {
-        ipWrap.innerHTML = '<span class="text-muted">Sin IP asignada</span>';
+    const f = (label, value, mono = false) => `
+        <div class="detail-field">
+            <span class="detail-label">${label}</span>
+            <span class="detail-value${mono ? ' mono' : ''}">${value || '—'}</span>
+        </div>`;
+
+    const ipHtml = d.ip
+        ? `<a href="http://${d.ip}" target="_blank" rel="noopener"
+              class="font-mono text-brand hover:underline flex items-center gap-1">
+               ${d.ip} <span class="material-symbols-outlined" style="font-size:15px">open_in_new</span>
+           </a>`
+        : '<span class="text-muted text-sm">Sin IP asignada</span>';
+
+    const estadoRaw = d.estadoRaw || '';
+    const estadoDisplay = estadoRaw === 'mantenimiento' ? 'Mantenimiento'
+        : estadoRaw === 'baja' ? 'Baja'
+        : d.responsable ? 'Asignado' : 'Almacén';
+
+    document.getElementById('panel-cuerpo').innerHTML = `
+        <div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">Identificación</p>
+            <div class="grid grid-cols-2 gap-3">
+                ${f('Área', d.area)}
+                ${f('No. Serie', d.serie, true)}
+                ${f('Marca / Modelo', d.marcaModelo)}
+            </div>
+        </div>
+        <div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">Red</p>
+            <div class="detail-field">
+                <span class="detail-label">Dirección IP</span>
+                <div class="mt-0.5">${ipHtml}</div>
+            </div>
+        </div>
+        <div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">Responsable / Estado</p>
+            <div class="grid grid-cols-1 gap-3">
+                ${f('Nombre', d.responsable || 'Sin asignar')}
+                ${d.correo ? f('Correo', d.correo) : ''}
+                <div class="detail-field">
+                    <span class="detail-label">Estado del equipo</span>
+                    <div class="flex items-center gap-2 mt-1">
+                        <select id="select-estado-impresora"
+                                class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
+                            <option value="" ${!estadoRaw ? 'selected' : ''}>Automático (${estadoDisplay})</option>
+                            <option value="almacen">Almacén (desvincula responsable)</option>
+                            <option value="mantenimiento" ${estadoRaw === 'mantenimiento' ? 'selected' : ''}>Mantenimiento</option>
+                            <option value="baja" ${estadoRaw === 'baja' ? 'selected' : ''}>Baja</option>
+                        </select>
+                        <button onclick="guardarEstadoImpresora()"
+                                class="px-3 py-1.5 bg-brand text-white text-xs font-bold rounded hover:opacity-90">
+                            Guardar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+}
+
+async function guardarEstadoImpresora() {
+    const select = document.getElementById('select-estado-impresora');
+    const nuevoEstado = select?.value ?? '';
+    const r = await fetch(`/kardex/impresora/${panelImpresoraId}/estado`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+        },
+        body: JSON.stringify({ estado: nuevoEstado }),
+    });
+    if (!r.ok) return;
+
+    const labelMap = { mantenimiento: 'Mantenimiento', baja: 'Baja', almacen: 'Almacén' };
+    const estadoDisplay = labelMap[nuevoEstado] ?? (nuevoEstado === 'almacen' ? 'Almacén' : 'Almacén');
+
+    // Actualizar badge en la tabla
+    const fila = document.querySelector(`tr[data-id="${panelImpresoraId}"]`);
+    if (fila) {
+        fila.dataset.estadoRaw = nuevoEstado === 'almacen' ? '' : nuevoEstado;
+        fila.dataset.estado    = labelMap[nuevoEstado] ?? 'Almacén';
+        const badge = fila.querySelector('.rounded-full');
+        if (badge) {
+            const clsMap = {
+                'Mantenimiento': 'bg-status-low/10 text-status-low',
+                'Baja':          'bg-muted/10 text-muted',
+                'Almacén':       'bg-status-free/10 text-status-free',
+                'Asignado':      'bg-status-active/10 text-status-active',
+            };
+            badge.className = `px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${clsMap[estadoDisplay] ?? ''}`;
+            badge.textContent = estadoDisplay;
+        }
     }
 
-    abrirModal('modal-impresora-detalle');
+    // Actualizar el select para reflejar el nuevo estado guardado
+    if (nuevoEstado === 'almacen') {
+        select.querySelector('option[value=""]').textContent = 'Automático (Almacén)';
+        select.value = '';
+    }
 }
 
 function filtrarResguardos() {

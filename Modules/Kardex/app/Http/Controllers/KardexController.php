@@ -47,16 +47,14 @@ class KardexController extends Controller
             ->get();
 
         return view('kardex::index', [
-            'equipos'       => $equipos,
-            'resguardos'    => $resguardos,
-            'insumos'       => $insumos,
-            'impresoras'    => $impresoras,
-            'totalEquipos'  => $equipos->count(),
-            'enAlmacen'     => $equipos->filter(fn($e) => !$e->user_id && $e->estado !== 'mantenimiento' && $e->estado !== 'baja')->count(),
-            'mantenimiento' => $equipos->where('estado', 'mantenimiento')->count(),
-            'criticos'      => $insumos->filter(fn($i) => $i->stock_actual <= $i->stock_minimo)->count(),
-            'totalInsumos'  => $insumos->sum('stock_actual'),
-            'stockCritico'  => $insumos->filter(fn($i) => $i->stock_actual <= $i->stock_minimo)->count(),
+            'equipos'                  => $equipos,
+            'resguardos'               => $resguardos,
+            'insumos'                  => collect(),
+            'impresoras'               => $impresoras,
+            'laptopsAsignadas'         => $equipos->where('tipo', 'Laptop')->whereNotNull('user_id')->count(),
+            'pcAvanzadasAsignadas'     => $equipos->where('tipo', 'PC Avanzada')->whereNotNull('user_id')->count(),
+            'pcEspecializadasAsignadas'=> $equipos->where('tipo', 'PC Especializada')->whereNotNull('user_id')->count(),
+            'impresorasAsignadas'      => $impresoras->whereNotNull('user_id')->count(),
         ]);
     }
 
@@ -92,6 +90,29 @@ class KardexController extends Controller
         if (in_array($estado, ['mantenimiento', 'baja'], true)) {
             IpAssigner::liberarEquipo((int) $id);
         }
+
+        return response()->json(['ok' => true]);
+    }
+
+    // ─── POST: cambia el estado de una impresora ─────────────────────────────
+
+    public function cambiarEstadoImpresora(Request $request, $id)
+    {
+        $estado = $request->estado ?: null;
+
+        if ($estado === 'almacen') {
+            DB::table('impresoras')->where('id_impresora', $id)->update([
+                'estado'     => null,
+                'user_id'    => null,
+                'updated_at' => now(),
+            ]);
+            return response()->json(['ok' => true]);
+        }
+
+        DB::table('impresoras')->where('id_impresora', $id)->update([
+            'estado'     => $estado,
+            'updated_at' => now(),
+        ]);
 
         return response()->json(['ok' => true]);
     }
