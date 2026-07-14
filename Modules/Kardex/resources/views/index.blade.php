@@ -4,7 +4,7 @@
     {{-- Header --}}
     <div class="flex justify-between items-end mb-8">
         <div>
-            <h2 class="text-[32px] font-bold leading-10 tracking-tight text-brand">Inventario de Insumos y Resguardos</h2>
+            <h2 class="text-[32px] font-bold leading-10 tracking-tight text-brand">Inventario de equipos y movimientos</h2>
             <p class="text-muted text-sm mt-1">Control de inventario técnico y asignación institucional de recursos.</p>
         </div>
         <div class="flex items-center gap-3">
@@ -17,6 +17,10 @@
                         class="px-6 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high">
                     Resguardos
                 </button>
+                <button id="tab-btn-movimientos" onclick="switchKardexTab('movimientos', this)"
+                        class="px-6 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high">
+                    Movimientos
+                </button>
             </div>
         </div>
     </div>
@@ -28,9 +32,10 @@
             ['label'=>'Laptops asignadas',       'value'=>$laptopsAsignadas,          'icon'=>'laptop',          'color'=>'var(--color-status-free)'],
             ['label'=>'PC Avanzadas asignadas',   'value'=>$pcAvanzadasAsignadas,      'icon'=>'desktop_windows', 'color'=>'var(--color-status-active)'],
             ['label'=>'PC Especializadas asig.',  'value'=>$pcEspecializadasAsignadas, 'icon'=>'computer',        'color'=>'var(--color-brand)'],
+            ['label'=>'Teléfonos asignados',      'value'=>$telefonosAsignados,        'icon'=>'phone',           'color'=>'#7c3aed'],
             ['label'=>'Impresoras asignadas',     'value'=>$impresorasAsignadas,       'icon'=>'print',           'color'=>'var(--color-status-low)'],
         ]; @endphp
-        <div class="grid grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-5 gap-4 mb-6">
             @foreach($equipStats as $s)
             <div class="bg-canvas border border-border p-5 rounded-xl flex items-center gap-4">
                 <div class="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style="background:{{ $s['color'] }}1a; color:{{ $s['color'] }}">
@@ -56,6 +61,7 @@
                             <option>Laptop</option>
                             <option>PC Avanzada</option>
                             <option>PC Especializada</option>
+                            <option>Telefono</option>
                             <option>Impresora</option>
                         </select>
                     </div>
@@ -102,18 +108,24 @@
                             default                         => 'Almacén',
                         };
                         $responsable = $eq->empleado_nombre ?? $eq->nombre_usuario ?? '—';
+                        $usuario     = $eq->usuario_nombre ?? null;
+                        $usuarioDif  = $usuario && $usuario !== $responsable;
                     @endphp
                     <tr class="hover:bg-gold/5 transition-colors cursor-pointer eq-row"
                         data-id="{{ $eq->id }}"
                         data-tipo="{{ $eq->tipo }}"
                         data-estado="{{ $estadoDisplay }}"
-                        data-texto="{{ strtolower(($eq->area ?? '') . ' ' . $responsable . ' ' . ($eq->cpu_serie ?? '')) }}"
+                        data-texto="{{ strtolower(($eq->area ?? '') . ' ' . $responsable . ' ' . ($usuario ?? '') . ' ' . ($eq->cpu_serie ?? '')) }}"
                         onclick="abrirPanelEquipo({{ $eq->id }})">
                         <td class="px-4 py-3 font-mono text-sm text-brand">{{ $eq->num_inventario ?? '—' }}</td>
                         <td class="px-4 py-3">
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase whitespace-nowrap
-                                {{ $eq->tipo === 'Laptop' ? 'bg-status-free/10 text-status-free' : 'bg-status-active/10 text-status-active' }}">
-                                {{ $eq->tipo }}
+                            @php $tipoCls = match($eq->tipo) {
+                                'Laptop'           => 'bg-status-free/10 text-status-free',
+                                'Telefono'         => 'bg-purple-100 text-purple-600',
+                                default            => 'bg-status-active/10 text-status-active',
+                            }; @endphp
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase whitespace-nowrap {{ $tipoCls }}">
+                                {{ $eq->tipo === 'Telefono' ? 'Teléfono' : $eq->tipo }}
                             </span>
                         </td>
                         <td class="px-4 py-3 text-sm">
@@ -126,7 +138,14 @@
                         </td>
                         <td class="px-4 py-3 font-mono text-sm text-brand whitespace-nowrap">{{ $eq->cpu_serie ?? '—' }}</td>
                         <td class="px-4 py-3 text-sm text-muted max-w-[160px] truncate" title="{{ $eq->area }}">{{ $eq->area ?? '—' }}</td>
-                        <td class="px-4 py-3 text-sm max-w-[160px] truncate" title="{{ $responsable }}" id="responsable-cell-{{ $eq->id }}">{{ $responsable }}</td>
+                        <td class="px-4 py-3 text-sm max-w-[160px]" id="responsable-cell-{{ $eq->id }}">
+                            <p class="truncate" title="{{ $responsable }}">{{ $responsable }}</p>
+                            @if($usuarioDif)
+                                <p class="truncate text-xs text-muted mt-0.5" title="Usuario: {{ $usuario }}">
+                                    <span class="text-brand/60">↳</span> {{ $usuario }}
+                                </p>
+                            @endif
+                        </td>
                         <td class="px-4 py-3">
                             @php $estadoColors = [
                                 'Asignado'      => 'bg-status-active/10 text-status-active',
@@ -324,6 +343,73 @@
         </div>
     </div>
 
+    {{-- ---- TAB: MOVIMIENTOS ---- --}}
+    <div id="tab-movimientos" class="hidden">
+        <div class="bg-canvas border border-border rounded-xl overflow-hidden shadow-sm">
+            <x-tabla-encabezado
+                titulo="Historial de movimientos"
+                tab="movimientos"
+                :importar="false"
+                exportUrl="{{ route('kardex.exportar', 'movimientos') }}">
+                <x-slot:filtros>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Activo</label>
+                        <select id="f-mov-activo" onchange="filtrarMovimientos()"
+                                class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
+                            <option value="">Todos</option>
+                            <option value="equipo">Equipo</option>
+                            <option value="impresora">Impresora</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Evento</label>
+                        <select id="f-mov-evento" onchange="filtrarMovimientos()"
+                                class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
+                            <option value="">Todos</option>
+                            <option>Entrada</option>
+                            <option>Asignación</option>
+                            <option>Reasignación</option>
+                            <option>Almacén</option>
+                            <option>Mantenimiento</option>
+                            <option>Baja</option>
+                            <option>Reingreso</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Buscar</label>
+                        <input id="f-mov-texto" oninput="filtrarMovimientos()" type="text" placeholder="Nombre, serie, área…"
+                               class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand w-44">
+                    </div>
+                </x-slot:filtros>
+            </x-tabla-encabezado>
+
+            <div class="overflow-x-auto">
+            <table class="w-full text-left" id="tabla-movimientos">
+                <thead class="bg-wash border-b border-border">
+                    <tr>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Fecha</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Tipo</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Activo</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Evento</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Origen → Destino</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Estado</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Notas</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Registrado por</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border" id="tbody-movimientos">
+                    <tr>
+                        <td colspan="8" class="px-6 py-10 text-center text-muted text-sm">
+                            <span class="material-symbols-outlined text-2xl animate-spin align-middle mr-2">progress_activity</span>
+                            Cargando movimientos…
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+
 {{-- ══ Panel lateral: detalle de equipo ══ --}}
 <div class="fixed top-0 right-0 h-screen w-[440px] bg-canvas shadow-2xl border-l border-gold z-[60] flex flex-col translate-x-full transition-transform duration-300" id="equipo-panel">
     <div class="p-5 border-b border-border bg-surface flex justify-between items-start shrink-0">
@@ -370,11 +456,95 @@ const INACTIVE_TAB= 'px-6 py-2 rounded-md text-sm font-bold transition-all text-
 let currentTab    = 'equipos';
 
 function switchKardexTab(tab, btn) {
-    ['equipos', 'resguardos'].forEach(t => {
+    ['equipos', 'resguardos', 'movimientos'].forEach(t => {
         document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
         document.getElementById('tab-btn-' + t).className = t === tab ? ACTIVE_TAB : INACTIVE_TAB;
     });
     currentTab = tab;
+    if (tab === 'movimientos' && !window._movimientosCargados) cargarMovimientos();
+}
+
+// ── Tab Movimientos ───────────────────────────────────────────────────
+let _todosMovimientos = [];
+
+async function cargarMovimientos() {
+    const r = await fetch('/kardex/movimientos/json');
+    _todosMovimientos = await r.json();
+    window._movimientosCargados = true;
+    renderMovimientos(_todosMovimientos);
+}
+
+function filtrarMovimientos() {
+    const activo  = document.getElementById('f-mov-activo').value;
+    const evento  = document.getElementById('f-mov-evento').value;
+    const texto   = document.getElementById('f-mov-texto').value.toLowerCase();
+
+    const filtrados = _todosMovimientos.filter(m =>
+        (!activo  || m.tipo_activo  === activo)
+     && (!evento  || m.tipo_evento  === evento)
+     && (!texto   || (m.texto_busqueda ?? '').includes(texto))
+    );
+
+    renderMovimientos(filtrados);
+}
+
+const MOV_COLORS = {
+    'Entrada':       'bg-status-free/10 text-status-free',
+    'Asignación':    'bg-status-active/10 text-status-active',
+    'Reasignación':  'bg-brand/10 text-brand',
+    'Almacén':       'bg-muted/10 text-muted',
+    'Mantenimiento': 'bg-status-low/10 text-status-low',
+    'Baja':          'bg-red-100 text-red-600',
+    'Reingreso':     'bg-status-free/10 text-status-free',
+};
+
+function renderMovimientos(movs) {
+    const tbody = document.getElementById('tbody-movimientos');
+    const count = document.getElementById('f-movimientos-count');
+    if (count) count.textContent = `${movs.length} registro${movs.length !== 1 ? 's' : ''}`;
+
+    if (!movs.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-10 text-center text-muted text-sm">Sin movimientos registrados.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = movs.map(m => {
+        const fecha = m.created_at
+            ? new Date(m.created_at).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+            : '—';
+        const cls   = MOV_COLORS[m.tipo_evento] ?? 'bg-muted/10 text-muted';
+        const tipoCls = m.tipo_activo === 'equipo'
+            ? 'bg-status-active/10 text-status-active'
+            : 'bg-status-low/10 text-status-low';
+        const origen  = m.origen  || '—';
+        const destino = m.destino || '—';
+
+        return `<tr class="hover:bg-gold/5 transition-colors mov-row"
+                    data-activo="${m.tipo_activo}"
+                    data-evento="${m.tipo_evento}">
+            <td class="px-4 py-3 text-xs text-muted whitespace-nowrap">${fecha}</td>
+            <td class="px-4 py-3">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${tipoCls}">
+                    ${m.tipo_activo === 'equipo' ? 'Equipo' : 'Impresora'}
+                </span>
+            </td>
+            <td class="px-4 py-3 text-sm">
+                <p class="font-medium text-brand font-mono text-xs">${m.activo_serie ?? '—'}</p>
+                <p class="text-muted text-xs">${m.activo_desc ?? ''}</p>
+            </td>
+            <td class="px-4 py-3">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${cls}">${m.tipo_evento}</span>
+            </td>
+            <td class="px-4 py-3 text-xs">
+                <span class="text-muted">${origen}</span>
+                ${origen !== '—' || destino !== '—' ? ' <span class="text-muted">→</span> ' : ''}
+                <span class="font-medium">${destino}</span>
+            </td>
+            <td class="px-4 py-3 text-xs text-muted">${m.estado_equipo ?? '—'}</td>
+            <td class="px-4 py-3 text-xs text-muted max-w-[180px] truncate" title="${m.notas ?? ''}">${m.notas ?? '—'}</td>
+            <td class="px-4 py-3 text-xs text-muted">${m.registrado_email ?? '—'}</td>
+        </tr>`;
+    }).join('');
 }
 
 // ── Filtros ──────────────────────────────────────────────────────────
@@ -470,6 +640,60 @@ function abrirPanelImpresora(row) {
                 </div>
             </div>
         </div>`;
+
+    // Cargar historial de movimientos al final del panel
+    fetch(`/kardex/impresora/${panelImpresoraId}/historial`)
+        .then(r => r.json())
+        .then(movs => {
+            const cuerpo = document.getElementById('panel-cuerpo');
+            if (cuerpo) cuerpo.insertAdjacentHTML('beforeend', renderHistorial(movs));
+        });
+}
+
+// ── Historial de movimientos — función compartida ─────────────────────
+function renderHistorial(movs) {
+    const colorEvento = {
+        'Entrada':       'bg-status-free/10 text-status-free',
+        'Asignación':    'bg-status-active/10 text-status-active',
+        'Reasignación':  'bg-brand/10 text-brand',
+        'Almacén':       'bg-muted/10 text-muted',
+        'Mantenimiento': 'bg-status-low/10 text-status-low',
+        'Baja':          'bg-red-100 text-red-600',
+        'Reingreso':     'bg-status-free/10 text-status-free',
+    };
+
+    const filas = movs.length
+        ? movs.map(m => {
+            const fecha = m.created_at
+                ? new Date(m.created_at).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' })
+                : '—';
+            const cls = colorEvento[m.tipo_evento] ?? 'bg-muted/10 text-muted';
+            const origen  = m.origen  ? `<span class="text-muted">${m.origen}</span> →` : '';
+            const destino = m.destino ? `<span class="font-medium">${m.destino}</span>` : '';
+            const estado  = m.estado_equipo ? `<span class="text-[10px] text-muted"> · ${m.estado_equipo}</span>` : '';
+            const notas   = m.notas ? `<p class="text-[11px] text-muted mt-0.5 ml-5">${m.notas}</p>` : '';
+            const por     = m.registrado_email ? `<p class="text-[10px] text-muted/60 ml-5 mt-0.5">Por: ${m.registrado_email}</p>` : '';
+
+            return `<div class="relative pl-5 border-l-2 border-border pb-4 last:pb-0">
+                <span class="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-border"></span>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[10px] font-bold text-muted">${fecha}</span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${cls}">${m.tipo_evento}</span>
+                    ${estado}
+                </div>
+                <p class="text-xs mt-0.5">${origen} ${destino}</p>
+                ${notas}${por}
+            </div>`;
+        }).join('')
+        : '<p class="text-xs text-muted">Sin movimientos registrados.</p>';
+
+    return `<div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
+        <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3 flex items-center gap-2">
+            <span class="material-symbols-outlined text-sm">history</span>
+            Historial de movimientos
+        </p>
+        <div class="space-y-3">${filas}</div>
+    </div>`;
 }
 
 async function guardarEstadoImpresora() {
@@ -589,8 +813,34 @@ async function abrirPanelEquipo(id) {
                 ${f('Área', eq.area)}
                 ${f('Nombre en documento', eq.nombre_usuario)}
             </div>
-        </div>
+        </div>`;
 
+    if (eq.tipo === 'Telefono') {
+        // Sección específica de teléfono
+        const ipHtml = (eq.ipv4_real || eq.ipv4)
+            ? `<a href="http://${eq.ipv4_real || eq.ipv4}" target="_blank" rel="noopener"
+                  class="font-mono text-brand hover:underline flex items-center gap-1">
+                   ${eq.ipv4_real || eq.ipv4}
+                   <span class="material-symbols-outlined" style="font-size:15px">open_in_new</span>
+               </a>`
+            : '<span class="text-muted text-sm">Sin IP asignada</span>';
+
+        html += `<div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">Teléfono</p>
+            <div class="grid grid-cols-2 gap-3">
+                ${f('Extensión', eq.extension, true)}
+                ${f('Número general', eq.numero_general, true)}
+                ${eq.cpu_marca ? f('Marca', eq.cpu_marca) : ''}
+                ${eq.cpu_modelo ? f('Modelo', eq.cpu_modelo) : ''}
+                ${eq.cpu_serie  ? f('No. Serie', eq.cpu_serie, true) : ''}
+            </div>
+            <div class="mt-3 detail-field">
+                <span class="detail-label">Dirección IP</span>
+                <div class="mt-0.5">${ipHtml}</div>
+            </div>
+        </div>`;
+    } else {
+        html += `
         {{-- CPU --}}
         <div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
             <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">CPU / Equipo principal</p>
@@ -603,45 +853,73 @@ async function abrirPanelEquipo(id) {
             </div>
         </div>`;
 
-    // Periféricos laptop
-    const laptopFields = [
-        ['Serie cargador', eq.cargador_serie, true],
-        ['Docking marca', eq.docking_marca],
-        ['Docking modelo', eq.docking_modelo],
-        ['Docking serie', eq.docking_serie, true],
-    ].filter(([, v]) => v);
-    if (eq.tipo === 'Laptop' && laptopFields.length) {
-        html += `<div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">Periféricos — Laptop</p>
-            <div class="grid grid-cols-2 gap-3">
-                ${laptopFields.map(([l,v,m]) => f(l,v,m)).join('')}
-            </div></div>`;
+        // Periféricos laptop
+        const laptopFields = [
+            ['Serie cargador', eq.cargador_serie, true],
+            ['Docking marca', eq.docking_marca],
+            ['Docking modelo', eq.docking_modelo],
+            ['Docking serie', eq.docking_serie, true],
+        ].filter(([, v]) => v);
+        if (eq.tipo === 'Laptop' && laptopFields.length) {
+            html += `<div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">Periféricos — Laptop</p>
+                <div class="grid grid-cols-2 gap-3">
+                    ${laptopFields.map(([l,v,m]) => f(l,v,m)).join('')}
+                </div></div>`;
+        }
+
+        // Periféricos PC
+        const pcFields = [
+            ['Monitor marca', eq.monitor_marca],
+            ['Monitor modelo', eq.monitor_modelo],
+            ['Monitor serie', eq.monitor_serie, true],
+            ['Teclado serie', eq.teclado_serie, true],
+            ['Mouse serie', eq.mouse_serie, true],
+            ['Nobreak marca', eq.nobreak_marca],
+            ['Nobreak modelo', eq.nobreak_modelo],
+            ['Nobreak serie', eq.nobreak_serie, true],
+        ].filter(([, v]) => v);
+        if ((eq.tipo === 'PC Avanzada' || eq.tipo === 'PC Especializada') && pcFields.length) {
+            html += `<div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">Periféricos — PC</p>
+                <div class="grid grid-cols-2 gap-3">
+                    ${pcFields.map(([l,v,m]) => f(l,v,m)).join('')}
+                </div></div>`;
+        }
     }
 
-    // Periféricos PC
-    const pcFields = [
-        ['Monitor marca', eq.monitor_marca],
-        ['Monitor modelo', eq.monitor_modelo],
-        ['Monitor serie', eq.monitor_serie, true],
-        ['Teclado serie', eq.teclado_serie, true],
-        ['Mouse serie', eq.mouse_serie, true],
-        ['Nobreak marca', eq.nobreak_marca],
-        ['Nobreak modelo', eq.nobreak_modelo],
-        ['Nobreak serie', eq.nobreak_serie, true],
-    ].filter(([, v]) => v);
-    if ((eq.tipo === 'PC Avanzada' || eq.tipo === 'PC Especializada') && pcFields.length) {
-        html += `<div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">Periféricos — PC</p>
-            <div class="grid grid-cols-2 gap-3">
-                ${pcFields.map(([l,v,m]) => f(l,v,m)).join('')}
-            </div></div>`;
-    }
+    // Responsable + Usuario actual + Estado
+    const usuarioActualLabel = eq.usuario_nombre && eq.usuario_nombre !== eq.empleado_nombre
+        ? `${eq.usuario_nombre}${eq.usuario_correo ? ' &lt;' + eq.usuario_correo + '&gt;' : ''}`
+        : (eq.usuario_nombre ? `${eq.usuario_nombre}${eq.usuario_correo ? ' &lt;' + eq.usuario_correo + '&gt;' : ''}` : 'Sin usuario asignado');
 
-    // Empleado vinculado
     html += `<div class="bg-[#F9FAFB] border border-border rounded-xl p-4">
         <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3">Responsable / Estado</p>
         <div class="grid grid-cols-1 gap-3">
-            ${f('Empleado vinculado', eq.empleado_nombre ? `${eq.empleado_nombre} &lt;${eq.empleado_correo ?? ''}&gt;` : 'Sin vincular')}
+            ${f('Responsable', eq.empleado_nombre ? `${eq.empleado_nombre}${eq.empleado_correo ? ' &lt;' + eq.empleado_correo + '&gt;' : ''}` : 'Sin vincular')}
+            <div class="detail-field">
+                <span class="detail-label">Usuario actual <span class="text-[9px] text-muted normal-case tracking-normal">(quien lo usa físicamente)</span></span>
+                <div class="flex items-center gap-2 mt-1" id="usuario-display-wrap-${eq.id}">
+                    <span class="text-sm flex-1" id="usuario-display-${eq.id}">${usuarioActualLabel}</span>
+                    <button onclick="toggleCambioUsuario(${eq.id})"
+                            class="text-xs text-brand hover:underline shrink-0">Cambiar</button>
+                </div>
+                <div class="hidden mt-2 flex items-center gap-2" id="usuario-edit-wrap-${eq.id}">
+                    <select id="select-usuario-${eq.id}"
+                            class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand flex-1">
+                        <option value="">— Sin usuario —</option>
+                        @foreach(\DB::table('users')->where('activo', 1)->orderBy('name')->select('id', 'name', 'apellido_paterno')->get() as $u)
+                        <option value="{{ $u->id }}" ${eq.usuario_actual_id == {{ $u->id }} ? 'selected' : ''}>
+                            {{ trim($u->name . ' ' . $u->apellido_paterno) }}
+                        </option>
+                        @endforeach
+                    </select>
+                    <button onclick="guardarUsuario(${eq.id})"
+                            class="px-3 py-1.5 bg-brand text-white text-xs font-bold rounded hover:opacity-90 shrink-0">
+                        Guardar
+                    </button>
+                </div>
+            </div>
             <div class="detail-field">
                 <span class="detail-label">Estado del equipo</span>
                 <div class="flex items-center gap-2 mt-1">
@@ -673,6 +951,14 @@ async function abrirPanelEquipo(id) {
     </p>`;
 
     document.getElementById('panel-cuerpo').innerHTML = html;
+
+    // Cargar historial de movimientos al final del panel
+    fetch(`/kardex/equipo/${id}/historial`)
+        .then(r => r.json())
+        .then(movs => {
+            const cuerpo = document.getElementById('panel-cuerpo');
+            if (cuerpo) cuerpo.insertAdjacentHTML('beforeend', renderHistorial(movs));
+        });
 }
 
 function cerrarPanelEquipo() {
@@ -729,6 +1015,49 @@ async function guardarEstado(id) {
 
         select.closest('.detail-field')?.querySelector('button')?.classList.add('opacity-50');
         setTimeout(() => select.closest('.detail-field')?.querySelector('button')?.classList.remove('opacity-50'), 1000);
+    }
+}
+
+function toggleCambioUsuario(id) {
+    document.getElementById('usuario-display-wrap-' + id)?.classList.toggle('hidden');
+    document.getElementById('usuario-edit-wrap-'   + id)?.classList.toggle('hidden');
+}
+
+async function guardarUsuario(id) {
+    const select    = document.getElementById('select-usuario-' + id);
+    const usuarioId = select?.value || null;
+    const r = await fetch(`/kardex/equipo/${id}/usuario`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+        },
+        body: JSON.stringify({ usuario_id: usuarioId }),
+    });
+    if (!r.ok) return;
+    const data = await r.json();
+
+    // Actualizar el texto en el panel sin recargar todo
+    const display = document.getElementById('usuario-display-' + id);
+    if (display) display.textContent = data.usuario_nombre ?? 'Sin usuario asignado';
+
+    toggleCambioUsuario(id);
+
+    // Actualizar sub-línea en la fila de la tabla
+    const fila = document.querySelector(`tr[data-id="${id}"]`);
+    const cell = document.getElementById('responsable-cell-' + id);
+    if (cell) {
+        let subline = cell.querySelector('.usuario-subline');
+        if (data.usuario_nombre) {
+            if (!subline) {
+                subline = document.createElement('p');
+                subline.className = 'usuario-subline truncate text-xs text-muted mt-0.5';
+                cell.appendChild(subline);
+            }
+            subline.innerHTML = `<span class="text-brand/60">↳</span> ${data.usuario_nombre}`;
+        } else if (subline) {
+            subline.remove();
+        }
     }
 }
 
