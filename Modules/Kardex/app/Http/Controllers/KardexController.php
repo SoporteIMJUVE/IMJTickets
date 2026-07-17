@@ -33,10 +33,16 @@ class KardexController extends Controller
             ->orderBy('inventario_equipos.consecutivo')
             ->get();
 
-        // Resguardos: mismas filas de inventario_equipos, pero solo las que
-        // realmente tienen el PDF de resguardo guardado — el punto en común
-        // sigue siendo cpu_serie, no hace falta ningún join nuevo.
-        $resguardos = $equipos->filter(fn ($e) => !empty($e->pdf_resguardo))->values();
+        // Resguardos: equipos institucionales = los que tienen al menos un evento
+        // 'Entrada' en movimientos_equipos (con o sin PDF adjunto).
+        // Los equipos personales (sin Entrada) quedan excluidos de esta tab.
+        $idsInstitucionales = DB::table('movimientos_equipos')
+            ->where('tipo_activo', 'equipo')
+            ->where('tipo_evento', 'Entrada')
+            ->pluck('activo_id')
+            ->flip();
+
+        $resguardos = $equipos->filter(fn ($e) => $idsInstitucionales->has($e->id))->values();
 
         $insumos = DB::table('insumos')->orderBy('nombre_insumo')->get();
 
@@ -69,11 +75,28 @@ class KardexController extends Controller
     {
         $estado = $request->estado ?: null;
 
+        // Equipos personales (sin evento 'Entrada') solo admiten Baja
+        if (in_array($estado, ['almacen', 'mantenimiento'], true)) {
+            $tieneResguardo = \Schema::hasTable('movimientos_equipos') && DB::table('movimientos_equipos')
+                ->where('activo_id', $id)
+                ->where('tipo_activo', 'equipo')
+                ->where('tipo_evento', 'Entrada')
+                ->exists();
+
+            if (!$tieneResguardo) {
+                return response()->json([
+                    'error' => 'Equipo personal (sin resguardo): solo puede cambiar a Baja. Almacén y Mantenimiento requieren resguardo del IMJUVE.',
+                ], 422);
+            }
+        }
+
         $equipo = DB::table('inventario_equipos')
             ->leftJoin('users', 'inventario_equipos.user_id', '=', 'users.id')
             ->select(
                 'inventario_equipos.user_id',
                 'inventario_equipos.estado as estado_actual',
+                'inventario_equipos.ipv4',
+                'inventario_equipos.cpu_serie',
                 DB::raw("NULLIF(TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'')), '') as responsable_nombre")
             )
             ->where('inventario_equipos.id', $id)
@@ -94,7 +117,7 @@ class KardexController extends Controller
                 origen:        $equipo->responsable_nombre ?? 'Sin responsable',
                 destino:       'Almacén',
                 user_from_id:  $equipo->user_id,
-                estado_equipo: 'Operativo',
+                estado_equipo: 'Almacén',
             );
 
             return response()->json(['ok' => true]);
@@ -111,9 +134,9 @@ class KardexController extends Controller
             default         => 'Almacén',
         };
         $estadoEquipo  = match($estado) {
-            'mantenimiento' => 'En Reparación',
-            'baja'          => 'Obsoleto',
-            default         => 'Operativo',
+            'mantenimiento' => 'Mantenimiento',
+            'baja'          => 'Baja',
+            default         => $equipo->user_id ? 'Asignado' : 'Almacén',
         };
 
         KardexMovimiento::registrar(
@@ -126,6 +149,17 @@ class KardexController extends Controller
         );
 
         if (in_array($estado, ['mantenimiento', 'baja'], true)) {
+            if ($equipo->ipv4) {
+                KardexMovimiento::registrar(
+                    tipo_activo:   'equipo',
+                    activo_id:     (int) $id,
+                    tipo_evento:   'Liberación IP',
+                    origen:        $equipo->cpu_serie ?? '—',
+                    destino:       'Sin equipo',
+                    estado_equipo: 'Libre',
+                    notas:         "IP: {$equipo->ipv4}",
+                );
+            }
             IpAssigner::liberarEquipo((int) $id);
         }
 
@@ -161,7 +195,7 @@ class KardexController extends Controller
                 origen:       $impresora->responsable_nombre ?? 'Sin responsable',
                 destino:      'Almacén',
                 user_from_id: $impresora->user_id,
-                estado_equipo:'Operativo',
+                estado_equipo:'Almacén',
             );
 
             return response()->json(['ok' => true]);
@@ -178,9 +212,9 @@ class KardexController extends Controller
             default         => 'Almacén',
         };
         $estadoEquipo = match($estado) {
-            'mantenimiento' => 'En Reparación',
-            'baja'          => 'Obsoleto',
-            default         => 'Operativo',
+            'mantenimiento' => 'Mantenimiento',
+            'baja'          => 'Baja',
+            default         => $impresora->user_id ? 'Asignado' : 'Almacén',
         };
 
         KardexMovimiento::registrar(
@@ -349,13 +383,31 @@ class KardexController extends Controller
             ->orderBy('users.name')
             ->get();
 
+        $datos = session('resguardo.datos');
+
+        // Si la série ya existe en inventario, el formulario detecta automáticamente
+        // si la operación será Reasignación (diferente responsable) o Renovación (mismo responsable).
+        $equipoExistente = null;
+        if (!empty($datos['cpu_serie'])) {
+            $equipoExistente = DB::table('inventario_equipos as eq')
+                ->leftJoin('users as resp', 'eq.user_id', '=', 'resp.id')
+                ->where('eq.cpu_serie', $datos['cpu_serie'])
+                ->select(
+                    'eq.id', 'eq.user_id', 'eq.tipo', 'eq.cpu_marca', 'eq.cpu_modelo', 'eq.area', 'eq.ipv4',
+                    DB::raw("NULLIF(TRIM(COALESCE(resp.name,'') || ' ' || COALESCE(resp.apellido_paterno,'')), '') as responsable_nombre"),
+                    'resp.email as responsable_correo'
+                )
+                ->first();
+        }
+
         return view('kardex::resguardo-preview', [
-            'datos'      => session('resguardo.datos'),
-            'textoRaw'   => session('resguardo.textoRaw'),
-            'candidatos' => collect(session('resguardo.candidatos', []))->map(fn($e) => (object) $e),
-            'directores' => $directores,
-            'tmpPdf'     => session('resguardo.tmpPdf'),
-            'esNativo'   => session('resguardo.esNativo', true),
+            'datos'           => $datos,
+            'textoRaw'        => session('resguardo.textoRaw'),
+            'candidatos'      => collect(session('resguardo.candidatos', []))->map(fn($e) => (object) $e),
+            'directores'      => $directores,
+            'tmpPdf'          => session('resguardo.tmpPdf'),
+            'esNativo'        => session('resguardo.esNativo', true),
+            'equipoExistente' => $equipoExistente,
         ]);
     }
 
@@ -371,8 +423,8 @@ class KardexController extends Controller
             'id_empleado'   => 'required|string',
             'nombre_pdf_detectado' => 'nullable|string|max:200',
             'ipv4'          => 'nullable|ip',
-            'nuevo_nombre'           => 'required_if:id_empleado,__nuevo__|string|max:80',
-            'nuevo_apellido_paterno' => 'required_if:id_empleado,__nuevo__|string|max:80',
+            'nuevo_nombre'           => 'nullable|required_if:id_empleado,__nuevo__|string|max:80',
+            'nuevo_apellido_paterno' => 'nullable|required_if:id_empleado,__nuevo__|string|max:80',
             'nuevo_apellido_materno' => 'nullable|string|max:80',
             'nuevo_correo'           => 'nullable|email|max:120|unique:users,email',
             'nuevo_puesto'           => 'nullable|string|max:120',
@@ -393,16 +445,15 @@ class KardexController extends Controller
             ]);
         }
 
-        // Verificar serie duplicada
-        $existente = DB::table('inventario_equipos')
-            ->where('cpu_serie', $request->cpu_serie)
+        // Buscar si la série ya existe — determina el tipo de operación Kardex.
+        $existente = DB::table('inventario_equipos as eq')
+            ->leftJoin('users as resp', 'eq.user_id', '=', 'resp.id')
+            ->where('eq.cpu_serie', $request->cpu_serie)
+            ->select(
+                'eq.*',
+                DB::raw("NULLIF(TRIM(COALESCE(resp.name,'') || ' ' || COALESCE(resp.apellido_paterno,'')), '') as responsable_nombre")
+            )
             ->first();
-
-        if ($existente) {
-            return redirect()->route('kardex.resguardo.preview')->withInput()->withErrors([
-                'cpu_serie' => "Ya existe un equipo con la serie {$request->cpu_serie} (ID: {$existente->id}).",
-            ]);
-        }
 
         // Responsable: id existente, persona nueva creada aquí mismo, o ninguno.
         $userId = null;
@@ -430,6 +481,116 @@ class KardexController extends Controller
         } elseif ($request->id_empleado) {
             $userId = (int) $request->id_empleado;
         }
+
+        $nombreEmpleado = DB::table('users')->where('id', $userId)
+            ->selectRaw("NULLIF(TRIM(COALESCE(name,'') || ' ' || COALESCE(apellido_paterno,'')), '') as nombre")
+            ->value('nombre') ?? 'Empleado';
+
+        // Helper para mover PDF de tmp a almacenamiento permanente
+        $moverPdf = function (int $idEquipo) use ($request): ?string {
+            if ($request->tmp_pdf && Storage::disk('local')->exists($request->tmp_pdf)) {
+                $path = "resguardos/{$idEquipo}.pdf";
+                Storage::disk('local')->move($request->tmp_pdf, $path);
+                DB::table('inventario_equipos')->where('id', $idEquipo)->update(['pdf_resguardo' => $path]);
+                return $path;
+            }
+            return null;
+        };
+
+        // ── CASO A: Equipo ya existe — Reasignación o Renovación ─────────────
+        if ($existente) {
+            $mismoResponsable = $existente->user_id && (int) $existente->user_id === $userId;
+
+            // Actualizar metadata del PDF nuevo (periféricos, área, etc.)
+            DB::table('inventario_equipos')->where('id', $existente->id)->update(array_filter([
+                'tipo'           => $request->tipo,
+                'area'           => $request->area           ?: $existente->area,
+                'cpu_marca'      => $request->cpu_marca      ?: $existente->cpu_marca,
+                'cpu_modelo'     => $request->cpu_modelo     ?: $existente->cpu_modelo,
+                'cargador_serie' => $request->cargador_serie ?: $existente->cargador_serie,
+                'docking_marca'  => $request->docking_marca  ?: $existente->docking_marca,
+                'docking_serie'  => $request->docking_serie  ?: $existente->docking_serie,
+                'monitor_marca'  => $request->monitor_marca  ?: $existente->monitor_marca,
+                'monitor_serie'  => $request->monitor_serie  ?: $existente->monitor_serie,
+                'teclado_serie'  => $request->teclado_serie  ?: $existente->teclado_serie,
+                'mouse_serie'    => $request->mouse_serie    ?: $existente->mouse_serie,
+                'nobreak_marca'  => $request->nobreak_marca  ?: $existente->nobreak_marca,
+                'nobreak_serie'  => $request->nobreak_serie  ?: $existente->nobreak_serie,
+                'observaciones'  => $request->observaciones  ?: $existente->observaciones,
+                'updated_at'     => now(),
+            ], fn($v) => $v !== null));
+
+            $moverPdf($existente->id);
+
+            // ── IP: asignar o cambiar si el admin proporcionó una nueva ──────
+            $msgIp = '';
+            $ipNueva = $request->ipv4 ? trim($request->ipv4) : null;
+            if ($ipNueva && $ipNueva !== ($existente->ipv4 ?? '')) {
+                $ipId    = IpAssigner::resolveId($ipNueva);
+                $ocupante = IpAssigner::findOccupant($ipId);
+
+                if ($ocupante && $ocupante->id !== $existente->id && (int) $ocupante->user_id !== $userId) {
+                    return redirect()->route('kardex.resguardo.preview')->withInput()->withErrors([
+                        'ipv4' => "La IP {$ipNueva} ya está asignada a otro dispositivo.",
+                    ]);
+                }
+
+                // Registrar evento según si ya tenía IP o no
+                $tipoEventoIp = $existente->ipv4 ? 'Cambio IP' : 'Asignación IP';
+                $notaIp = $existente->ipv4
+                    ? "IP: {$existente->ipv4} → {$ipNueva}"
+                    : "IP: {$ipNueva}";
+
+                DB::table('inventario_equipos')->where('id', $existente->id)->update([
+                    'ip_id'      => $ipId,
+                    'ipv4'       => $ipNueva,
+                    'updated_at' => now(),
+                ]);
+
+                KardexMovimiento::registrar(
+                    tipo_activo:   'equipo',
+                    activo_id:     $existente->id,
+                    tipo_evento:   $tipoEventoIp,
+                    origen:        $existente->cpu_serie,
+                    destino:       $existente->cpu_serie,
+                    estado_equipo: 'Ocupada',
+                    notas:         $notaIp,
+                );
+
+                $accionIp = $tipoEventoIp === 'Cambio IP' ? 'actualizada' : 'asignada';
+                $msgIp = " IP {$accionIp}: {$ipNueva}.";
+            }
+
+            if (!$mismoResponsable) {
+                // ── Reasignación: nuevo responsable formal ────────────────
+                DB::table('inventario_equipos')->where('id', $existente->id)->update([
+                    'user_id'           => $userId,
+                    'usuario_actual_id' => $userId,
+                    'updated_at'        => now(),
+                ]);
+
+                KardexMovimiento::registrar(
+                    tipo_activo:   'equipo',
+                    activo_id:     $existente->id,
+                    tipo_evento:   'Reasignación',
+                    origen:        $existente->responsable_nombre ?? 'Sin responsable',
+                    destino:       $nombreEmpleado,
+                    user_from_id:  $existente->user_id,
+                    user_to_id:    $userId,
+                    estado_equipo: 'Asignado',
+                    notas:         'Cambio de responsable por nuevo resguardo PDF.',
+                );
+
+                return redirect()->route('kardex.index')
+                    ->with('success', "Responsable de {$request->cpu_serie} actualizado a {$nombreEmpleado}. Reasignación registrada en Kardex.{$msgIp}");
+            }
+
+            // ── Renovación: mismo responsable, solo actualiza PDF (+ IP si hubo) ─
+            return redirect()->route('kardex.index')
+                ->with('success', "PDF de resguardo renovado para {$request->cpu_serie} (ID {$existente->id}).{$msgIp}");
+        }
+
+        // ── CASO B: Equipo nuevo — Entrada + Asignación ───────────────────────
 
         // Resolver la IP contra el registro maestro. Si ya la tiene asignada
         // ESTA MISMA persona en otro equipo, se libera de ahí (switcheo). Si
@@ -487,30 +648,17 @@ class KardexController extends Controller
             'updated_at'     => now(),
         ]);
 
-        // Mover PDF de tmp a almacenamiento permanente y registrar path
-        $pdfPath = null;
-        if ($request->tmp_pdf && Storage::disk('local')->exists($request->tmp_pdf)) {
-            $pdfPath = "resguardos/{$idEquipo}.pdf";
-            Storage::disk('local')->move($request->tmp_pdf, $pdfPath);
-            DB::table('inventario_equipos')->where('id', $idEquipo)->update(['pdf_resguardo' => $pdfPath]);
-        }
+        $moverPdf($idEquipo);
 
-        // ── Ciclo de vida: ENTRADA → ASIGNACIÓN ─────────────────────────────
-        // Todo equipo nuevo llega primero a Subdirección de Sistemas (desde el proveedor),
-        // y de ahí se asigna al responsable. Ambos eventos siempre se registran.
-
+        // Ciclo de vida: ENTRADA → ASIGNACIÓN
         KardexMovimiento::registrar(
             tipo_activo:   'equipo',
             activo_id:     $idEquipo,
             tipo_evento:   'Entrada',
             origen:        'Proveedor',
             destino:       'Subdirección de Sistemas',
-            estado_equipo: 'Nuevo',
+            estado_equipo: 'Almacén',
         );
-
-        $nombreEmpleado = DB::table('users')->where('id', $userId)
-            ->selectRaw("NULLIF(TRIM(COALESCE(name,'') || ' ' || COALESCE(apellido_paterno,'')), '') as nombre")
-            ->value('nombre') ?? 'Empleado';
 
         // Detectar si el nombre del PDF no coincide con el responsable asignado
         $notaAsignacion = $request->observaciones;
@@ -532,9 +680,35 @@ class KardexController extends Controller
             origen:        'Subdirección de Sistemas',
             destino:       $nombreEmpleado,
             user_to_id:    $userId,
-            estado_equipo: 'Operativo',
+            estado_equipo: 'Asignado',
             notas:         $notaAsignacion,
         );
+
+        // ── Eventos de IP ────────────────────────────────────────────────────
+        if ($request->ipv4) {
+            $serieAnterior = null;
+            if ($switcheo) {
+                $serieAnterior = DB::table('inventario_equipos')->where('id', $ocupante->id)->value('cpu_serie') ?? '—';
+                KardexMovimiento::registrar(
+                    tipo_activo:   'equipo',
+                    activo_id:     $ocupante->id,
+                    tipo_evento:   'Liberación IP',
+                    origen:        $serieAnterior,
+                    destino:       $request->cpu_serie,
+                    estado_equipo: 'Libre',
+                    notas:         "IP: {$request->ipv4} — liberada por switcheo",
+                );
+            }
+            KardexMovimiento::registrar(
+                tipo_activo:   'equipo',
+                activo_id:     $idEquipo,
+                tipo_evento:   'Asignación IP',
+                origen:        $serieAnterior ?? 'Sin equipo',
+                destino:       $request->cpu_serie,
+                estado_equipo: 'Ocupada',
+                notas:         "IP: {$request->ipv4}",
+            );
+        }
 
         $mensaje = "Equipo registrado (ID {$idEquipo}). PDF guardado en el sistema.";
         if ($switcheo) {
@@ -562,16 +736,49 @@ class KardexController extends Controller
             $tipo = $mapa[strtolower($tipo)] ?? $tipo;
         }
 
-        // Número de serie — busca patrones alfanuméricos de ≥5 chars cerca de "SERIE"
-        $serie = $find('/NO[\.\s]*SERIE\s*[:\|]?\s*([A-Z0-9\-]{5,})/i');
+        // Iniciales para fila de tabla
+        $serie      = null;
+        $inventario = null;
+        $marca      = null;
+        $modelo     = null;
 
-        // Número de inventario
-        $inventario = $find('/INVENTARIO\s*[:\|]?\s*(\d+)/i');
+        // Estrategia 1: fila de tabla con columnas separadas por tabulaciones o 2+ espacios.
+        // Acepta \t+, 2+ espacios o mezcla — el modelo puede tener un espacio interno.
+        // Formato típico: Laptop    DELL    Latitude 3420    33KGW93    65
+        $sepCol = '(?:\t+|[ ]{2,})';   // separador de columna: tab(s) o ≥2 espacios
+        if (preg_match(
+            '/^(Laptop|PC\s+Avanzada|PC\s+Especializada)' . $sepCol .
+            '(\S+)' . $sepCol .
+            '(.+?)' . $sepCol .
+            '([A-Z0-9]{4,20})' . $sepCol .
+            '(\d+)\s*$/mi',
+            $texto, $m
+        )) {
+            $marca      = trim($m[2]);
+            $modelo     = trim($m[3]);
+            $serie      = trim($m[4]);
+            $inventario = trim($m[5]);
+        }
 
-        // Marca y modelo — aparecen en la fila de la tabla de equipo
-        $marca  = null;
-        $modelo = null;
-        if ($tipo) {
+        // Estrategia 2: campo explícito "NO. SERIE: xxx" (resguardos formales del IMJUVE).
+        // Solo se activa si la fila de tabla no capturó la serie.
+        // Se salta si el siguiente token es "INVENTARIO" (encabezado de columna).
+        if (!$serie) {
+            if (preg_match('/NO[\.\s]*SERIE\s*[:\|]?\s*([A-Z0-9\-]{4,})/i', $texto, $m)) {
+                $candidato = trim($m[1]);
+                if (strtoupper($candidato) !== 'INVENTARIO') {
+                    $serie = $candidato;
+                }
+            }
+        }
+
+        // Número de inventario: solo desde la fila de tabla (Strategy 1).
+        // No se extrae del texto libre para evitar capturar números de inventario
+        // mencionados en contextos como "equipo inventario 79 dañado".
+        // Si la tabla no lo capturó queda null y el admin lo llena a mano.
+
+        // Marca / modelo si no vinieron de la tabla
+        if (!$marca && $tipo) {
             $tipoEsc = preg_quote($tipo, '/');
             if (preg_match('/' . $tipoEsc . '\s+([\w]+)\s+([\w][\w\s\-]+?)(?:\s{2,}|\t)/i', $texto, $m)) {
                 $marca  = trim($m[1]);

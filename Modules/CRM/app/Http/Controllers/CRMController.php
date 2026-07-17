@@ -4,6 +4,7 @@ namespace Modules\CRM\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Support\IpAssigner;
+use App\Support\KardexMovimiento;
 use App\Support\NewAccountProvisioner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,8 @@ class CRMController extends Controller
             'tel_extension'     => 'nullable|integer',
             // Equipos (array, opcional)
             'equipos'           => 'nullable|array|max:10',
-            'equipos.*.tipo'           => 'required_with:equipos|string|in:Laptop,PC Avanzada,PC Especializada',
+            'equipos.*.tipo'           => 'required_with:equipos|string|in:Laptop,PC Avanzada,PC Especializada,Telefono',
+            'equipos.*.tabla'          => 'nullable|string|in:inventario_equipos,impresoras',
             'equipos.*.nombre_equipo'  => 'nullable|string|max:60',
             'equipos.*.cpu_marca'      => 'nullable|string|max:60',
             'equipos.*.cpu_modelo'     => 'nullable|string|max:100',
@@ -50,7 +52,7 @@ class CRMController extends Controller
             'equipos.*.candado'        => 'nullable|string|max:50',
             'equipos.*.mac'            => 'nullable|string|max:30',
             'equipos.*.ipv4'           => 'nullable|ip',
-            'equipos.*.ipv4_actual'    => 'nullable|ip',
+            'equipos.*.extension'      => 'nullable|integer',
             'equipos.*.check_entrega'  => 'nullable|string|max:50',
             'equipos.*.observaciones'  => 'nullable|string',
         ], [
@@ -131,7 +133,7 @@ class CRMController extends Controller
                 'candado'        => $equipo['candado']        ?? null,
                 'mac'            => $equipo['mac']            ?? null,
                 'ipv4'           => $equipo['ipv4']           ?? null,
-                'ipv4_actual'    => $equipo['ipv4_actual']    ?? null,
+                'extension'      => $equipo['extension']      ?? null,
                 'ip_id'          => $ipsPorEquipo[$i] ?? null,
                 'check_entrega'  => $equipo['check_entrega']  ?? null,
                 'observaciones'  => $equipo['observaciones']  ?? null,
@@ -160,7 +162,8 @@ class CRMController extends Controller
             'id_departamento'  => 'nullable|exists:departamentos,id_departamento',
             'equipos'                  => 'nullable|array|max:20',
             'equipos.*.id'             => 'nullable|integer',
-            'equipos.*.tipo'           => 'required_with:equipos|string|in:Laptop,PC Avanzada,PC Especializada',
+            'equipos.*.tipo'           => 'required_with:equipos|string|in:Laptop,PC Avanzada,PC Especializada,Telefono,Impresora',
+            'equipos.*.tabla'          => 'nullable|string|in:inventario_equipos,impresoras',
             'equipos.*.nombre_equipo'  => 'nullable|string|max:60',
             'equipos.*.cpu_marca'      => 'nullable|string|max:60',
             'equipos.*.cpu_modelo'     => 'nullable|string|max:100',
@@ -180,7 +183,7 @@ class CRMController extends Controller
             'equipos.*.candado'        => 'nullable|string|max:50',
             'equipos.*.mac'            => 'nullable|string|max:30',
             'equipos.*.ipv4'           => 'nullable|ip',
-            'equipos.*.ipv4_actual'    => 'nullable|ip',
+            'equipos.*.extension'      => 'nullable|integer',
             'equipos.*.check_entrega'  => 'nullable|string|max:50',
             'equipos.*.observaciones'  => 'nullable|string',
         ], [
@@ -209,6 +212,42 @@ class CRMController extends Controller
 
         foreach ($validated['equipos'] ?? [] as $equipo) {
             if (empty($equipo['tipo'])) continue;
+
+            // Impresora seleccionada desde búsqueda: solo actualizar user_id
+            if (($equipo['tabla'] ?? null) === 'impresoras' && !empty($equipo['id'])) {
+                DB::table('impresoras')
+                    ->where('id_impresora', $equipo['id'])
+                    ->update(['user_id' => $id, 'updated_at' => now()]);
+                continue;
+            }
+
+            // Leer estado actual del equipo (sin restricción de user_id para permitir switch)
+            $actual      = null;
+            $ipAnterior  = null;
+            $serieEquipo = null;
+            $userAnterior = null;
+            if (!empty($equipo['id'])) {
+                $actual       = DB::table('inventario_equipos')
+                    ->where('id', $equipo['id'])
+                    ->select('ipv4', 'cpu_serie', 'user_id')
+                    ->first();
+                $ipAnterior   = $actual->ipv4     ?? null;
+                $serieEquipo  = $actual->cpu_serie ?? null;
+                $userAnterior = $actual->user_id   ?? null;
+
+                // Sin evento 'Entrada' en Kardex → equipo personal → no se puede reasignar
+                $tieneResguardo = \Schema::hasTable('movimientos_equipos') && DB::table('movimientos_equipos')
+                    ->where('activo_id', $equipo['id'])
+                    ->where('tipo_activo', 'equipo')
+                    ->where('tipo_evento', 'Entrada')
+                    ->exists();
+
+                if (!$tieneResguardo && $userAnterior && (int) $userAnterior !== (int) $id) {
+                    return back()->withInput()->withErrors([
+                        'equipos' => 'El equipo ' . ($actual->cpu_serie ?? "#{$equipo['id']}") . ' es propiedad personal del empleado actual y no puede reasignarse.',
+                    ]);
+                }
+            }
 
             $ipId = null;
             if (!empty($equipo['ipv4'])) {
@@ -241,26 +280,70 @@ class CRMController extends Controller
                 'candado'        => $equipo['candado']         ?? null,
                 'mac'            => $equipo['mac']             ?? null,
                 'ipv4'           => $equipo['ipv4']            ?? null,
-                'ipv4_actual'    => $equipo['ipv4_actual']     ?? null,
+                'extension'      => $equipo['extension']       ?? null,
                 'ip_id'          => $ipId,
                 'check_entrega'  => $equipo['check_entrega']   ?? null,
                 'observaciones'  => $equipo['observaciones']   ?? null,
+                'user_id'        => $id,
                 'updated_at'     => now(),
             ];
 
             if (!empty($equipo['id'])) {
-                // Equipo existente — solo actualizar si pertenece a este empleado
-                DB::table('inventario_equipos')
-                    ->where('id', $equipo['id'])
-                    ->where('user_id', $id)
-                    ->update($campos);
+                DB::table('inventario_equipos')->where('id', $equipo['id'])->update($campos);
+
+                $hayKardex = \Schema::hasTable('movimientos_equipos');
+
+                // Reasignación: el equipo pasó de manos
+                if ($hayKardex && $userAnterior && (int) $userAnterior !== (int) $id) {
+                    $nombreAnterior = DB::table('users')->where('id', $userAnterior)->value('name') ?? '—';
+                    $nombreNuevo    = DB::table('users')->where('id', $id)->value('name') ?? '—';
+                    KardexMovimiento::registrar(
+                        tipo_activo:   'equipo',
+                        activo_id:     (int) $equipo['id'],
+                        tipo_evento:   'Reasignación',
+                        origen:        $nombreAnterior,
+                        destino:       $nombreNuevo,
+                        user_from_id:  (int) $userAnterior,
+                        user_to_id:    (int) $id,
+                        estado_equipo: 'Asignado',
+                        notas:         'Cambio de responsable desde panel CRM.',
+                    );
+                }
+
+                // Evento de IP si cambió
+                $nuevaIp = $equipo['ipv4'] ?? null;
+                if ($hayKardex && $nuevaIp && $nuevaIp !== $ipAnterior) {
+                    KardexMovimiento::registrar(
+                        tipo_activo:   'equipo',
+                        activo_id:     (int) $equipo['id'],
+                        tipo_evento:   $ipAnterior ? 'Cambio IP' : 'Asignación IP',
+                        origen:        $ipAnterior ? ($serieEquipo ?? '—') : 'Sin equipo',
+                        destino:       $serieEquipo ?? '—',
+                        estado_equipo: 'Ocupada',
+                        notas:         $ipAnterior
+                            ? "IP: {$ipAnterior} → {$nuevaIp}"
+                            : "IP: {$nuevaIp}",
+                    );
+                }
             } else {
-                // Nuevo equipo agregado durante la edición
-                DB::table('inventario_equipos')->insert(array_merge($campos, [
-                    'user_id'           => $id,
+                // Equipo nuevo registrado desde CRM (sin resguardo → sin evento Entrada)
+                $nuevoId = DB::table('inventario_equipos')->insertGetId(array_merge($campos, [
                     'usuario_actual_id' => $id,
                     'created_at'        => now(),
                 ]));
+
+                // Registrar evento de IP si se capturó una
+                if (!empty($equipo['ipv4']) && \Schema::hasTable('movimientos_equipos')) {
+                    KardexMovimiento::registrar(
+                        tipo_activo:   'equipo',
+                        activo_id:     $nuevoId,
+                        tipo_evento:   'Asignación IP',
+                        origen:        'Sin equipo',
+                        destino:       $equipo['cpu_serie'] ?? '—',
+                        estado_equipo: 'Ocupada',
+                        notas:         "IP: {$equipo['ipv4']}",
+                    );
+                }
             }
         }
 
