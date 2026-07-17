@@ -369,10 +369,24 @@ class CRMController extends Controller
 
     public function destroy($id)
     {
-        // Baja lógica — no elimina el registro. Se fuerza una contraseña
-        // aleatoria y se invalida el código de recuperación para que la
-        // cuenta quede realmente inaccesible (ninguno de los dos mecanismos
-        // de login — password o código — sigue funcionando).
+        $empleado = DB::table('users')
+            ->leftJoin('departamentos', 'users.id_departamento', '=', 'departamentos.id_departamento')
+            ->select('users.*', 'departamentos.nombre as departamento_nombre')
+            ->where('users.id', $id)
+            ->first();
+
+        abort_if(!$empleado, 404);
+
+        $nombreEmpleado = trim(implode(' ', array_filter([
+            $empleado->name, $empleado->apellido_paterno,
+        ])));
+        $areaEmpleado = $empleado->departamento_nombre ?? 'Sin área';
+
+        $admin       = DB::table('users')->where('role', 'admin')->select('id', 'name', 'email')->first();
+        $adminEmail  = $admin?->email ?? 'sistemas@imjuventud.gob.mx';
+        $adminNombre = $admin?->name ?? 'Subdirección de Sistemas';
+
+        // ── 1. Baja lógica del usuario ───────────────────────────────────
         DB::table('users')->where('id', $id)->update([
             'activo'             => false,
             'fecha_baja'         => now(),
@@ -381,18 +395,96 @@ class CRMController extends Controller
             'updated_at'         => now(),
         ]);
 
-        // Todos los equipos donde esta persona era responsable o usuario
-        // actual regresan a Almacén: se desvincula, pero conservan su IP
-        // asignada (mismo comportamiento que "Regresar a Almacén" en Kardex).
-        DB::table('inventario_equipos')
+        // ── 2. Clasificar equipos del empleado ───────────────────────────
+        $equipos = DB::table('inventario_equipos')
+            ->where(function ($q) use ($id) {
+                $q->where('user_id', $id)->orWhere('usuario_actual_id', $id);
+            })
+            ->select('id', 'cpu_serie', 'cpu_marca', 'cpu_modelo', 'tipo', 'area', 'ipv4', 'ip_id')
+            ->get();
+
+        if ($equipos->isNotEmpty()) {
+            $idsInstitucionales = DB::table('movimientos_equipos')
+                ->where('tipo_activo', 'equipo')
+                ->where('tipo_evento', 'Entrada')
+                ->whereIn('activo_id', $equipos->pluck('id'))
+                ->pluck('activo_id')
+                ->flip();
+
+            foreach ($equipos as $eq) {
+                if ($idsInstitucionales->has($eq->id)) {
+                    // Institucional: Almacén, conservar IP, evento Kardex + ticket
+                    DB::table('inventario_equipos')->where('id', $eq->id)->update([
+                        'estado'            => null,
+                        'user_id'           => null,
+                        'usuario_actual_id' => null,
+                        'nombre_usuario'    => null,
+                        'updated_at'        => now(),
+                    ]);
+                    KardexMovimiento::registrar(
+                        tipo_activo:   'equipo',
+                        activo_id:     (int) $eq->id,
+                        tipo_evento:   'Almacén',
+                        origen:        $nombreEmpleado,
+                        destino:       'Almacén',
+                        user_from_id:  (int) $id,
+                        estado_equipo: 'Almacén',
+                        notas:         "Desvinculado por baja del empleado — ref. usuario #{$id}",
+                    );
+                    // Ticket automático para que el admin reasigne el resguardo
+                    $desc = trim("{$eq->tipo} {$eq->cpu_marca} {$eq->cpu_modelo}");
+                    DB::table('tickets')->insert([
+                        'nombre'      => $adminNombre,
+                        'correo'      => $adminEmail,
+                        'area'        => $areaEmpleado,
+                        'tipo'        => 'Solicitud de Equipo',
+                        'descripcion' => "El empleado {$nombreEmpleado} fue dado de baja (ref. usuario #{$id}). "
+                                       . "El equipo {$desc} (No. serie: {$eq->cpu_serie}) quedó en Almacén. "
+                                       . "Se requiere asignar nuevo responsable de resguardo.",
+                        'estado'      => 1,
+                        'ip'          => request()->ip() ?? '127.0.0.1',
+                        'created_at'  => now(),
+                        'updated_at'  => now(),
+                    ]);
+                } else {
+                    // Personal: baja + liberar IP
+                    DB::table('inventario_equipos')->where('id', $eq->id)->update([
+                        'estado'            => 'baja',
+                        'user_id'           => null,
+                        'usuario_actual_id' => null,
+                        'nombre_usuario'    => null,
+                        'updated_at'        => now(),
+                    ]);
+                    KardexMovimiento::registrar(
+                        tipo_activo:   'equipo',
+                        activo_id:     (int) $eq->id,
+                        tipo_evento:   'Baja',
+                        origen:        $areaEmpleado,
+                        destino:       'Proveedor',
+                        user_from_id:  (int) $id,
+                        estado_equipo: 'Baja',
+                        notas:         "Equipo personal dado de baja por baja del empleado — ref. usuario #{$id}",
+                    );
+                    if ($eq->ipv4) {
+                        KardexMovimiento::registrar(
+                            tipo_activo:   'equipo',
+                            activo_id:     (int) $eq->id,
+                            tipo_evento:   'Liberación IP',
+                            origen:        $eq->cpu_serie ?? '—',
+                            destino:       'Sin equipo',
+                            estado_equipo: 'Libre',
+                            notas:         "IP: {$eq->ipv4}",
+                        );
+                        IpAssigner::liberarEquipo((int) $eq->id);
+                    }
+                }
+            }
+        }
+
+        // ── 3. Impresoras — desvinculan (bug #2) ────────────────────────
+        DB::table('impresoras')
             ->where('user_id', $id)
-            ->orWhere('usuario_actual_id', $id)
-            ->update([
-                'estado'            => null,
-                'user_id'           => null,
-                'usuario_actual_id' => null,
-                'updated_at'        => now(),
-            ]);
+            ->update(['user_id' => null, 'updated_at' => now()]);
 
         if (request()->expectsJson()) {
             return response()->json(['ok' => true]);

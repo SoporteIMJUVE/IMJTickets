@@ -22,6 +22,14 @@ class IpAssigner
     {
         $existente = DB::table('inventario_ips_completo')->where('ip', $ip)->first();
         if ($existente) {
+            // Garantizar que la fila maestra quede Ocupada — puede haber
+            // llegado como Libre desde el dump de importación.
+            if ($existente->estatus !== 'Ocupada') {
+                DB::table('inventario_ips_completo')->where('id', $existente->id)->update([
+                    'estatus'    => 'Ocupada',
+                    'updated_at' => now(),
+                ]);
+            }
             return $existente->id;
         }
 

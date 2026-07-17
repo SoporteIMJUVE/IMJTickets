@@ -110,8 +110,8 @@ El evento 3 solo se registra si se capturó una IPv4. Los eventos 1 y 2 siempre 
 **Punto de entrada:** Panel lateral del equipo en `/kardex` → selector "Estado del equipo" → opción "Baja" → botón Guardar.
 
 **Qué ocurre al ejecutar la baja:**
-- `estado` se actualiza a `'baja'` en `inventario_equipos` (o `impresoras`)
-- El `user_id` y `usuario_actual_id` **no se tocan** — el responsable formal sigue registrado (la baja no desvincula)
+- `estado` se actualiza a `'baja'` en `inventario_equipos`
+- `user_id`, `usuario_actual_id` y `nombre_usuario` se limpian — la baja desvincula al responsable
 - La IP asignada se **libera automáticamente** (`IpAssigner::liberarEquipo`) y queda disponible en el pool
 - El badge en la tabla cambia a "Baja" (gris)
 
@@ -119,16 +119,14 @@ El evento 3 solo se registra si se capturó una IPv4. Los eventos 1 y 2 siempre 
 
 | # | Evento | Origen | Destino | Estado equipo |
 |---|---|---|---|---|
-| 1 | `Baja` | Nombre del responsable | — (null) | `Baja` |
+| 1 | `Baja` | Área del equipo (`area`) | `Proveedor` | `Baja` |
 | 2 | `Liberación IP` | `cpu_serie` del equipo | `Sin equipo` | `Libre` |
 
 El evento 2 solo se registra si el equipo tenía IP asignada. Se registra antes de llamar a `IpAssigner::liberarEquipo()`, que limpia `ip_id` e `ipv4` en `inventario_equipos` y devuelve la fila a `estatus='Libre'` en `inventario_ips_completo`.
 
-El mismo par de eventos se genera para **Mantenimiento** (reemplazando `Baja` por `Mantenimiento` y `estado_equipo='Mantenimiento'`).
+**Diferencia con Almacén:** Almacén desvincula al responsable (`user_id = null`) pero **no libera la IP** — el equipo queda en Almacén con su IP conservada. Baja libera la IP y desvincula al responsable. El equipo de baja queda "muerto" pero trazable.
 
-**Diferencia con Almacén:** Almacén desvincula al responsable (`user_id = null`) pero **no libera la IP** (bug conocido — la IP queda ocupada aunque el equipo regrese a almacén). Baja y Mantenimiento sí liberan la IP y registran el evento `Liberación IP`. El equipo de baja queda "muerto" pero trazable.
-
-**Diferencia con Mantenimiento:** Mantenimiento libera la IP y registra `estado_equipo = 'Mantenimiento'`; el equipo puede volver a Asignado. Baja es terminal — no hay evento de reingreso implementado aún.
+**Diferencia con Mantenimiento:** Mantenimiento libera la IP y registra `estado_equipo = 'Mantenimiento'` pero **no** desvincula al responsable — el equipo puede volver a Asignado. Baja es terminal — no hay evento de reingreso implementado aún.
 
 **Archivos clave:**
 - `Modules/Kardex/app/Http/Controllers/KardexController.php@cambiarEstadoEquipo` — lógica para equipos
@@ -184,32 +182,53 @@ El mismo par de eventos se genera para **Mantenimiento** (reemplazando `Baja` po
 | Recurso | Acción |
 |---|---|
 | `users` | `activo=false`, `fecha_baja=now()`, contraseña aleatoria, `recovery_code_hash=null` |
-| `inventario_equipos` (equipo como responsable o usuario) | `user_id=null`, `usuario_actual_id=null`, `estado=null` → pasan a estado Almacén |
-| IPs de esos equipos | **No se liberan** — el equipo queda en Almacén con su IP conservada |
-| `impresoras` donde era responsable | **No se tocan** ⚠️ — la impresora sigue vinculada al usuario dado de baja |
-| Tickets abiertos | **No se cierran ni reasignan** — quedan activos en el sistema |
-| `movimientos_equipos` | **No se registra ningún movimiento** ⚠️ — el paso a Almacén no queda en el historial |
+| Equipos **personales** (sin evento `Entrada`) | `estado='baja'`, `user_id=null`, `usuario_actual_id=null`, `nombre_usuario=null`; IP liberada |
+| Equipos **institucionales** (con evento `Entrada`) | `estado=null` (Almacén), `user_id=null`, `usuario_actual_id=null`, `nombre_usuario=null`; IP **conservada** |
+| `impresoras` donde era responsable | `user_id=null` — desvinculadas |
+| Tickets abiertos | No se cierran ni reasignan — quedan activos en el sistema |
 
-**Teléfonos:** Al estar en `inventario_equipos` (tipo=`'Telefono'`), los teléfonos del empleado también quedan desvinculados junto con los equipos de cómputo (misma query).
+**Teléfonos:** Al estar en `inventario_equipos`, los teléfonos del empleado siguen la misma clasificación personal/institucional que los equipos de cómputo.
 
 **Cuenta queda bloqueada:** La contraseña se reemplaza por un hash aleatorio y el `recovery_code_hash` se anula, por lo que ninguno de los dos mecanismos de acceso (contraseña o código de recuperación) sigue funcionando aunque el registro exista.
 
+**Eventos registrados en `movimientos_equipos` por cada equipo:**
+
+| Tipo de equipo | Evento | Origen | Destino | Estado equipo | Notas |
+|---|---|---|---|---|---|
+| Personal | `Baja` | Área del empleado | `Proveedor` | `Baja` | `Desvinculado por baja del empleado — ref. usuario #{id}` |
+| Personal con IP | `Liberación IP` | `cpu_serie` | `Sin equipo` | `Libre` | `IP: x.x.x.x` |
+| Institucional | `Almacén` | Nombre del empleado | `Almacén` | `Almacén` | `Desvinculado por baja del empleado — ref. usuario #{id}` |
+
+**Ticket automático por cada equipo institucional:**
+
+Al desvincularse un equipo institucional, el sistema crea automáticamente un ticket en Tickets para que el administrador asigne un nuevo responsable de resguardo:
+
+| Campo | Valor |
+|---|---|
+| `nombre` / `correo` | Admin del sistema |
+| `area` | Departamento del empleado dado de baja |
+| `tipo` | `Solicitud de Equipo` |
+| `descripcion` | `"El empleado {nombre} fue dado de baja (ref. usuario #{id}). El equipo {tipo} {marca} {modelo} (No. serie: {serie}) quedó en Almacén. Se requiere asignar nuevo responsable de resguardo."` |
+| `estado` | `1` (abierto) |
+
+> **Pendiente — id de orden de baja:** La referencia `ref. usuario #{id}` usa el `id` del empleado en `users`. Cuando se implemente un catálogo formal de órdenes de baja, este campo se actualizará. Por ahora es suficiente para rastrear el motivo de la desvinculación en Kardex y en el ticket.
+
 **Reactivar empleado (`PATCH /crm/empleados/{id}/reactivar`):**
 - Restaura `activo=true` y anula `fecha_baja`
-- **No re-vincula** ningún equipo que se haya desvinculado durante la baja
-- El empleado queda activo en el directorio pero sin activos asignados
+- **No re-vincula** ningún equipo — el empleado queda activo en el directorio pero sin activos asignados
+- El administrador debe reasignar los equipos manualmente desde los tickets generados durante la baja
 
-**Problemas identificados:**
+**Estado de los problemas identificados:**
 
 | # | Estado | Descripción |
 |---|---|---|
-| 1 | ⚠️ Pendiente | Los equipos que regresan a Almacén no generan evento en `movimientos_equipos` — el historial Kardex queda sin registro del motivo de la desvinculación |
-| 2 | ⚠️ Pendiente | Las impresoras vinculadas al empleado **no se desvinculan** — quedan con `user_id` apuntando a un usuario inactivo |
+| 1 | ✅ Resuelto | Los equipos que regresan a Almacén ahora generan evento `Almacén` en `movimientos_equipos` con nota de baja del empleado |
+| 2 | ✅ Resuelto | Las impresoras vinculadas al empleado ahora se desvinculan (`user_id = null`) al ejecutar la baja |
 | 3 | ⚠️ Pendiente | `CRMController@store` todavía inserta en la tabla `telefonos` aunque los teléfonos ya se migraron a `inventario_equipos` |
 | 4 | ✅ Resuelto | Campo `ipv4_actual` eliminado del INSERT de `store()` — ya no causa error al dar de alta empleados con equipos |
 
 **Archivos clave:**
-- `Modules/CRM/app/Http/Controllers/CRMController.php@destroy` — baja lógica + desvinculación de equipos
+- `Modules/CRM/app/Http/Controllers/CRMController.php@destroy` — clasificación personal/institucional, eventos Kardex, tickets automáticos, baja de impresoras
 - `Modules/CRM/app/Http/Controllers/CRMController.php@reactivar` — restauración del usuario
 - `Modules/CRM/routes/web.php` → `DELETE /crm/empleados/{id}` / `PATCH /crm/empleados/{id}/reactivar`
 - `Modules/CRM/resources/views/index.blade.php` → botón en panel lateral, llama DELETE o PATCH según `activo`
@@ -333,6 +352,59 @@ Cuando el equipo seleccionado pertenecía a otra persona (`user_id` diferente al
 - `Modules/CRM/routes/web.php` → `GET /crm/equipos/buscar` — búsqueda unificada con `es_personal` computado
 - `Modules/CRM/resources/views/index.blade.php` → `modoEquipoBuscar()`, `buscarEquipos()`, `seleccionarEquipoExistente()`
 - `Modules/CRM/app/Http/Controllers/CRMController.php@update` — switch de `user_id` + evento `Reasignación`
+
+---
+
+### CU-08 — Gestión de IPs desde el panel Network
+
+**Descripción:** Un administrador opera directamente sobre la tabla maestra de IPs (`inventario_ips_completo`) desde `/network`: libera una IP poniéndola en baja/mantenimiento, o la transfiere a otro equipo (switcheo). Ambas acciones quedan registradas en `movimientos_equipos`.  
+**Punto de entrada:** `/network` → clic en una fila de IP ocupada → panel lateral → botón "Liberar IP".
+
+**Precondición:** El botón "Liberar IP" solo está habilitado cuando `inventario_ips_completo.estatus = 'Ocupada'`. Si la IP figura como `'Libre'` aunque `inventario_equipos.ip_id` apunte a ella (desincronía por importación legada), `IpAssigner::resolveId()` la corrige a `'Ocupada'` la próxima vez que se asigne desde CRM o Kardex.
+
+#### Variante A — Dar de baja / mantenimiento al equipo actual
+
+El equipo que ocupa la IP pasa al estado elegido y la IP queda libre.
+
+**Eventos registrados en `movimientos_equipos`:**
+
+| # | Evento | `tipo_activo` | Origen | Destino | Estado equipo | Notas |
+|---|---|---|---|---|---|---|
+| 1 | `Liberación IP` | equipo o impresora | `cpu_serie` del equipo | `Sin equipo` | `Libre` | `IP: x.x.x.x` |
+| 2 | `Baja` o `Mantenimiento` | equipo | Área del equipo | `Proveedor` (solo Baja) | `Baja` / `Mantenimiento` | `Operación ejecutada desde panel Network.` |
+
+El evento 2 no se registra para impresoras (no tienen columna `estado`).
+
+**Qué actualiza en la BD:**
+- `inventario_equipos.estado` → `'baja'` o `'mantenimiento'`
+- `inventario_equipos.ip_id` y `.ipv4` → `null` (vía `IpAssigner::liberarEquipo()`)
+- `inventario_ips_completo.estatus` → `'Libre'`
+
+#### Variante B — Switcheo (mover IP a otro equipo)
+
+La IP se mueve del equipo actual (origen) a otro equipo seleccionado (destino). Si el destino ya tenía una IP distinta, esa IP queda huérfana como `'Libre'` en el registro maestro.
+
+**Eventos registrados en `movimientos_equipos`:**
+
+| # | Evento | `tipo_activo` | Origen | Destino | Estado equipo | Notas |
+|---|---|---|---|---|---|---|
+| 1 | `Liberación IP` | equipo u impresora | `cpu_serie` del equipo que pierde la IP | `cpu_serie` del equipo que la recibe | `Libre` | `IP: x.x.x.x — liberada por switcheo` |
+| 2 | `Asignación IP` o `Cambio IP` | equipo | `cpu_serie` del equipo que pierde la IP | `cpu_serie` del equipo que la recibe | `Ocupada` | `IP: x.x.x.x` |
+
+El evento 2 es `Asignación IP` si el equipo destino no tenía IP previa, o `Cambio IP` si ya tenía una.
+
+**Convención de origen/destino en eventos de IP (aplica a todos los CU):**  
+`origen` y `destino` siempre son el `cpu_serie` del equipo involucrado, **nunca el nombre de la persona**. La dirección IP va en `notas`. Esto permite rastrear el historial de una IP buscando por serie en `movimientos_equipos`.
+
+**Nota sobre `IpAssigner::resolveId()`:**  
+Cuando CRM o Kardex asignan una IP, `resolveId()` busca primero la fila en `inventario_ips_completo`. Si la encuentra con `estatus='Libre'` (situación común en el dump importado), la actualiza a `'Ocupada'` antes de devolver el ID. Esto garantiza que el panel Network siempre vea el estado correcto sin necesidad de intervención manual.
+
+**Archivos clave:**
+- `Modules/Network/app/Http/Controllers/NetworkController.php@liberarPorEstado` — variante A
+- `Modules/Network/app/Http/Controllers/NetworkController.php@liberarPorSwitch` — variante B
+- `Modules/Network/routes/web.php` → `POST /network/ip/{id}/liberar-estado` / `POST /network/ip/{id}/liberar-switch`
+- `app/Support/IpAssigner.php@resolveId` — garantiza `estatus='Ocupada'` en fila maestra al asignar
+- `Modules/Network/resources/views/index.blade.php` → `abrirModalLiberar()`, `confirmarLiberar()`
 
 ---
 

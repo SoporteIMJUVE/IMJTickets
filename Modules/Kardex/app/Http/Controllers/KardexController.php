@@ -97,6 +97,7 @@ class KardexController extends Controller
                 'inventario_equipos.estado as estado_actual',
                 'inventario_equipos.ipv4',
                 'inventario_equipos.cpu_serie',
+                'inventario_equipos.area',
                 DB::raw("NULLIF(TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'')), '') as responsable_nombre")
             )
             ->where('inventario_equipos.id', $id)
@@ -123,30 +124,39 @@ class KardexController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        DB::table('inventario_equipos')->where('id', $id)->update([
-            'estado'     => $estado,
-            'updated_at' => now(),
-        ]);
+        if ($estado === 'baja') {
+            DB::table('inventario_equipos')->where('id', $id)->update([
+                'estado'            => 'baja',
+                'user_id'           => null,
+                'usuario_actual_id' => null,
+                'nombre_usuario'    => null,
+                'updated_at'        => now(),
+            ]);
 
-        $tipoEvento    = match($estado) {
-            'mantenimiento' => 'Mantenimiento',
-            'baja'          => 'Baja',
-            default         => 'Almacén',
-        };
-        $estadoEquipo  = match($estado) {
-            'mantenimiento' => 'Mantenimiento',
-            'baja'          => 'Baja',
-            default         => $equipo->user_id ? 'Asignado' : 'Almacén',
-        };
+            KardexMovimiento::registrar(
+                tipo_activo:   'equipo',
+                activo_id:     (int) $id,
+                tipo_evento:   'Baja',
+                origen:        $equipo->area ?? 'Sin área',
+                destino:       'Proveedor',
+                user_from_id:  $equipo->user_id,
+                estado_equipo: 'Baja',
+            );
+        } else {
+            DB::table('inventario_equipos')->where('id', $id)->update([
+                'estado'     => $estado,
+                'updated_at' => now(),
+            ]);
 
-        KardexMovimiento::registrar(
-            tipo_activo:   'equipo',
-            activo_id:     (int) $id,
-            tipo_evento:   $tipoEvento,
-            origen:        $equipo->responsable_nombre ?? 'Sin responsable',
-            user_from_id:  $equipo->user_id,
-            estado_equipo: $estadoEquipo,
-        );
+            KardexMovimiento::registrar(
+                tipo_activo:   'equipo',
+                activo_id:     (int) $id,
+                tipo_evento:   'Mantenimiento',
+                origen:        $equipo->responsable_nombre ?? 'Sin responsable',
+                user_from_id:  $equipo->user_id,
+                estado_equipo: 'Mantenimiento',
+            );
+        }
 
         if (in_array($estado, ['mantenimiento', 'baja'], true)) {
             if ($equipo->ipv4) {
