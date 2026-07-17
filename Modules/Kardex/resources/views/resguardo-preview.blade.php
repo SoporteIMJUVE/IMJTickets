@@ -22,6 +22,11 @@
     </div>
     @endif
 
+    {{-- Banner de operación Kardex: se actualiza dinámicamente según el responsable seleccionado --}}
+    <div id="banner-operacion" class="mb-4 flex items-start gap-3 rounded-xl px-4 py-3 text-sm">
+        {{-- contenido inicial inyectado por JS al cargar --}}
+    </div>
+
     @if($errors->any())
     <div class="mb-4 flex items-start gap-3 bg-error-container border border-red-200 text-on-surface rounded-xl px-4 py-3 text-sm font-semibold">
         <span class="material-symbols-outlined text-error mt-0.5">error</span>
@@ -76,10 +81,17 @@
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">
                                 Número de serie <span class="text-red-500">*</span>
                             </label>
-                            <input type="text" name="cpu_serie" value="{{ old('cpu_serie', $datos['cpu_serie']) }}"
+                            <input type="text" name="cpu_serie" id="campo-serie"
+                                value="{{ old('cpu_serie', $datos['cpu_serie']) }}"
+                                autocomplete="off"
                                 class="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-2 focus:ring-primary-container
                                        {{ $errors->has('cpu_serie') ? 'border-red-400 bg-red-50' : ($datos['cpu_serie'] ? 'border-border bg-yellow-50' : 'border-border bg-canvas') }}">
                             @error('cpu_serie')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                            {{-- Info card: aparece cuando la serie corregida encuentra un equipo existente --}}
+                            <div id="serie-info" class="hidden mt-2 px-3 py-2 bg-surface-low border border-border rounded-lg text-xs space-y-0.5">
+                                <p class="font-bold text-on-surface" id="serie-info-titulo"></p>
+                                <p class="text-muted" id="serie-info-resp"></p>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">No. Inventario</label>
@@ -308,28 +320,42 @@
                 </div>
 
                 {{-- Red --}}
-                <div class="bg-canvas border border-border rounded-2xl shadow-sm p-5">
+                @php $ipActual = $equipoExistente->ipv4 ?? null; @endphp
+                <div class="bg-canvas border border-border rounded-2xl shadow-sm p-5" id="sec-red">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-3">Dirección IP</h3>
+
                     <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">
                         Área <span class="text-red-500">*</span>
                     </label>
-                    <input type="text" name="area" id="campo-area" value="{{ old('area', $datos['area']) }}"
+                    <input type="text" name="area" id="campo-area"
+                        value="{{ old('area', $datos['area'] ?? ($equipoExistente->area ?? '')) }}"
                         placeholder="Ej: DRHM, DEC..."
                         class="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-2 focus:ring-primary-container mb-1
-                               {{ $errors->has('area') ? 'border-red-400 bg-red-50' : ($datos['area'] ? 'border-border bg-yellow-50' : 'border-border bg-canvas') }}">
+                               {{ $errors->has('area') ? 'border-red-400 bg-red-50' : (($datos['area'] ?? ($equipoExistente->area ?? null)) ? 'border-border bg-yellow-50' : 'border-border bg-canvas') }}">
                     @error('area')<p class="mb-2 text-xs text-red-600">{{ $message }}</p>@else<div class="mb-2"></div>@enderror
 
                     <label class="block text-[11px] font-bold uppercase tracking-wider text-on-surface-variant mb-1">IPv4 asignada</label>
                     <div class="flex gap-2">
-                        <input type="text" name="ipv4" id="campo-ip" value="{{ old('ipv4') }}"
-                            placeholder="0.0.0.0"
-                            class="flex-1 rounded-lg px-3 py-2 text-sm border border-border bg-canvas outline-none focus:ring-2 focus:ring-primary-container">
+                        <input type="text" name="ipv4" id="campo-ip"
+                            value="{{ old('ipv4', $ipActual) }}"
+                            placeholder="Se sugiere al llenar el área"
+                            readonly
+                            class="flex-1 font-mono rounded-lg px-3 py-2 text-sm border border-border bg-surface-low outline-none cursor-default
+                                   {{ $ipActual ? 'text-brand font-bold' : 'text-on-surface-variant' }}">
+                        @if(!$ipActual)
                         <button type="button" id="btn-sugerir-ip"
                             class="px-3 py-2 bg-surface-high border border-border rounded-lg text-xs font-bold text-on-surface-variant hover:bg-surface-highest transition-colors"
                             title="Sugerir primera IP libre del área">
                             <span class="material-symbols-outlined" style="font-size:16px">auto_fix_high</span>
                         </button>
+                        @endif
                     </div>
+                    @if($ipActual)
+                    <p class="mt-1 text-[11px] text-muted flex items-center gap-1">
+                        <span class="material-symbols-outlined shrink-0" style="font-size:12px">lock</span>
+                        IP actual del equipo — se conserva. Para cambiarla usa el panel de Kardex.
+                    </p>
+                    @endif
                     <p id="ip-msg" class="mt-1 text-[11px] text-on-surface-variant hidden"></p>
                 </div>
 
@@ -413,6 +439,9 @@ function checkNombreMismatch(nombreSeleccionado) {
     }
 }
 
+// IP del equipo al cargar la página (null = sin IP, equipo nuevo o sin asignar)
+const IP_EQUIPO_ACTUAL = @json($ipActual ?? null);
+
 // ── Event delegation: todos los radios de id_empleado ───────────────
 document.addEventListener('change', function (e) {
     if (e.target.name !== 'id_empleado') return;
@@ -420,20 +449,22 @@ document.addEventListener('change', function (e) {
     document.getElementById('form-nuevo-usuario').classList.toggle('hidden', e.target.value !== '__nuevo__');
 
     checkNombreMismatch(e.target.dataset.nombre ?? '');
+    actualizarBanner(e.target.value, e.target.dataset.nombre ?? '');
 
-    const ipActual   = e.target.dataset.ip;
-    const areaActual = e.target.dataset.area;
-    const campoIp    = document.getElementById('campo-ip');
-    const campoArea  = document.getElementById('campo-area');
-    const msg        = document.getElementById('ip-msg');
+    const ipResp  = e.target.dataset.ip;
+    const areaResp = e.target.dataset.area;
+    const campoIp   = document.getElementById('campo-ip');
+    const campoArea = document.getElementById('campo-area');
+    const msg       = document.getElementById('ip-msg');
 
-    if (ipActual) {
-        campoIp.value = ipActual;
+    // Solo auto-rellenar IP desde el responsable si el equipo NO tiene IP propia
+    if (ipResp && !IP_EQUIPO_ACTUAL) {
+        campoIp.value = ipResp;
         msg.textContent = 'IP actual de este usuario — se reasignará a este equipo (switcheo).';
         msg.classList.remove('hidden');
     }
-    if (areaActual && !campoArea.value.trim()) {
-        campoArea.value = areaActual;
+    if (areaResp && !campoArea.value.trim()) {
+        campoArea.value = areaResp;
     }
 });
 
@@ -541,6 +572,75 @@ function seleccionarDesdeModal(id, nombre, correo, depto, puesto) {
     seleccionarResponsable(id, nombre, correo, depto, '', puesto);
 }
 
+// ── Verificación dinámica del número de serie ────────────────────────
+// Cuando el admin corrige el campo manualmente, se re-evalúa si la serie
+// ya existe en inventario y se actualiza el banner de operación Kardex.
+let _serieTimer = null;
+
+document.getElementById('campo-serie').addEventListener('input', function () {
+    clearTimeout(_serieTimer);
+    const serie = this.value.trim().toUpperCase();
+    this.value = serie;   // normalizar a mayúsculas en tiempo real
+
+    const infoCard  = document.getElementById('serie-info');
+    const infoTitulo = document.getElementById('serie-info-titulo');
+    const infoResp   = document.getElementById('serie-info-resp');
+
+    if (serie.length < 3) {
+        infoCard.classList.add('hidden');
+        // Sin serie suficiente: conservar estado previo del banner
+        return;
+    }
+
+    _serieTimer = setTimeout(async () => {
+        const url = `{{ route('kardex.resguardo.verificar-serie') }}?serie=${encodeURIComponent(serie)}`;
+        const data = await fetch(url).then(r => r.json()).catch(() => undefined);
+
+        // Actualizar variable global para que actualizarBanner la use
+        EQUIPO_EXISTENTE_MUT = data ?? null;
+
+        if (data) {
+            const tipo  = data.tipo ?? '';
+            const marca = data.cpu_marca ?? '';
+            const mod   = data.cpu_modelo ?? '';
+            infoTitulo.textContent = `Equipo encontrado: ${tipo} ${marca} ${mod}`.trim();
+            infoResp.textContent   = data.responsable_nombre
+                ? `Responsable actual: ${data.responsable_nombre}`
+                : 'Sin responsable asignado';
+            infoCard.classList.remove('hidden');
+        } else {
+            infoCard.classList.add('hidden');
+        }
+
+        // Re-evaluar banner con el responsable actualmente seleccionado
+        const checked = document.querySelector('input[name="id_empleado"]:checked');
+        actualizarBanner(
+            checked?.value ?? null,
+            checked?.dataset?.nombre ?? null
+        );
+    }, 400);
+});
+
+// La variable EQUIPO_EXISTENTE es const (no se puede reasignar),
+// así que usamos una variable mutable paralela que los helpers leen.
+let EQUIPO_EXISTENTE_MUT = EQUIPO_EXISTENTE;
+
+// Sobrescribir renderBanner y actualizarBanner para que usen EQUIPO_EXISTENTE_MUT
+const _renderBanner = renderBanner;
+const _actualizarBanner = actualizarBanner;
+renderBanner = function(tipo, nombre) { _renderBanner(tipo, nombre); };
+actualizarBanner = function(uid, nombre) {
+    if (!EQUIPO_EXISTENTE_MUT) {
+        renderBanner('nuevo', null);
+        return;
+    }
+    if (uid && String(uid) === String(EQUIPO_EXISTENTE_MUT.user_id)) {
+        renderBanner('renovacion', null);
+    } else {
+        renderBanner('reasignacion', nombre);
+    }
+};
+
 // ── Guard: no enviar sin responsable ────────────────────────────────
 document.querySelector('form').addEventListener('submit', function (e) {
     if (!document.querySelector('input[name="id_empleado"]:checked')) {
@@ -555,23 +655,120 @@ document.querySelector('form').addEventListener('submit', function (e) {
     }
 });
 
+// ── Banner de operación Kardex ───────────────────────────────────────
+@php
+$_eqJs = $equipoExistente ? [
+    'id'                => $equipoExistente->id,
+    'user_id'           => $equipoExistente->user_id,
+    'responsable'       => $equipoExistente->responsable_nombre,
+    'responsable_email' => $equipoExistente->responsable_correo,
+    'tipo'              => $equipoExistente->tipo,
+    'marca'             => $equipoExistente->cpu_marca,
+    'modelo'            => $equipoExistente->cpu_modelo,
+    'ipv4'              => $equipoExistente->ipv4,
+] : null;
+@endphp
+const EQUIPO_EXISTENTE = @json($_eqJs);
+
+const BANNERS = {
+    nuevo: {
+        cls: 'bg-green-50 border border-green-300 text-green-900',
+        icon: 'add_circle',
+        iconCls: 'text-green-600',
+        titulo: 'Equipo nuevo',
+        cuerpo: 'Kardex registrará: <strong>Entrada</strong> → <strong>Asignación</strong>.',
+    },
+    reasignacion: {
+        cls: 'bg-amber-50 border border-amber-300 text-amber-900',
+        icon: 'swap_horiz',
+        iconCls: 'text-amber-600',
+        titulo: 'Cambio de responsable',
+        cuerpo: '',   // se rellena dinámicamente con los nombres
+    },
+    renovacion: {
+        cls: 'bg-blue-50 border border-blue-300 text-blue-900',
+        icon: 'autorenew',
+        iconCls: 'text-blue-600',
+        titulo: 'Renovación de resguardo',
+        cuerpo: 'El responsable no cambia. Kardex <strong>no registrará eventos nuevos</strong> — solo se actualiza el PDF.',
+    },
+};
+
+function renderBanner(tipo, nombreNuevo) {
+    const b = BANNERS[tipo];
+    let cuerpo = b.cuerpo;
+    if (tipo === 'reasignacion') {
+        const anterior = EQUIPO_EXISTENTE?.responsable ?? 'Sin responsable';
+        cuerpo = `Kardex registrará: <strong>Reasignación</strong>.<br>
+                  <span class="opacity-80">${anterior} → ${nombreNuevo ?? '…'}</span>`;
+    }
+    const banner = document.getElementById('banner-operacion');
+    banner.className = `mb-4 flex items-start gap-3 rounded-xl px-4 py-3 text-sm ${b.cls}`;
+    banner.innerHTML = `
+        <span class="material-symbols-outlined ${b.iconCls} mt-0.5 shrink-0">${b.icon}</span>
+        <div>
+            <p class="font-bold">${b.titulo}</p>
+            <p class="mt-0.5">${cuerpo}</p>
+        </div>`;
+}
+
+function actualizarBanner(selectedUserId, selectedNombre) {
+    if (!EQUIPO_EXISTENTE) {
+        renderBanner('nuevo', null);
+        return;
+    }
+    if (selectedUserId && String(selectedUserId) === String(EQUIPO_EXISTENTE.user_id)) {
+        renderBanner('renovacion', null);
+    } else {
+        renderBanner('reasignacion', selectedNombre);
+    }
+}
+
+// Estado inicial (sin responsable seleccionado aún)
+(function initBanner() {
+    const checked = document.querySelector('input[name="id_empleado"]:checked');
+    if (checked) {
+        actualizarBanner(checked.value, checked.dataset.nombre);
+    } else if (EQUIPO_EXISTENTE) {
+        // Equipo existe pero todavía no se eligió responsable
+        renderBanner('reasignacion', null);
+    } else {
+        renderBanner('nuevo', null);
+    }
+})();
+
 // ── Sugerir IP libre ─────────────────────────────────────────────────
-document.getElementById('btn-sugerir-ip').addEventListener('click', function () {
-    const area = document.getElementById('campo-area').value.trim();
-    const msg  = document.getElementById('ip-msg');
+async function sugerirIp() {
+    const campoArea = document.getElementById('campo-area');
+    const campoIp   = document.getElementById('campo-ip');
+    const msg       = document.getElementById('ip-msg');
+    if (!campoArea || !campoIp) return;   // no hay inputs (equipo existente)
+
+    const area = campoArea.value.trim();
     if (!area) { msg.textContent = 'Ingresa el área primero.'; msg.classList.remove('hidden'); return; }
 
-    fetch(`{{ route('kardex.resguardo.ip') }}?area=${encodeURIComponent(area)}`)
-        .then(r => r.json())
-        .then(data => {
-            if (data.ip) {
-                document.getElementById('campo-ip').value = data.ip;
-                msg.textContent = 'IP sugerida: primera libre del rango del área.';
-            } else {
-                msg.textContent = data.mensaje ?? 'Sin IPs disponibles para esa área.';
-            }
-            msg.classList.remove('hidden');
-        });
-});
+    const data = await fetch(`{{ route('kardex.resguardo.ip') }}?area=${encodeURIComponent(area)}`)
+        .then(r => r.json()).catch(() => null);
+
+    if (data?.ip) {
+        campoIp.value = data.ip;
+        msg.textContent = `IP sugerida: ${data.ip} (primera libre del rango del área).`;
+    } else {
+        msg.textContent = data?.mensaje ?? 'Sin IPs disponibles para esa área.';
+    }
+    msg.classList.remove('hidden');
+}
+
+const btnSugerirIp = document.getElementById('btn-sugerir-ip');
+if (btnSugerirIp) btnSugerirIp.addEventListener('click', sugerirIp);
+
+// Auto-sugerir IP cuando el campo área pierde el foco (solo equipo nuevo)
+const campoAreaEl = document.getElementById('campo-area');
+if (campoAreaEl) {
+    campoAreaEl.addEventListener('blur', function () {
+        const campoIp = document.getElementById('campo-ip');
+        if (campoIp && !campoIp.value.trim()) sugerirIp();
+    });
+}
 </script>
 </x-layouts.app>

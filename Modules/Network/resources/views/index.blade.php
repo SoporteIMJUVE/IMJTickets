@@ -165,14 +165,19 @@
                     @forelse($ipsAll as $ip)
                     <tr class="hover:bg-gold/5 transition-colors cursor-pointer"
                         data-ip="{{ $ip->ip }}"
-                        data-usuario="{{ strtolower($ip->usuario ?? '') }}"
+                        data-usuario="{{ strtolower(($ip->responsable_fk ?? $ip->usuario) ?? '') }}"
                         data-area="{{ strtolower($ip->departamento_pestana ?? '') }}"
                         data-estatus="{{ strtolower($ip->estatus ?? 'libre') }}"
                         onclick="abrirPanelIp({{ $ip->id }})">
                         <td class="px-6 py-3 font-mono text-sm text-brand">{{ $ip->ip }}</td>
-                        <td class="px-6 py-3 text-sm">{{ $ip->usuario ?: '—' }}</td>
-                        <td class="px-6 py-3 text-sm text-muted">{{ $ip->tipo_equipo ?: '—' }}
-                            @if($ip->marca) · {{ $ip->marca }} @endif
+                        <td class="px-6 py-3 text-sm">
+                            {{ ($ip->responsable_fk ?? $ip->usuario) ?: '—' }}
+                            @if($ip->activo_serie)
+                            <br><span class="font-mono text-[11px] text-muted">{{ $ip->activo_serie }}</span>
+                            @endif
+                        </td>
+                        <td class="px-6 py-3 text-sm text-muted">{{ $ip->tipo_display ?: '—' }}
+                            @if($ip->marca_display) · {{ $ip->marca_display }} @endif
                         </td>
                         <td class="px-6 py-3">
                             @if(strtolower($ip->estatus ?? '') === 'ocupada')

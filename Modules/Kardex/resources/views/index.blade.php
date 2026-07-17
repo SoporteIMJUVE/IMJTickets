@@ -276,6 +276,7 @@
                         <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Área</th>
                         <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Estado</th>
                         <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Registrado</th>
+                        <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">PDF</th>
                         <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted text-right">Detalle</th>
                     </tr>
                 </thead>
@@ -325,6 +326,15 @@
                         <td class="px-4 py-3 text-xs text-muted">
                             {{ $eq->created_at ? \Carbon\Carbon::parse($eq->created_at)->format('d/m/Y') : '—' }}
                         </td>
+                        <td class="px-4 py-3">
+                            @if(!empty($eq->pdf_resguardo))
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-status-active/10 text-status-active">
+                                    <span class="material-symbols-outlined text-[10px]">description</span>PDF
+                                </span>
+                            @else
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-muted/10 text-muted">Sin PDF</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-right">
                             <button onclick="event.stopPropagation(); abrirPanelEquipo({{ $eq->id }})"
                                     class="p-1.5 hover:bg-wash rounded text-muted hover:text-brand">
@@ -334,7 +344,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="9" class="px-6 py-10 text-center text-muted text-sm">Sin resguardos con PDF registrados</td>
+                        <td colspan="10" class="px-6 py-10 text-center text-muted text-sm">Sin equipos institucionales registrados</td>
                     </tr>
                     @endforelse
                 </tbody>
@@ -627,7 +637,7 @@ function abrirPanelImpresora(row) {
                     <div class="flex items-center gap-2 mt-1">
                         <select id="select-estado-impresora"
                                 class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
-                            <option value="" ${!estadoRaw ? 'selected' : ''}>Automático (${estadoDisplay})</option>
+                            <option value="" ${!estadoRaw ? 'selected' : ''}>${estadoDisplay}</option>
                             <option value="almacen">Almacén (desvincula responsable)</option>
                             <option value="mantenimiento" ${estadoRaw === 'mantenimiento' ? 'selected' : ''}>Mantenimiento</option>
                             <option value="baja" ${estadoRaw === 'baja' ? 'selected' : ''}>Baja</option>
@@ -732,7 +742,7 @@ async function guardarEstadoImpresora() {
 
     // Actualizar el select para reflejar el nuevo estado guardado
     if (nuevoEstado === 'almacen') {
-        select.querySelector('option[value=""]').textContent = 'Automático (Almacén)';
+        select.querySelector('option[value=""]').textContent = 'Almacén';
         select.value = '';
     }
 }
@@ -922,12 +932,19 @@ async function abrirPanelEquipo(id) {
             </div>
             <div class="detail-field">
                 <span class="detail-label">Estado del equipo</span>
+                ${eq.es_personal ? `
+                <div class="flex items-center gap-1.5 mt-1 mb-2 px-2 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50">
+                    <span class="material-symbols-outlined text-amber-600 dark:text-amber-400 text-sm shrink-0">person</span>
+                    <p class="text-[11px] text-amber-800 dark:text-amber-300 leading-snug">
+                        Equipo personal — sin resguardo del IMJUVE.<br>
+                        Solo puede cambiar a <strong>Baja</strong>.
+                    </p>
+                </div>` : ''}
                 <div class="flex items-center gap-2 mt-1">
-                    <select id="select-estado-panel" class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand"
-                            onchange="">
-                        <option value="" ${!eq.estado ? 'selected' : ''}>Automático (${estadoDisplay})</option>
-                        <option value="almacen">Almacén (desvincula responsable)</option>
-                        <option value="mantenimiento" ${eq.estado === 'mantenimiento' ? 'selected' : ''}>Mantenimiento</option>
+                    <select id="select-estado-panel" class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand">
+                        <option value="" ${!eq.estado ? 'selected' : ''}>${estadoDisplay}</option>
+                        ${!eq.es_personal ? `<option value="almacen">Almacén (desvincula responsable)</option>` : ''}
+                        ${!eq.es_personal ? `<option value="mantenimiento" ${eq.estado === 'mantenimiento' ? 'selected' : ''}>Mantenimiento</option>` : ''}
                         <option value="baja" ${eq.estado === 'baja' ? 'selected' : ''}>Baja</option>
                     </select>
                     <button onclick="guardarEstado(${eq.id})"
@@ -978,6 +995,12 @@ async function guardarEstado(id) {
         },
         body: JSON.stringify({ estado: nuevoEstado }),
     });
+    if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        alert(body.error ?? 'No se pudo cambiar el estado.');
+        return;
+    }
+
     if (r.ok) {
         // "almacen" desvincula al responsable → el estado real pasa a
         // Almacén independientemente de qué tuviera panelEquipoUserId antes.

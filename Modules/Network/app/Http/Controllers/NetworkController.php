@@ -22,6 +22,42 @@ class NetworkController extends Controller
             ->orderBy('ip')
             ->get();
 
+        // Lookup FK-linked device info per ip_id (FK wins over stale legacy text)
+        $equipoPorIpId = DB::table('inventario_equipos as eq')
+            ->leftJoin('users as u', 'eq.user_id', '=', 'u.id')
+            ->whereNotNull('eq.ip_id')
+            ->select(
+                'eq.ip_id',
+                'eq.tipo',
+                'eq.cpu_marca',
+                'eq.cpu_serie',
+                DB::raw("NULLIF(TRIM(COALESCE(u.name,'') || ' ' || COALESCE(u.apellido_paterno,'')), '') as responsable")
+            )
+            ->get()
+            ->keyBy('ip_id');
+
+        $impresoraPorIpId = DB::table('impresoras as imp')
+            ->leftJoin('users as u', 'imp.user_id', '=', 'u.id')
+            ->whereNotNull('imp.ip_id')
+            ->select(
+                'imp.ip_id',
+                'imp.marca',
+                'imp.serie',
+                DB::raw("NULLIF(TRIM(COALESCE(u.name,'') || ' ' || COALESCE(u.apellido_paterno,'')), '') as responsable")
+            )
+            ->get()
+            ->keyBy('ip_id');
+
+        $ipsAll = $ipsAll->map(function ($ip) use ($equipoPorIpId, $impresoraPorIpId) {
+            $eq  = $equipoPorIpId[$ip->id]  ?? null;
+            $imp = $impresoraPorIpId[$ip->id] ?? null;
+            $ip->responsable_fk = $eq?->responsable ?? $imp?->responsable ?? null;
+            $ip->activo_serie   = $eq?->cpu_serie ?? $imp?->serie ?? null;
+            $ip->tipo_display   = $eq?->tipo ?? ($imp ? 'Impresora' : null) ?? $ip->tipo_equipo ?? null;
+            $ip->marca_display  = $eq?->cpu_marca ?? $imp?->marca ?? $ip->marca ?? null;
+            return $ip;
+        });
+
         // cat_rangos_ips.siglas y .ocupadas están vacíos en el dump;
         // se calculan en tiempo real comparando rangos de IP.
         $rangos = DB::table('cat_rangos_ips')->orderBy('area_nombre')->get()

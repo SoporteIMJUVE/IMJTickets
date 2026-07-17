@@ -271,12 +271,27 @@
             </section>
         </div>
 
-        {{-- Tab: Historial — todos los tickets del empleado --}}
+        {{-- Tab: Historial — tickets + equipos --}}
         <div class="p-6 hidden" id="tab-historial">
-            <div id="historial-content">
+            {{-- Mini-tabs --}}
+            <div class="flex gap-1 bg-wash rounded-lg p-1 mb-4">
+                <button id="htab-btn-tickets"
+                        class="flex-1 py-1.5 text-xs font-bold rounded-md bg-canvas shadow-sm text-brand transition-colors"
+                        onclick="switchHistorialTab('tickets')">Tickets</button>
+                <button id="htab-btn-equipos"
+                        class="flex-1 py-1.5 text-xs font-medium rounded-md text-muted hover:text-brand transition-colors"
+                        onclick="switchHistorialTab('equipos')">Equipos</button>
+            </div>
+            <div id="historial-tickets-content">
                 <div class="text-center text-muted py-12">
                     <span class="material-symbols-outlined text-4xl mb-2 block">history</span>
                     <p class="text-sm">Sin historial de tickets</p>
+                </div>
+            </div>
+            <div id="historial-equipos-content" class="hidden">
+                <div class="flex items-center justify-center py-12 text-muted gap-2">
+                    <span class="material-symbols-outlined text-2xl animate-spin">progress_activity</span>
+                    <span class="text-sm">Cargando…</span>
                 </div>
             </div>
         </div>
@@ -308,14 +323,48 @@
 {{-- Backdrop --}}
 <div class="fixed inset-0 bg-black/20 backdrop-blur-sm z-[55] hidden" id="panel-backdrop" onclick="closeUserPanel()"></div>
 
+{{-- Modal: Seleccionar IP libre --}}
+<div id="modal-ip-libres" class="hidden fixed inset-0 z-[90] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="cerrarModalIp()"></div>
+    <div class="relative bg-canvas rounded-2xl shadow-2xl border border-border w-full max-w-sm flex flex-col max-h-[80vh]">
+        <div class="p-5 border-b border-border flex items-center gap-3">
+            <span class="material-symbols-outlined text-brand">lan</span>
+            <div class="flex-1 min-w-0">
+                <h3 class="font-bold text-ink text-sm">Seleccionar IP</h3>
+                <p class="text-[11px] text-muted truncate" id="modal-ip-area-label">Área: —</p>
+            </div>
+            <button onclick="cerrarModalIp()" class="text-muted hover:text-ink transition-colors">
+                <span class="material-symbols-outlined text-lg">close</span>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4" id="modal-ip-lista">
+            <div class="flex items-center justify-center py-10 text-muted gap-2">
+                <span class="material-symbols-outlined text-xl animate-spin">progress_activity</span>
+                <span class="text-sm">Cargando IPs…</span>
+            </div>
+        </div>
+        <div class="p-4 border-t border-border flex gap-2">
+            <button onclick="cerrarModalIp()"
+                    class="flex-1 py-2 text-sm font-bold rounded-lg bg-wash text-muted hover:text-ink transition-colors">
+                Cancelar
+            </button>
+            <button onclick="asignarIpSeleccionada()"
+                    class="flex-1 py-2 text-sm font-bold rounded-lg bg-brand text-white hover:opacity-90 transition-opacity">
+                Asignar
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 // Tickets de todos los empleados indexados por correo
 // Patrón inter-módulo: datos cargados desde el controlador con DB::table('tickets'),
 // sin importar nada del módulo Tickets.
 const ticketsPorCorreo = {!! json_encode($ticketsPorCorreo, JSON_HEX_TAG) !!};
 
-let currentEmpleado = {};
-let currentEquipos  = [];
+let currentEmpleado          = {};
+let currentEquipos           = [];
+let historialEquiposLoaded   = false;
 
 async function openUserPanel(row) {
     currentEmpleado = {
@@ -362,15 +411,22 @@ async function openUserPanel(row) {
     const todos   = ticketsPorCorreo[correo] || [];
     const activos = todos.filter(t => t.estado < 2);
 
-    document.getElementById('historial-content').innerHTML = todos.length
+    historialEquiposLoaded = false;
+    document.getElementById('historial-tickets-content').innerHTML = todos.length
         ? todos.map(renderTicketItem).join('')
         : emptyState('history', 'Sin historial de tickets');
+    document.getElementById('historial-equipos-content').innerHTML =
+        `<div class="flex items-center justify-center py-12 text-muted gap-2">
+            <span class="material-symbols-outlined text-2xl animate-spin">progress_activity</span>
+            <span class="text-sm">Cargando…</span>
+         </div>`;
 
     document.getElementById('tickets-activos-content').innerHTML = activos.length
         ? activos.map(renderTicketItem).join('')
         : emptyState('confirmation_number', 'Sin tickets activos');
 
-    // Volver al tab Recursos por defecto
+    // Volver al tab Recursos por defecto; resetear mini-tab historial a Tickets
+    switchHistorialTab('tickets');
     switchPanelTab('recursos', document.querySelector('#user-panel .flex.border-b button'));
 
     document.getElementById('user-panel').classList.remove('closed');
@@ -483,10 +539,142 @@ function escHtml(s) {
         .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function switchHistorialTab(tab) {
+    const isTickets = tab === 'tickets';
+    document.getElementById('historial-tickets-content').classList.toggle('hidden', !isTickets);
+    document.getElementById('historial-equipos-content').classList.toggle('hidden',  isTickets);
+
+    const activeClass   = 'flex-1 py-1.5 text-xs font-bold rounded-md bg-canvas shadow-sm text-brand transition-colors';
+    const inactiveClass = 'flex-1 py-1.5 text-xs font-medium rounded-md text-muted hover:text-brand transition-colors';
+    document.getElementById('htab-btn-tickets').className = isTickets ? activeClass : inactiveClass;
+    document.getElementById('htab-btn-equipos').className = isTickets ? inactiveClass : activeClass;
+
+    if (!isTickets && !historialEquiposLoaded) {
+        cargarHistorialEquipos();
+    }
+}
+
+async function cargarHistorialEquipos() {
+    try {
+        const movs = await fetch(`/crm/empleado/${currentEmpleado.id}/movimientos`).then(r => r.json());
+        historialEquiposLoaded = true;
+        const el = document.getElementById('historial-equipos-content');
+        el.innerHTML = movs.length
+            ? movs.map(renderMovimientoItem).join('')
+            : emptyState('inventory_2', 'Sin movimientos de equipos');
+    } catch (e) {
+        document.getElementById('historial-equipos-content').innerHTML =
+            `<p class="text-xs text-red-500 text-center py-8">Error al cargar historial de equipos.</p>`;
+    }
+}
+
+function renderMovimientoItem(m) {
+    const eventoColor = {
+        'Asignación':   ['#16653415','var(--color-status-active)'],
+        'Entrada':      ['#1e40af15','var(--color-status-free)'],
+        'Almacén':      ['#92400E15','var(--color-status-attend)'],
+        'Reasignación': ['#7c3aed15','#7c3aed'],
+        'Mantenimiento':['#d9770615','#d97706'],
+        'Baja':         ['#99182715','var(--color-status-critical)'],
+    }[m.tipo_evento] ?? ['#88888815','var(--color-muted)'];
+
+    const tipoActivo = m.tipo_activo === 'impresora' ? 'Impresora' : (m.equipo_tipo ?? 'Equipo');
+    const marca  = m.tipo_activo === 'impresora'
+        ? [m.imp_marca, m.imp_modelo].filter(Boolean).join(' ')
+        : [m.cpu_marca, m.cpu_modelo].filter(Boolean).join(' ');
+    const serie  = m.tipo_activo === 'impresora' ? (m.imp_serie ?? '—') : (m.cpu_serie ?? '—');
+    const fecha  = m.created_at
+        ? new Date(m.created_at).toLocaleDateString('es-MX', {day:'2-digit', month:'short', year:'numeric'})
+        : '';
+
+    return `<div class="border border-border rounded-lg p-3 mb-2 last:mb-0">
+        <div class="flex items-center gap-2 mb-2">
+            <span style="background:${eventoColor[0]};color:${eventoColor[1]};font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px">
+                ${escHtml(m.tipo_evento)}
+            </span>
+            <span class="text-[10px] text-muted ml-auto">${fecha}</span>
+        </div>
+        <p class="text-xs font-bold text-ink mb-1">${escHtml(tipoActivo)}${marca ? ' — ' + escHtml(marca) : ''}</p>
+        <p class="font-mono text-[11px] text-brand mb-2">${escHtml(serie)}</p>
+        ${(m.origen || m.destino) ? `
+        <div class="flex items-center gap-1 text-[11px] text-muted">
+            <span>${escHtml(m.origen ?? '—')}</span>
+            <span class="material-symbols-outlined text-sm">arrow_forward</span>
+            <span class="font-medium text-ink">${escHtml(m.destino ?? '—')}</span>
+        </div>` : ''}
+        ${m.notas ? `<p class="text-[11px] text-muted mt-1 italic">${escHtml(m.notas)}</p>` : ''}
+    </div>`;
+}
+
 function closeUserPanel() {
     document.getElementById('user-panel').classList.add('closed');
     document.getElementById('panel-backdrop').classList.add('hidden');
 }
+
+// ─── Modal IP libres ─────────────────────────────────────────────────────────
+
+let _ipModalIdx = null;
+
+async function abrirModalLiberar(idx, area, ipActual) {
+    _ipModalIdx = idx;
+    document.getElementById('modal-ip-area-label').textContent = area ? 'Área: ' + area : 'Todas las IPs libres';
+    document.getElementById('modal-ip-lista').innerHTML =
+        `<div class="flex items-center justify-center py-10 text-muted gap-2">
+            <span class="material-symbols-outlined text-xl animate-spin">progress_activity</span>
+            <span class="text-sm">Cargando IPs…</span>
+         </div>`;
+    document.getElementById('modal-ip-libres').classList.remove('hidden');
+
+    try {
+        const params = area ? '?area=' + encodeURIComponent(area) : '';
+        const ips = await fetch(`/crm/ips-libres${params}`).then(r => r.json());
+
+        if (!ips.length) {
+            document.getElementById('modal-ip-lista').innerHTML =
+                `<p class="text-center text-sm text-muted py-8">No hay IPs libres para esta área.<br>
+                 <button onclick="abrirModalLiberar(${idx}, '', '${escHtml(ipActual)}')"
+                         class="mt-2 text-brand underline text-xs">Ver todas las IPs libres</button></p>`;
+            return;
+        }
+
+        document.getElementById('modal-ip-lista').innerHTML = ips.map(ip => {
+            const esActual = ip === ipActual;
+            return `<label class="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-wash transition-colors ${esActual ? 'bg-brand/5 border border-brand/30' : ''}">
+                <input type="radio" name="ip_modal_sel" value="${escHtml(ip)}" ${esActual ? 'checked' : ''}
+                       class="accent-brand shrink-0">
+                <span class="font-mono text-sm text-ink">${escHtml(ip)}</span>
+                ${esActual ? '<span class="ml-auto text-[10px] font-bold text-brand">Actual</span>' : ''}
+            </label>`;
+        }).join('');
+    } catch(e) {
+        document.getElementById('modal-ip-lista').innerHTML =
+            `<p class="text-center text-sm text-red-500 py-8">Error al cargar IPs.</p>`;
+    }
+}
+
+function asignarIpSeleccionada() {
+    const sel = document.querySelector('input[name="ip_modal_sel"]:checked');
+    if (!sel) return;
+    const ip = sel.value;
+    const idx = _ipModalIdx;
+
+    const hidden  = document.getElementById('ip-input-' + idx);
+    const display = document.getElementById('ip-display-' + idx);
+    const btn     = display?.closest('div')?.querySelector('button[type="button"]');
+
+    if (hidden)  hidden.value = ip;
+    if (display) display.innerHTML = escHtml(ip);
+    if (btn)     btn.textContent = 'Cambiar IP';
+
+    cerrarModalIp();
+}
+
+function cerrarModalIp() {
+    document.getElementById('modal-ip-libres').classList.add('hidden');
+    _ipModalIdx = null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function switchPanelTab(tab, btn) {
     ['recursos', 'historial', 'tickets'].forEach(t => {
@@ -500,7 +688,7 @@ function switchPanelTab(tab, btn) {
 }
 
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closeUserPanel(); closeUsuarioModal(); }
+    if (e.key === 'Escape') { closeUserPanel(); closeUsuarioModal(); cerrarModalIp(); }
 });
 
 function aplicarFiltros() {
@@ -705,22 +893,29 @@ function camposEquipo(idx, tipo, vals = {}) {
                 class="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand">
         </div>`;
 
-    // Campos comunes a todos los tipos
-    let html = `
+    // Telefono: campos mínimos — sin IP ni accesorios
+    if (tipo === 'Telefono') {
+        return `
         <div class="grid grid-cols-2 gap-3">
-            ${f('nombre_equipo', 'Nombre del equipo', 'IMJUVE-LAP-001')}
+            ${f('nombre_equipo', 'Descripción', 'Cisco IP Phone 7942G')}
+            ${f('cpu_marca',  'Marca',   'Cisco / Avaya')}
+            ${f('cpu_modelo', 'Modelo',  '7942G')}
+            ${f('cpu_serie',  'No. Serie')}
             <div>
-                <label class="block text-xs font-bold text-muted mb-1">Marca CPU</label>
-                <input type="text" name="equipos[${idx}][cpu_marca]" placeholder="Dell / HP / Lenovo"
+                <label class="block text-xs font-bold text-muted mb-1">Extensión</label>
+                <input type="number" name="equipos[${idx}][extension]" placeholder="1234" min="1" max="9999" ${v('extension')}
                     class="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand">
             </div>
-            ${f('cpu_modelo', 'Modelo CPU', 'Latitude 5540')}
-            ${f('cpu_serie', 'No. Serie CPU')}
-            ${f('ipv4',      'IPv4 asignada', '10.10.0.100', 'class="font-mono w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"').replace('class="w-full', 'style="display:none" class="w-full')}
-            ${f('mac',       'Dirección MAC',  'AA-BB-CC-DD-EE-FF', 'class="font-mono w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"').replace('class="w-full', 'class="w-full')}`;
+            <div class="col-span-2">
+                <label class="block text-xs font-bold text-muted mb-1">Observaciones</label>
+                <input type="text" name="equipos[${idx}][observaciones]" ${v('observaciones')}
+                    class="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand">
+            </div>
+        </div>`;
+    }
 
-    // Reconstruyo ipv4 y mac correctamente sin el hack de replace
-    html = `
+    // Equipos de cómputo: campos comunes + IP + MAC + accesorios según tipo
+    let html = `
         <div class="grid grid-cols-2 gap-3">
             ${f('nombre_equipo', 'Nombre del equipo', 'IMJUVE-LAP-001')}
             ${f('cpu_marca',  'Marca CPU',    'Dell / HP / Lenovo')}
@@ -728,8 +923,18 @@ function camposEquipo(idx, tipo, vals = {}) {
             ${f('cpu_serie',  'No. Serie CPU')}
             <div>
                 <label class="block text-xs font-bold text-muted mb-1">IPv4 asignada</label>
-                <input type="text" name="equipos[${idx}][ipv4]" placeholder="10.10.0.100" ${v('ipv4')}
-                    class="w-full border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-brand">
+                <div class="flex items-center gap-2">
+                    <span id="ip-display-${idx}" class="font-mono text-sm px-2 py-1 rounded bg-wash border border-border text-brand flex-1 truncate">
+                        ${vals.ipv4 ? escHtml(String(vals.ipv4)) : '<span class="text-muted">Sin IP</span>'}
+                    </span>
+                    <button type="button"
+                            onclick="abrirModalLiberar(${idx}, '${escHtml(String(vals.area ?? ''))}', '${escHtml(String(vals.ipv4 ?? ''))}')"
+                            class="shrink-0 px-2 py-1 text-[11px] font-bold bg-brand text-white rounded hover:opacity-90 transition-opacity whitespace-nowrap">
+                        ${vals.ipv4 ? 'Cambiar IP' : 'Agregar IP'}
+                    </button>
+                </div>
+                <input type="hidden" name="equipos[${idx}][ipv4]" id="ip-input-${idx}"
+                       value="${vals.ipv4 ? escHtml(String(vals.ipv4)) : ''}">
             </div>
             <div>
                 <label class="block text-xs font-bold text-muted mb-1">Dirección MAC</label>
@@ -760,18 +965,13 @@ function camposEquipo(idx, tipo, vals = {}) {
     if (tipo === 'PC Especializada') {
         html += `
             ${f('nobreak_serie',   'No. Serie No-Break')}
-            <div>
-                <label class="block text-xs font-bold text-muted mb-1">IPv4 actual (asignada en red)</label>
-                <input type="text" name="equipos[${idx}][ipv4_actual]" placeholder="10.10.0.101" ${v('ipv4_actual')}
-                    class="w-full border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-brand">
-            </div>
             ${f('check_entrega',   'No. Check / Entrega')}`;
     }
 
     html += `
             <div class="col-span-2">
                 <label class="block text-xs font-bold text-muted mb-1">Observaciones</label>
-                <input type="text" name="equipos[${idx}][observaciones]"
+                <input type="text" name="equipos[${idx}][observaciones]" ${v('observaciones')}
                     class="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand">
             </div>
         </div>`;
@@ -779,19 +979,71 @@ function camposEquipo(idx, tipo, vals = {}) {
     return html;
 }
 
+const _closeBtnHtml = `<button type="button" onclick="this.closest('.equipo-item').remove()"
+    class="absolute top-2 right-2 text-muted hover:text-red-600 transition-colors">
+    <span class="material-symbols-outlined text-lg">close</span>
+</button>`;
+
 function agregarEquipo() {
     const idx = equipoIdx++;
     const div = document.createElement('div');
     div.className = 'equipo-item border border-border rounded-xl p-4 relative bg-surface';
     div.dataset.idx = idx;
     div.innerHTML = `
-        <button type="button" onclick="this.closest('.equipo-item').remove()"
-            class="absolute top-2 right-2 text-muted hover:text-red-600 transition-colors">
-            <span class="material-symbols-outlined text-lg">close</span>
-        </button>
+        ${_closeBtnHtml}
+        <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-3 pr-6">Agregar activo</p>
+        <div class="grid grid-cols-2 gap-2">
+            <button type="button" onclick="modoEquipoBuscar(this)"
+                class="py-2.5 border border-border rounded-lg text-sm font-bold text-ink hover:bg-wash transition-colors flex items-center justify-center gap-1.5">
+                <span class="material-symbols-outlined text-base">search</span>
+                Buscar existente
+            </button>
+            <button type="button" onclick="modoEquipoNuevo(this)"
+                class="py-2.5 border border-dashed border-gold text-brand rounded-lg text-sm font-bold hover:bg-gold/10 transition-colors flex items-center justify-center gap-1.5">
+                <span class="material-symbols-outlined text-base">add_circle</span>
+                Registrar nuevo
+            </button>
+        </div>`;
+    document.getElementById('equipos-container').appendChild(div);
+}
+
+function modoEquipoBuscar(btn) {
+    const item = btn.closest('.equipo-item');
+    const idx  = item.dataset.idx;
+    item.innerHTML = `
+        ${_closeBtnHtml}
+        <p class="text-[10px] font-bold uppercase tracking-wider text-muted mb-2 pr-6">Buscar activo existente</p>
+        <div class="relative">
+            <div class="flex items-center gap-2 border border-border rounded-lg px-3 py-2 focus-within:border-brand transition-colors bg-canvas">
+                <span class="material-symbols-outlined text-muted text-sm">search</span>
+                <input type="text" placeholder="Serie, nombre, marca…"
+                       oninput="buscarEquipos(this, ${idx})"
+                       class="flex-1 text-sm outline-none bg-transparent">
+            </div>
+            <div id="buscar-resultados-${idx}"
+                 class="absolute z-10 left-0 right-0 mt-1 bg-canvas border border-border rounded-lg shadow-lg overflow-hidden max-h-52 overflow-y-auto hidden"></div>
+        </div>
+        <p class="text-[11px] text-muted mt-2">Escribe al menos 2 caracteres para buscar por serie, nombre o marca.</p>`;
+}
+
+function modoEquipoNuevo(btn) {
+    const item = btn.closest('.equipo-item');
+    const idx  = item.dataset.idx;
+    item.innerHTML = `
+        ${_closeBtnHtml}
+        <div class="mb-3 flex gap-2 items-start bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg p-3">
+            <span class="material-symbols-outlined text-amber-600 dark:text-amber-400 text-sm mt-0.5 shrink-0">warning</span>
+            <p class="text-[11px] text-amber-800 dark:text-amber-300 leading-snug">
+                <strong>Equipo personal.</strong> Al registrar un activo sin resguardo se entiende que es
+                <strong>propiedad del empleado y no del IMJUVE</strong>. El IMJUVE no se hace responsable
+                de ningún daño, pérdida o mantenimiento de este equipo. Este activo quedará excluido del
+                switcheo de responsables. Se recomienda registrar primero al empleado e ingresar el
+                <a href="{{ route('kardex.index') }}" class="font-bold underline">resguardo en Inventario</a>.
+            </p>
+        </div>
         <div class="mb-3">
             <label class="block text-xs font-bold text-muted mb-1">
-                Tipo de equipo <span class="text-red-500">*</span>
+                Tipo de activo <span class="text-red-500">*</span>
             </label>
             <select name="equipos[${idx}][tipo]" required
                 onchange="actualizarCamposEquipo(this)"
@@ -800,12 +1052,114 @@ function agregarEquipo() {
                 <option value="Laptop">Laptop</option>
                 <option value="PC Avanzada">PC Avanzada</option>
                 <option value="PC Especializada">PC Especializada</option>
+                <option value="Telefono">Teléfono</option>
             </select>
         </div>
         <div class="campos-equipo text-sm text-muted italic">
             Selecciona un tipo para ver los campos correspondientes.
         </div>`;
-    document.getElementById('equipos-container').appendChild(div);
+}
+
+let _buscarTimer = null;
+async function buscarEquipos(input, idx) {
+    const q = input.value.trim();
+    const resultados = document.getElementById(`buscar-resultados-${idx}`);
+    if (q.length < 2) { resultados.classList.add('hidden'); return; }
+    clearTimeout(_buscarTimer);
+    _buscarTimer = setTimeout(async () => {
+        resultados.innerHTML = '<p class="px-3 py-2 text-xs text-muted">Buscando…</p>';
+        resultados.classList.remove('hidden');
+        try {
+            const r = await fetch(`/crm/equipos/buscar?q=${encodeURIComponent(q)}`);
+            const data = await r.json();
+            if (!data.length) {
+                resultados.innerHTML = '<p class="px-3 py-2 text-xs text-muted">Sin resultados para ese criterio.</p>';
+                return;
+            }
+            resultados.innerHTML = data.map(e => {
+                const esPersonal = e.es_personal && e.responsable;
+                return `
+                <button type="button"
+                    onclick="seleccionarEquipoExistente(this, ${idx})"
+                    data-equipo="${escHtml(JSON.stringify(e))}"
+                    ${esPersonal ? 'title="Equipo personal — no se puede reasignar"' : ''}
+                    class="w-full text-left px-3 py-2 hover:bg-wash transition-colors border-b border-border last:border-0 flex items-center gap-3 ${esPersonal ? 'opacity-60' : ''}">
+                    <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-brand/10 text-brand shrink-0 whitespace-nowrap">
+                        ${escHtml(e.tipo)}
+                    </span>
+                    <span class="flex-1 min-w-0">
+                        <span class="text-sm font-medium block truncate">
+                            ${escHtml(e.serie || e.nombre_equipo || 'Sin serie')}
+                            ${e.es_personal ? '<span class="ml-1 text-[9px] font-bold uppercase px-1 py-0.5 rounded bg-amber-100 text-amber-700">Personal</span>' : ''}
+                        </span>
+                        <span class="text-[11px] text-muted block truncate">${escHtml(e.marca || '')}${e.modelo ? ' · ' + escHtml(e.modelo) : ''}${e.responsable ? ' · ' + escHtml(e.responsable) : ''}</span>
+                    </span>
+                    ${esPersonal ? '<span class="material-symbols-outlined text-muted text-sm shrink-0">lock</span>' : ''}
+                </button>`;
+            }).join('');
+        } catch {
+            resultados.innerHTML = '<p class="px-3 py-2 text-xs text-muted">Error de conexión.</p>';
+        }
+    }, 350);
+}
+
+function seleccionarEquipoExistente(btn, idx) {
+    const item = btn.closest('.equipo-item');
+    const eq   = JSON.parse(btn.dataset.equipo);
+
+    // Equipo personal con responsable actual → no se puede reasignar
+    if (eq.es_personal && eq.responsable) {
+        alert(`"${eq.serie || eq.nombre_equipo || 'Este equipo'}" es propiedad personal de ${eq.responsable} y no puede reasignarse a otro empleado.`);
+        return;
+    }
+
+    if (eq.tabla === 'impresoras') {
+        item.innerHTML = `
+            ${_closeBtnHtml}
+            <input type="hidden" name="equipos[${idx}][id]"    value="${escHtml(String(eq.id))}">
+            <input type="hidden" name="equipos[${idx}][tipo]"  value="Impresora">
+            <input type="hidden" name="equipos[${idx}][tabla]" value="impresoras">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                      style="background:color-mix(in srgb,var(--color-status-low) 15%,transparent);color:var(--color-status-low)">
+                    Impresora
+                </span>
+                <span class="text-[10px] text-muted">Activo existente — se asignará a este empleado</span>
+            </div>
+            <p class="text-sm font-medium">${escHtml(eq.serie || 'Sin serie')}</p>
+            <p class="text-xs text-muted">${escHtml(eq.marca || '')}${eq.modelo ? ' · ' + escHtml(eq.modelo) : ''}${eq.responsable ? ' · Responsable actual: ' + escHtml(eq.responsable) : ''}</p>`;
+        return;
+    }
+
+    // inventario_equipos: construir item con formulario precargado
+    const nuevoItem = crearEquipoExistente(idx, {
+        id:             eq.id,
+        tipo:           eq.tipo,
+        nombre_equipo:  eq.nombre_equipo,
+        cpu_marca:      eq.marca,
+        cpu_modelo:     eq.modelo,
+        cpu_serie:      eq.serie,
+        ipv4:           eq.ipv4,
+        mac:            eq.mac,
+        area:           eq.area,
+        extension:      eq.extension,
+        observaciones:  eq.observaciones,
+        teclado_serie:  eq.teclado_serie,
+        mouse_serie:    eq.mouse_serie,
+        monitor_marca:  eq.monitor_marca,
+        monitor_modelo: eq.monitor_modelo,
+        monitor_serie:  eq.monitor_serie,
+        nobreak_marca:  eq.nobreak_marca,
+        nobreak_modelo: eq.nobreak_modelo,
+        nobreak_serie:  eq.nobreak_serie,
+        cargador_serie: eq.cargador_serie,
+        docking_marca:  eq.docking_marca,
+        docking_modelo: eq.docking_modelo,
+        docking_serie:  eq.docking_serie,
+        candado:        eq.candado,
+        check_entrega:  eq.check_entrega,
+    });
+    item.replaceWith(nuevoItem);
 }
 
 function actualizarCamposEquipo(select) {
@@ -821,7 +1175,12 @@ function actualizarCamposEquipo(select) {
 }
 
 function crearEquipoExistente(idx, eq) {
-    const tipoColor = { 'Laptop':'var(--color-status-free)', 'PC Avanzada':'var(--color-status-active)', 'PC Especializada':'var(--color-status-low)' };
+    const tipoColor = {
+        'Laptop':           'var(--color-status-free)',
+        'PC Avanzada':      'var(--color-status-active)',
+        'PC Especializada': 'var(--color-status-low)',
+        'Telefono':         'var(--color-gold)',
+    };
     const color = tipoColor[eq.tipo] ?? 'var(--color-brand)';
     const div = document.createElement('div');
     div.className = 'equipo-item border border-gold rounded-xl p-4 relative bg-surface';
@@ -1010,19 +1369,19 @@ document.getElementById('form-nuevo-usuario')?.addEventListener('submit', async 
                 </div>
             </details>
 
-            {{-- Equipos de cómputo — solo visible en modo nuevo --}}
+            {{-- Activos asignados — equipos, teléfonos, impresoras --}}
             <details id="section-extras-eq" class="border border-border rounded-xl overflow-hidden">
                 <summary class="flex items-center gap-2 px-4 py-3 cursor-pointer select-none font-bold text-sm text-ink hover:bg-surface transition-colors list-none">
-                    <span class="material-symbols-outlined text-muted text-lg">computer</span>
-                    Equipos de cómputo
-                    <span class="text-xs font-normal text-muted ml-1">(opcional, puede agregar varios)</span>
+                    <span class="material-symbols-outlined text-muted text-lg">devices</span>
+                    Activos asignados
+                    <span class="text-xs font-normal text-muted ml-1">(equipos, teléfonos, impresoras)</span>
                 </summary>
                 <div class="px-4 pb-4 pt-1">
                     <div id="equipos-container" class="space-y-3 mb-3"></div>
                     <button type="button" onclick="agregarEquipo()"
                         class="w-full py-2 border-2 border-dashed border-gold text-brand rounded-lg text-sm font-bold hover:bg-gold/10 transition-colors flex items-center justify-center gap-1">
                         <span class="material-symbols-outlined text-lg">add</span>
-                        Agregar equipo
+                        Agregar activo
                     </button>
                 </div>
             </details>

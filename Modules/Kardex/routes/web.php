@@ -36,7 +36,13 @@ Route::middleware(['auth', 'admin'])->prefix('kardex')->name('kardex.')->group(f
                 \DB::raw("(SELECT ips.mac FROM inventario_ips_completo ips
                      WHERE LOWER(TRIM(ips.serie)) = LOWER(TRIM(inventario_equipos.cpu_serie))
                        AND ips.mac IS NOT NULL AND TRIM(ips.mac) NOT IN ('','/')
-                     LIMIT 1) as mac_real")
+                     LIMIT 1) as mac_real"),
+                \DB::raw("CASE WHEN EXISTS (
+                    SELECT 1 FROM movimientos_equipos m
+                    WHERE m.activo_id = inventario_equipos.id
+                      AND m.tipo_activo = 'equipo'
+                      AND m.tipo_evento = 'Entrada'
+                ) THEN 0 ELSE 1 END as es_personal")
             )
             ->where('inventario_equipos.id', $id)
             ->first();
@@ -161,4 +167,23 @@ Route::middleware(['auth', 'admin'])->prefix('kardex')->name('kardex.')->group(f
     Route::get('/resguardo/preview',    [KardexController::class, 'mostrarPreview'])->name('resguardo.preview');
     Route::post('/resguardo/guardar',   [KardexController::class, 'guardarResguardo'])->name('resguardo.guardar');
     Route::get('/resguardo/ip',         [KardexController::class, 'sugerirIp'])->name('resguardo.ip');
+
+    // JSON: verifica si una serie ya existe — permite que el formulario de preview
+    // actualice el banner de operación cuando el admin corrige el número de serie.
+    Route::get('/resguardo/verificar-serie', function (\Illuminate\Http\Request $request) {
+        $serie = trim($request->query('serie', ''));
+        if (strlen($serie) < 3) return response()->json(null);
+
+        $eq = \DB::table('inventario_equipos as eq')
+            ->leftJoin('users as resp', 'eq.user_id', '=', 'resp.id')
+            ->where('eq.cpu_serie', $serie)
+            ->select(
+                'eq.id', 'eq.user_id', 'eq.tipo', 'eq.cpu_marca', 'eq.cpu_modelo', 'eq.area', 'eq.ipv4',
+                \DB::raw("NULLIF(TRIM(COALESCE(resp.name,'') || ' ' || COALESCE(resp.apellido_paterno,'')), '') as responsable_nombre"),
+                'resp.email as responsable_correo'
+            )
+            ->first();
+
+        return response()->json($eq);
+    })->name('resguardo.verificar-serie');
 });
