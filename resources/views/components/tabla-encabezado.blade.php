@@ -233,5 +233,13 @@ document.addEventListener('click', function(e) {
     const mImp = document.getElementById('modal-importar');
     if (mImp && !mImp.classList.contains('hidden') && e.target === mImp) cerrarModalImportar();
 });
+
+// Los modales son fixed pero quedan atrapados en el primer tab que los renderizó.
+// Si ese tab tiene display:none, los modales son invisibles aunque sean fixed.
+// Moverlos al body los libera de cualquier ancestro con display:none.
+['modal-exportar', 'modal-importar'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) document.body.appendChild(el);
+});
 </script>
 @endonce
