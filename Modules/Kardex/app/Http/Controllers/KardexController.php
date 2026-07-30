@@ -539,10 +539,33 @@ class KardexController extends Controller
                 $ipId    = IpAssigner::resolveId($ipNueva);
                 $ocupante = IpAssigner::findOccupant($ipId);
 
-                if ($ocupante && $ocupante->id !== $existente->id && (int) $ocupante->user_id !== $userId) {
-                    return redirect()->route('kardex.resguardo.preview')->withInput()->withErrors([
-                        'ipv4' => "La IP {$ipNueva} ya está asignada a otro dispositivo.",
+                if ($ocupante && (int) $ocupante->id !== (int) $existente->id) {
+                    // La IP está en un dispositivo distinto al que se está guardando.
+                    if ($ocupante->tabla === 'inventario_equipos' && (int) $ocupante->user_id !== $userId) {
+                        // Diferente equipo, diferente propietario → bloquear
+                        return redirect()->route('kardex.resguardo.preview')->withInput()->withErrors([
+                            'ipv4' => "La IP {$ipNueva} ya está asignada a otro equipo (distinto propietario). Libérala primero desde el panel Network.",
+                        ]);
+                    }
+                    // Mismo propietario (u ocupante es impresora) → switcheo implícito:
+                    // se desvincula la IP del dispositivo anterior sin pasar por 'Libre',
+                    // porque inmediatamente se reasigna abajo.
+                    $pkAnterior      = $ocupante->tabla === 'inventario_equipos' ? 'id' : 'id_impresora';
+                    $campoIpAnterior = $ocupante->tabla === 'inventario_equipos' ? 'ipv4' : 'ip_address';
+                    DB::table($ocupante->tabla)->where($pkAnterior, $ocupante->id)->update([
+                        'ip_id'          => null,
+                        $campoIpAnterior => null,
+                        'updated_at'     => now(),
                     ]);
+                    KardexMovimiento::registrar(
+                        tipo_activo:   $ocupante->tabla === 'inventario_equipos' ? 'equipo' : 'impresora',
+                        activo_id:     (int) $ocupante->id,
+                        tipo_evento:   'Liberación IP',
+                        origen:        $existente->cpu_serie,
+                        destino:       $existente->cpu_serie,
+                        estado_equipo: 'Libre',
+                        notas:         "IP: {$ipNueva} — liberada por reasignación de resguardo",
+                    );
                 }
 
                 // Registrar evento según si ya tenía IP o no
@@ -587,6 +610,7 @@ class KardexController extends Controller
                     destino:       $nombreEmpleado,
                     user_from_id:  $existente->user_id,
                     user_to_id:    $userId,
+                    ticket_ref:    $request->ticket_ref ?: null,
                     estado_equipo: 'Asignado',
                     notas:         'Cambio de responsable por nuevo resguardo PDF.',
                 );
@@ -690,6 +714,7 @@ class KardexController extends Controller
             origen:        'Subdirección de Sistemas',
             destino:       $nombreEmpleado,
             user_to_id:    $userId,
+            ticket_ref:    $request->ticket_ref ?: null,
             estado_equipo: 'Asignado',
             notas:         $notaAsignacion,
         );
