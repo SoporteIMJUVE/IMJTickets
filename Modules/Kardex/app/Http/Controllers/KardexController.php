@@ -929,4 +929,166 @@ class KardexController extends Controller
             return response()->json(['error' => $e->getMessage()], 422);
         }
     }
+
+    // ─── Licencias ─────────────────────────────────────────────────────────────
+
+    public function licenciasJson()
+    {
+        $licencias = DB::table('licencias')->orderBy('correo')->get();
+
+        $nUsuarios = DB::table('licencia_users')
+            ->selectRaw('licencia_id, COUNT(*) as total')
+            ->groupBy('licencia_id')
+            ->pluck('total', 'licencia_id');
+
+        $nEquipos = DB::table('licencia_equipos')
+            ->selectRaw('licencia_id, COUNT(*) as total')
+            ->groupBy('licencia_id')
+            ->pluck('total', 'licencia_id');
+
+        return response()->json($licencias->map(function ($lic) use ($nUsuarios, $nEquipos) {
+            $lic->n_usuarios = (int) ($nUsuarios[$lic->id] ?? 0);
+            $lic->n_equipos  = (int) ($nEquipos[$lic->id] ?? 0);
+            return $lic;
+        }));
+    }
+
+    public function licenciaDetalle($id)
+    {
+        $lic = DB::table('licencias')->where('id', $id)->first();
+        abort_if(!$lic, 404);
+
+        $titulares = DB::table('licencia_users')
+            ->join('users', 'licencia_users.user_id', '=', 'users.id')
+            ->where('licencia_users.licencia_id', $id)
+            ->select(
+                'users.id',
+                DB::raw("TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'')) as nombre"),
+                'users.email',
+                'users.puesto',
+            )
+            ->get();
+
+        $equipos = DB::table('licencia_equipos')
+            ->join('inventario_equipos', 'licencia_equipos.equipo_id', '=', 'inventario_equipos.id')
+            ->where('licencia_equipos.licencia_id', $id)
+            ->select(
+                'inventario_equipos.id',
+                'inventario_equipos.tipo',
+                'inventario_equipos.cpu_serie',
+                'inventario_equipos.cpu_marca',
+                'inventario_equipos.cpu_modelo',
+                'inventario_equipos.area',
+            )
+            ->get();
+
+        $lic->titulares = $titulares;
+        $lic->equipos   = $equipos;
+
+        return response()->json($lic);
+    }
+
+    public function storeLicencia(Request $request)
+    {
+        $defaults = match ($request->input('tipo')) {
+            'E3'             => ['max_usuarios' => 1, 'max_equipos' => 5],
+            'E1'             => ['max_usuarios' => 1, 'max_equipos' => 0],
+            'Exchange Plan 1'=> ['max_usuarios' => 1, 'max_equipos' => 0],
+            default          => ['max_usuarios' => 1, 'max_equipos' => 0],
+        };
+
+        $data = $request->validate([
+            'correo'        => 'required|email|unique:licencias,correo|max:150',
+            'tipo'          => 'required|string|max:50',
+            'max_usuarios'  => 'required|integer|min:1',
+            'max_equipos'   => 'required|integer|min:0',
+            'area'          => 'nullable|string',
+            'estado'        => 'required|string|in:Activa,Inactiva,Suspendida',
+            'caducidad'     => 'nullable|date',
+            'observaciones' => 'nullable|string',
+        ]);
+
+        $id = DB::table('licencias')->insertGetId(array_merge($data, [
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]));
+
+        return response()->json(['ok' => true, 'id' => $id]);
+    }
+
+    public function updateLicencia(Request $request, $id)
+    {
+        abort_if(!DB::table('licencias')->where('id', $id)->exists(), 404);
+
+        $data = $request->validate([
+            'correo'        => "required|email|max:150|unique:licencias,correo,{$id}",
+            'tipo'          => 'required|string|max:50',
+            'max_usuarios'  => 'required|integer|min:1',
+            'max_equipos'   => 'required|integer|min:0',
+            'area'          => 'nullable|string',
+            'estado'        => 'required|string|in:Activa,Inactiva,Suspendida',
+            'caducidad'     => 'nullable|date',
+            'observaciones' => 'nullable|string',
+        ]);
+
+        DB::table('licencias')->where('id', $id)->update(array_merge($data, ['updated_at' => now()]));
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function asignarLicenciaUsuario(Request $request, $id)
+    {
+        $lic = DB::table('licencias')->where('id', $id)->first();
+        abort_if(!$lic, 404);
+
+        $userId = $request->validate(['user_id' => 'required|exists:users,id'])['user_id'];
+
+        $nActual = DB::table('licencia_users')->where('licencia_id', $id)->count();
+        if ($nActual >= $lic->max_usuarios) {
+            return response()->json(['error' => "Cupo de titulares alcanzado ({$lic->max_usuarios})."], 422);
+        }
+
+        DB::table('licencia_users')->updateOrInsert(
+            ['licencia_id' => $id, 'user_id' => $userId],
+            ['created_at'  => now()]
+        );
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function desasignarLicenciaUsuario($id, $userId)
+    {
+        DB::table('licencia_users')->where('licencia_id', $id)->where('user_id', $userId)->delete();
+        return response()->json(['ok' => true]);
+    }
+
+    public function asignarLicenciaEquipo(Request $request, $id)
+    {
+        $lic = DB::table('licencias')->where('id', $id)->first();
+        abort_if(!$lic, 404);
+
+        if ($lic->max_equipos <= 0) {
+            return response()->json(['error' => 'Esta licencia no permite instalación en equipos (solo acceso web).'], 422);
+        }
+
+        $equipoId = $request->validate(['equipo_id' => 'required|exists:inventario_equipos,id'])['equipo_id'];
+
+        $nActual = DB::table('licencia_equipos')->where('licencia_id', $id)->count();
+        if ($nActual >= $lic->max_equipos) {
+            return response()->json(['error' => "Cupo de equipos alcanzado ({$lic->max_equipos})."], 422);
+        }
+
+        DB::table('licencia_equipos')->updateOrInsert(
+            ['licencia_id' => $id, 'equipo_id' => $equipoId],
+            ['created_at'  => now()]
+        );
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function desasignarLicenciaEquipo($id, $equipoId)
+    {
+        DB::table('licencia_equipos')->where('licencia_id', $id)->where('equipo_id', $equipoId)->delete();
+        return response()->json(['ok' => true]);
+    }
 }

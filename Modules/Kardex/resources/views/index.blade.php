@@ -21,6 +21,10 @@
                         class="px-6 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high">
                     Movimientos
                 </button>
+                <button id="tab-btn-licencias" onclick="switchKardexTab('licencias', this)"
+                        class="px-6 py-2 rounded-md text-sm font-bold transition-all text-muted hover:bg-surface-high">
+                    Licencias
+                </button>
             </div>
         </div>
     </div>
@@ -423,6 +427,153 @@
         </div>
     </div>
 
+    {{-- ---- TAB: LICENCIAS ---- --}}
+    <div id="tab-licencias" class="hidden">
+        <div class="bg-canvas border border-border rounded-xl overflow-hidden shadow-sm">
+            {{-- Encabezado --}}
+            <div class="flex items-center justify-between px-6 py-4 border-b border-border bg-wash">
+                <div>
+                    <h3 class="font-bold text-base">Licencias Microsoft 365</h3>
+                    <p class="text-xs text-muted mt-0.5">Cuentas de correo con licencias de pago y sus cupos de uso.</p>
+                </div>
+                <button onclick="abrirFormLicencia(null)"
+                        class="flex items-center gap-2 px-4 py-2 bg-brand text-white rounded-lg text-sm font-bold hover:opacity-90 transition-opacity">
+                    <span class="material-symbols-outlined text-sm">add</span>
+                    Nueva licencia
+                </button>
+            </div>
+
+            {{-- Tabla --}}
+            <div class="overflow-x-auto">
+                <table class="w-full text-left" id="tabla-licencias">
+                    <thead class="bg-wash border-b border-border">
+                        <tr>
+                            <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Correo</th>
+                            <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Tipo</th>
+                            <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Titulares</th>
+                            <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Equipos</th>
+                            <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Área</th>
+                            <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Caducidad</th>
+                            <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted">Estado</th>
+                            <th class="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border" id="tbody-licencias">
+                        <tr>
+                            <td colspan="8" class="px-6 py-10 text-center text-muted text-sm">
+                                <span class="material-symbols-outlined text-2xl animate-spin align-middle mr-2">progress_activity</span>
+                                Cargando licencias…
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+{{-- ══ Panel lateral: detalle de licencia ══ --}}
+<div class="fixed top-0 right-0 h-screen w-[480px] bg-canvas shadow-2xl border-l border-gold z-[60] flex flex-col translate-x-full transition-transform duration-300" id="licencia-panel">
+    <div class="p-5 border-b border-border bg-surface flex justify-between items-start shrink-0">
+        <div class="min-w-0 pr-4">
+            <p class="text-[11px] font-bold uppercase tracking-wider text-muted" id="lp-tipo-badge">—</p>
+            <h4 class="text-base font-bold text-brand truncate" id="lp-correo">—</h4>
+        </div>
+        <button class="text-muted hover:text-brand p-1 shrink-0" onclick="cerrarPanelLicencia()">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar" id="lp-cuerpo">
+        <div class="flex items-center justify-center py-16 text-muted">
+            <span class="material-symbols-outlined text-4xl animate-spin">progress_activity</span>
+        </div>
+    </div>
+</div>
+<div class="fixed inset-0 bg-black/20 backdrop-blur-sm z-[55] hidden" id="licencia-backdrop"
+     onclick="cerrarPanelLicencia()"></div>
+
+{{-- Modal: crear / editar licencia --}}
+<div id="modal-licencia" class="fixed inset-0 z-[70] flex items-center justify-center hidden">
+    <div class="absolute inset-0 bg-black/40" onclick="cerrarModalLicencia()"></div>
+    <div class="relative bg-canvas rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 z-10">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="font-bold text-lg" id="modal-lic-titulo">Nueva licencia</h3>
+            <button onclick="cerrarModalLicencia()" class="text-muted hover:text-brand">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <form id="form-licencia" class="space-y-4">
+            <input type="hidden" id="lic-edit-id">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2">
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Correo M365 *</label>
+                    <input id="lic-correo" type="email" required
+                           class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-canvas outline-none focus:ring-2 focus:ring-brand"
+                           placeholder="usuario@dominio.gob.mx">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Tipo *</label>
+                    <select id="lic-tipo" onchange="autoFillCupos()"
+                            class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-canvas outline-none focus:ring-2 focus:ring-brand">
+                        <option value="E1">E1</option>
+                        <option value="E3" selected>E3</option>
+                        <option value="Exchange Plan 1">Exchange Plan 1</option>
+                        <option value="Microsoft 365 Business Basic">Microsoft 365 Business Basic</option>
+                        <option value="Microsoft 365 Business Standard">Microsoft 365 Business Standard</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Estado *</label>
+                    <select id="lic-estado"
+                            class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-canvas outline-none focus:ring-2 focus:ring-brand">
+                        <option value="Activa">Activa</option>
+                        <option value="Inactiva">Inactiva</option>
+                        <option value="Suspendida">Suspendida</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Max. Titulares *</label>
+                    <input id="lic-max-usuarios" type="number" min="1" required value="1"
+                           class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-canvas outline-none focus:ring-2 focus:ring-brand">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Max. Equipos *</label>
+                    <input id="lic-max-equipos" type="number" min="0" required value="5"
+                           class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-canvas outline-none focus:ring-2 focus:ring-brand">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Área</label>
+                    <input id="lic-area" type="text"
+                           class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-canvas outline-none focus:ring-2 focus:ring-brand"
+                           placeholder="Dirección de Sistemas…">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Caducidad</label>
+                    <input id="lic-caducidad" type="date"
+                           class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-canvas outline-none focus:ring-2 focus:ring-brand">
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Observaciones</label>
+                    <textarea id="lic-observaciones" rows="2"
+                              class="w-full text-sm border border-border rounded-lg px-3 py-2 bg-canvas outline-none focus:ring-2 focus:ring-brand resize-none"
+                              placeholder="Notas adicionales…"></textarea>
+                </div>
+            </div>
+            <div id="modal-lic-error" class="hidden text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2"></div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="cerrarModalLicencia()"
+                        class="flex-1 py-2.5 border border-border rounded-lg text-sm font-bold text-muted hover:bg-wash">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="flex-1 py-2.5 bg-brand text-white rounded-lg text-sm font-bold hover:opacity-90">
+                    Guardar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {{-- ══ Panel lateral: detalle de equipo ══ --}}
 <div class="fixed top-0 right-0 h-screen w-[440px] bg-canvas shadow-2xl border-l border-gold z-[60] flex flex-col translate-x-full transition-transform duration-300" id="equipo-panel">
     <div class="p-5 border-b border-border bg-surface flex justify-between items-start shrink-0">
@@ -469,12 +620,13 @@ const INACTIVE_TAB= 'px-6 py-2 rounded-md text-sm font-bold transition-all text-
 let currentTab    = 'equipos';
 
 function switchKardexTab(tab, btn) {
-    ['equipos', 'resguardos', 'movimientos'].forEach(t => {
+    ['equipos', 'resguardos', 'movimientos', 'licencias'].forEach(t => {
         document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
         document.getElementById('tab-btn-' + t).className = t === tab ? ACTIVE_TAB : INACTIVE_TAB;
     });
     currentTab = tab;
     if (tab === 'movimientos' && !window._movimientosCargados) cargarMovimientos();
+    if (tab === 'licencias'   && !window._licenciasCargadas)   cargarLicencias();
 }
 
 // ── Tab Movimientos ───────────────────────────────────────────────────
@@ -1088,7 +1240,295 @@ async function guardarUsuario(id) {
 }
 
 document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') cerrarPanelEquipo();
+    if (e.key === 'Escape') { cerrarPanelEquipo(); cerrarPanelLicencia(); cerrarModalLicencia(); }
+});
+
+// ── Tab Licencias ─────────────────────────────────────────────────────
+let _todasLicencias = [];
+
+async function cargarLicencias() {
+    const r = await fetch('{{ route("kardex.licencias.json") }}');
+    _todasLicencias = await r.json();
+    window._licenciasCargadas = true;
+    renderLicencias(_todasLicencias);
+}
+
+function renderLicencias(licencias) {
+    const tbody = document.getElementById('tbody-licencias');
+    if (!licencias.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-10 text-center text-muted text-sm">Sin licencias registradas. <button onclick="abrirFormLicencia(null)" class="underline text-brand">Agregar una</button>.</td></tr>`;
+        return;
+    }
+
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    tbody.innerHTML = licencias.map(lic => {
+        const nU = lic.n_usuarios, maxU = lic.max_usuarios;
+        const nE = lic.n_equipos,  maxE = lic.max_equipos;
+
+        const badgeU = cupo(nU, maxU);
+        const badgeE = maxE > 0 ? cupo(nE, maxE) : `<span class="text-[11px] text-muted">N/A</span>`;
+
+        // Caducidad badge
+        let cadBadge = '<span class="text-muted text-xs">—</span>';
+        if (lic.caducidad) {
+            const cad = new Date(lic.caducidad + 'T00:00:00');
+            const diff = Math.ceil((cad - hoy) / 86400000);
+            const color = diff < 0 ? 'bg-red-100 text-red-700' : diff <= 30 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-700';
+            cadBadge = `<span class="text-[11px] px-2 py-0.5 rounded-full font-bold ${color}">${lic.caducidad}</span>`;
+        }
+
+        const estadoColors = { 'Activa': 'bg-status-free/10 text-status-free', 'Inactiva': 'bg-muted/10 text-muted', 'Suspendida': 'bg-red-100 text-red-600' };
+        const estadoClass  = estadoColors[lic.estado] ?? 'bg-muted/10 text-muted';
+
+        return `<tr class="hover:bg-wash cursor-pointer transition-colors" onclick="abrirPanelLicencia(${lic.id})">
+            <td class="px-4 py-3 text-sm font-mono text-brand">${lic.correo}</td>
+            <td class="px-4 py-3"><span class="text-[11px] font-bold px-2 py-0.5 rounded bg-brand/10 text-brand">${lic.tipo}</span></td>
+            <td class="px-4 py-3">${badgeU}</td>
+            <td class="px-4 py-3">${badgeE}</td>
+            <td class="px-4 py-3 text-sm text-muted">${lic.area ?? '—'}</td>
+            <td class="px-4 py-3">${cadBadge}</td>
+            <td class="px-4 py-3"><span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${estadoClass}">${lic.estado}</span></td>
+            <td class="px-4 py-3">
+                <button onclick="event.stopPropagation(); abrirFormLicencia(${lic.id})"
+                        class="text-muted hover:text-brand p-1" title="Editar">
+                    <span class="material-symbols-outlined text-sm">edit</span>
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function cupo(n, max) {
+    const color = n >= max ? 'bg-red-100 text-red-700' : n >= max * 0.8 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-700';
+    return `<span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${color}">${n}/${max}</span>`;
+}
+
+// ── Panel lateral licencia ───────────────────────────────────────────
+
+let _licenciaActual = null;
+
+async function abrirPanelLicencia(id) {
+    document.getElementById('lp-correo').textContent    = '…';
+    document.getElementById('lp-tipo-badge').textContent = '…';
+    document.getElementById('lp-cuerpo').innerHTML = `<div class="flex items-center justify-center py-16 text-muted"><span class="material-symbols-outlined text-4xl animate-spin">progress_activity</span></div>`;
+
+    const panel = document.getElementById('licencia-panel');
+    panel.classList.remove('translate-x-full');
+    document.getElementById('licencia-backdrop').classList.remove('hidden');
+
+    const r   = await fetch(`/kardex/licencias/${id}/detalle`);
+    const lic = await r.json();
+    _licenciaActual = lic;
+
+    document.getElementById('lp-correo').textContent     = lic.correo;
+    document.getElementById('lp-tipo-badge').textContent  = lic.tipo + ' · ' + lic.estado;
+
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    let cadHtml = '—';
+    if (lic.caducidad) {
+        const diff = Math.ceil((new Date(lic.caducidad + 'T00:00:00') - hoy) / 86400000);
+        const cls  = diff < 0 ? 'text-red-600 font-bold' : diff <= 30 ? 'text-yellow-700 font-bold' : 'text-green-700';
+        cadHtml = `<span class="${cls}">${lic.caducidad}${diff < 0 ? ' (vencida)' : diff <= 30 ? ` (${diff}d)` : ''}</span>`;
+    }
+
+    const titularesHtml = lic.titulares.length
+        ? lic.titulares.map(u => `
+            <div class="flex items-center justify-between py-1.5">
+                <div class="min-w-0">
+                    <p class="text-sm font-medium truncate">${u.nombre}</p>
+                    <p class="text-xs text-muted truncate">${u.email} · ${u.puesto ?? '—'}</p>
+                </div>
+                <button onclick="desasignarLicenciaUsuario(${id}, ${u.id})" class="text-red-400 hover:text-red-600 ml-2 shrink-0" title="Quitar">
+                    <span class="material-symbols-outlined text-sm">person_remove</span>
+                </button>
+            </div>`).join('<hr class="border-border">')
+        : '<p class="text-xs text-muted py-2">Sin titulares asignados.</p>';
+
+    const equiposHtml = lic.equipos.length
+        ? lic.equipos.map(e => `
+            <div class="flex items-center justify-between py-1.5">
+                <div class="min-w-0">
+                    <p class="text-xs font-mono text-brand truncate">${e.cpu_serie}</p>
+                    <p class="text-xs text-muted truncate">${e.tipo} · ${[e.cpu_marca, e.cpu_modelo].filter(Boolean).join(' ') || '—'} · ${e.area ?? '—'}</p>
+                </div>
+                <button onclick="desasignarLicenciaEquipo(${id}, ${e.id})" class="text-red-400 hover:text-red-600 ml-2 shrink-0" title="Quitar">
+                    <span class="material-symbols-outlined text-sm">link_off</span>
+                </button>
+            </div>`).join('<hr class="border-border">')
+        : '<p class="text-xs text-muted py-2">Sin equipos vinculados.</p>';
+
+    const canAddEquipo = lic.max_equipos > 0 && lic.equipos.length < lic.max_equipos;
+
+    document.getElementById('lp-cuerpo').innerHTML = `
+        <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="detail-field"><span class="detail-label">Área</span><span class="detail-value">${lic.area ?? '—'}</span></div>
+            <div class="detail-field"><span class="detail-label">Caducidad</span><span class="detail-value">${cadHtml}</span></div>
+            <div class="detail-field col-span-2"><span class="detail-label">Observaciones</span><span class="detail-value">${lic.observaciones ?? '—'}</span></div>
+        </div>
+
+        <div class="border border-border rounded-xl overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2.5 bg-wash border-b border-border">
+                <p class="text-xs font-bold uppercase tracking-wider">Titulares <span class="text-muted font-normal">(${lic.titulares.length}/${lic.max_usuarios})</span></p>
+                ${lic.titulares.length < lic.max_usuarios
+                    ? `<button onclick="abrirAddUsuario(${id})" class="text-[11px] font-bold text-brand flex items-center gap-1"><span class="material-symbols-outlined text-sm">person_add</span> Agregar</button>`
+                    : `<span class="text-[11px] text-muted">Cupo lleno</span>`}
+            </div>
+            <div class="px-4 py-1 divide-y divide-border">${titularesHtml}</div>
+        </div>
+
+        <div class="border border-border rounded-xl overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2.5 bg-wash border-b border-border">
+                <p class="text-xs font-bold uppercase tracking-wider">Equipos instalados <span class="text-muted font-normal">(${lic.equipos.length}/${lic.max_equipos > 0 ? lic.max_equipos : 'N/A'})</span></p>
+                ${canAddEquipo
+                    ? `<button onclick="abrirAddEquipo(${id})" class="text-[11px] font-bold text-brand flex items-center gap-1"><span class="material-symbols-outlined text-sm">add_circle</span> Vincular</button>`
+                    : `<span class="text-[11px] text-muted">${lic.max_equipos <= 0 ? 'Solo web' : 'Cupo lleno'}</span>`}
+            </div>
+            <div class="px-4 py-1 divide-y divide-border">${equiposHtml}</div>
+        </div>
+
+        <button onclick="abrirFormLicencia(${id})"
+                class="w-full py-2 border border-border rounded-lg text-sm font-bold text-muted hover:bg-wash flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-sm">edit</span> Editar licencia
+        </button>`;
+}
+
+function cerrarPanelLicencia() {
+    document.getElementById('licencia-panel').classList.add('translate-x-full');
+    document.getElementById('licencia-backdrop').classList.add('hidden');
+    _licenciaActual = null;
+}
+
+async function desasignarLicenciaUsuario(licId, userId) {
+    if (!confirm('¿Quitar este titular de la licencia?')) return;
+    await fetch(`/kardex/licencias/${licId}/usuario/${userId}`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content } });
+    await recargarLicencias();
+    abrirPanelLicencia(licId);
+}
+
+async function desasignarLicenciaEquipo(licId, equipoId) {
+    if (!confirm('¿Desvincular este equipo de la licencia?')) return;
+    await fetch(`/kardex/licencias/${licId}/equipo/${equipoId}`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content } });
+    await recargarLicencias();
+    abrirPanelLicencia(licId);
+}
+
+async function abrirAddUsuario(licId) {
+    const q = prompt('Email o nombre del empleado a agregar como titular:');
+    if (!q) return;
+    const r = await fetch(`/kardex/usuarios/buscar?q=${encodeURIComponent(q)}`);
+    const users = await r.json();
+    if (!users.length) { alert('No se encontró ningún empleado con esa búsqueda.'); return; }
+    let texto = users.map((u, i) => `${i+1}. ${u.nombre} ${u.apellido_paterno ?? ''} <${u.correo}>`).join('\n');
+    const sel = parseInt(prompt(`Selecciona el número del empleado:\n\n${texto}`));
+    if (!sel || sel < 1 || sel > users.length) return;
+    const user = users[sel - 1];
+    const res = await fetch(`/kardex/licencias/${licId}/usuario`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+        body: JSON.stringify({ user_id: user.id_empleado })
+    });
+    const json = await res.json();
+    if (!res.ok) { alert(json.error ?? 'Error al asignar.'); return; }
+    await recargarLicencias();
+    abrirPanelLicencia(licId);
+}
+
+async function abrirAddEquipo(licId) {
+    const serie = prompt('No. de Serie del equipo a vincular:');
+    if (!serie) return;
+    // Buscar el ID del equipo por serie
+    const busq = await fetch(`/kardex/resguardo/verificar-serie?serie=${encodeURIComponent(serie.trim())}`);
+    const eq   = await busq.json();
+    if (!eq || !eq.id) { alert('No se encontró ningún equipo con esa serie.'); return; }
+    const r = await fetch(`/kardex/licencias/${licId}/equipo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+        body: JSON.stringify({ equipo_id: eq.id })
+    });
+    const json = await r.json();
+    if (!r.ok) { alert(json.error ?? 'Error al vincular.'); return; }
+    await recargarLicencias();
+    abrirPanelLicencia(licId);
+}
+
+async function recargarLicencias() {
+    const r = await fetch('{{ route("kardex.licencias.json") }}');
+    _todasLicencias = await r.json();
+    renderLicencias(_todasLicencias);
+}
+
+// ── Modal crear / editar licencia ────────────────────────────────────
+
+const LIC_CAPS = {
+    'E3': { max_usuarios: 1, max_equipos: 5 },
+    'E1': { max_usuarios: 1, max_equipos: 0 },
+    'Exchange Plan 1': { max_usuarios: 1, max_equipos: 0 },
+    'Microsoft 365 Business Basic': { max_usuarios: 1, max_equipos: 0 },
+    'Microsoft 365 Business Standard': { max_usuarios: 1, max_equipos: 5 },
+};
+
+function autoFillCupos() {
+    const tipo = document.getElementById('lic-tipo').value;
+    const caps = LIC_CAPS[tipo];
+    if (caps) {
+        document.getElementById('lic-max-usuarios').value = caps.max_usuarios;
+        document.getElementById('lic-max-equipos').value  = caps.max_equipos;
+    }
+}
+
+function abrirFormLicencia(id) {
+    cerrarPanelLicencia();
+    document.getElementById('modal-lic-error').classList.add('hidden');
+    const lic = id ? _todasLicencias.find(l => l.id === id) : null;
+    document.getElementById('modal-lic-titulo').textContent = id ? 'Editar licencia' : 'Nueva licencia';
+    document.getElementById('lic-edit-id').value      = id ?? '';
+    document.getElementById('lic-correo').value       = lic?.correo       ?? '';
+    document.getElementById('lic-tipo').value         = lic?.tipo         ?? 'E3';
+    document.getElementById('lic-estado').value       = lic?.estado       ?? 'Activa';
+    document.getElementById('lic-max-usuarios').value = lic?.max_usuarios ?? 1;
+    document.getElementById('lic-max-equipos').value  = lic?.max_equipos  ?? 5;
+    document.getElementById('lic-area').value         = lic?.area         ?? '';
+    document.getElementById('lic-caducidad').value    = lic?.caducidad    ?? '';
+    document.getElementById('lic-observaciones').value= lic?.observaciones ?? '';
+    document.getElementById('modal-licencia').classList.remove('hidden');
+}
+
+function cerrarModalLicencia() {
+    document.getElementById('modal-licencia').classList.add('hidden');
+}
+
+document.getElementById('form-licencia').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const errDiv = document.getElementById('modal-lic-error');
+    errDiv.classList.add('hidden');
+    const id = document.getElementById('lic-edit-id').value;
+
+    const payload = {
+        correo:        document.getElementById('lic-correo').value,
+        tipo:          document.getElementById('lic-tipo').value,
+        estado:        document.getElementById('lic-estado').value,
+        max_usuarios:  parseInt(document.getElementById('lic-max-usuarios').value),
+        max_equipos:   parseInt(document.getElementById('lic-max-equipos').value),
+        area:          document.getElementById('lic-area').value || null,
+        caducidad:     document.getElementById('lic-caducidad').value || null,
+        observaciones: document.getElementById('lic-observaciones').value || null,
+    };
+
+    const url    = id ? `/kardex/licencias/${id}` : '/kardex/licencias';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+        body: JSON.stringify(payload),
+    });
+    const json = await r.json();
+    if (!r.ok) {
+        const msgs = json.errors ? Object.values(json.errors).flat().join(' ') : (json.error ?? 'Error al guardar.');
+        errDiv.textContent = msgs; errDiv.classList.remove('hidden'); return;
+    }
+    cerrarModalLicencia();
+    await recargarLicencias();
+    if (json.id) abrirPanelLicencia(json.id);
 });
 
 // Deep-link: ?open=id abre el panel del equipo directamente

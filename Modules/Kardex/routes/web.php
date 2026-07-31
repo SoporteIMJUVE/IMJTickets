@@ -165,6 +165,16 @@ Route::middleware(['auth', 'admin'])->prefix('kardex')->name('kardex.')->group(f
     Route::post('/importar/validar',    [KardexController::class, 'validarImport'])->name('importar.validar');
     Route::post('/importar/aplicar',    [KardexController::class, 'aplicarImport'])->name('importar.aplicar');
 
+    // ── Licencias ────────────────────────────────────────────────────────────
+    Route::get('/licencias/json',                                     [KardexController::class, 'licenciasJson'])->name('licencias.json');
+    Route::get('/licencias/{id}/detalle',                             [KardexController::class, 'licenciaDetalle'])->name('licencias.detalle');
+    Route::post('/licencias',                                         [KardexController::class, 'storeLicencia'])->name('licencias.store');
+    Route::put('/licencias/{id}',                                     [KardexController::class, 'updateLicencia'])->name('licencias.update');
+    Route::post('/licencias/{id}/usuario',                            [KardexController::class, 'asignarLicenciaUsuario'])->name('licencias.asignar-usuario');
+    Route::delete('/licencias/{id}/usuario/{userId}',                 [KardexController::class, 'desasignarLicenciaUsuario'])->name('licencias.desasignar-usuario');
+    Route::post('/licencias/{id}/equipo',                             [KardexController::class, 'asignarLicenciaEquipo'])->name('licencias.asignar-equipo');
+    Route::delete('/licencias/{id}/equipo/{equipoId}',                [KardexController::class, 'desasignarLicenciaEquipo'])->name('licencias.desasignar-equipo');
+
     Route::get('/resguardo/subir',      [KardexController::class, 'subirResguardo'])->name('resguardo.subir');
     Route::post('/resguardo/extraer',   [KardexController::class, 'extraerResguardo'])->name('resguardo.extraer');
     Route::get('/resguardo/preview',    [KardexController::class, 'mostrarPreview'])->name('resguardo.preview');

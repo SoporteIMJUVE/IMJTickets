@@ -53,11 +53,22 @@ class EmpleadosExporter extends BaseExporter
             ->get()
             ->groupBy('user_id');
 
+        $licenciasPorUsuario = DB::table('licencia_users')
+            ->join('licencias', 'licencia_users.licencia_id', '=', 'licencias.id')
+            ->select('licencia_users.user_id', 'licencias.tipo', 'licencias.correo')
+            ->get()
+            ->groupBy('user_id');
+
         $rows = [];
         foreach ($empleados as $emp) {
             $equipos  = $equiposPorEmpleado->get($emp->id_empleado, collect());
             $tipos    = $equipos->pluck('tipo')->filter()->implode(', ') ?: '—';
             $numInvs  = $equipos->pluck('num_inventario')->filter()->implode(', ') ?: '—';
+
+            $lics = $licenciasPorUsuario->get($emp->id_empleado, collect());
+            $licTexto = $lics->isNotEmpty()
+                ? $lics->map(fn($l) => "{$l->tipo} ({$l->correo})")->implode(' | ')
+                : '—';
 
             $rows[] = [
                 trim($emp->nombre_completo),
@@ -66,7 +77,7 @@ class EmpleadosExporter extends BaseExporter
                 $tipos,
                 $numInvs,
                 $emp->activo ? 'Activo' : 'Baja',
-                '', // Licencia — campo pendiente
+                $licTexto,
             ];
         }
 
