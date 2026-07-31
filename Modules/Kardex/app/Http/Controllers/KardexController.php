@@ -877,4 +877,56 @@ class KardexController extends Controller
 
         return response()->json(['ip' => null, 'mensaje' => 'Rango sin IPs disponibles']);
     }
+
+    // ─── Importación masiva de equipos (solo equipos sin resguardo) ───────────
+
+    public function validarImport(Request $request)
+    {
+        $request->validate([
+            'archivo' => 'required|file|mimes:xlsx,xls|max:10240',
+        ]);
+
+        $path     = $request->file('archivo')->store('temp_imports', 'local');
+        $fullPath = Storage::disk('local')->path($path);
+
+        try {
+            $importer  = new \App\Imports\EquiposImporter();
+            $resultado = $importer->process($fullPath, dryRun: true);
+
+            session(['import_temp_path' => $path, 'import_temp_ts' => now()->timestamp]);
+
+            return response()->json($resultado);
+        } catch (\Throwable $e) {
+            Storage::disk('local')->delete($path);
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function aplicarImport(Request $request)
+    {
+        $path = session('import_temp_path');
+        $ts   = (int) session('import_temp_ts', 0);
+
+        if (!$path || (now()->timestamp - $ts) > 1800) {
+            return response()->json(['error' => 'Sesión de importación expirada (30 min). Vuelve a subir el archivo.'], 422);
+        }
+
+        $fullPath = Storage::disk('local')->path($path);
+
+        if (!file_exists($fullPath)) {
+            return response()->json(['error' => 'El archivo temporal ya no existe. Vuelve a subir.'], 422);
+        }
+
+        try {
+            $importer  = new \App\Imports\EquiposImporter();
+            $resultado = $importer->process($fullPath, dryRun: false);
+
+            Storage::disk('local')->delete($path);
+            session()->forget(['import_temp_path', 'import_temp_ts']);
+
+            return response()->json($resultado);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
 }

@@ -408,6 +408,156 @@ Cuando CRM o Kardex asignan una IP, `resolveId()` busca primero la fila en `inve
 
 ---
 
+### CU-09 — Actualización masiva de equipos por importación Excel
+
+**Descripción:** Un administrador descarga un archivo Excel pre-armado con los datos actuales de los equipos sin resguardo, edita los campos necesarios (periféricos, área, responsable, IP, observaciones) y lo reimporta para actualizar múltiples registros de una sola vez. El proceso siempre pasa por una fase de previsualización antes de aplicar cualquier cambio.  
+**Punto de entrada:** Módulo Kardex (`/kardex`) → tab "Inventario de Equipos" → botón "Importar" → modal de importación.
+
+**Actores:** Administrador de TI.
+
+**Precondición:** El administrador debe tener rol `admin`. Los equipos que se desean actualizar no deben tener resguardo activo (`pdf_resguardo IS NULL` y `user_id IS NULL`).
+
+---
+
+#### Flujo principal
+
+**Paso 1 — Descarga del formato**
+
+El administrador hace clic en **"Descargar formato (.xlsx)"** dentro del modal. El sistema genera un Excel con tres hojas:
+
+| Hoja | Visibilidad | Contenido |
+|---|---|---|
+| `INSTRUCCIONES` | Visible | Reglas de uso, advertencia de equipos excluidos, guía de columnas |
+| `EQUIPOS` | Visible (activa) | Una fila por equipo sin resguardo, con los datos actuales precargados |
+| `CATALOGOS` | Oculta | Fuente de verdad de los desplegables: áreas, tipos, responsables, IPs |
+
+El formato **respeta los filtros activos** en la UI al momento de hacer clic. Si hay filtro `tipo=Laptop`, el Excel solo contiene Laptops. Los filtros se pasan como query params al endpoint de descarga.
+
+Los equipos con resguardo activo son excluidos automáticamente. Si hubo exclusiones, la hoja `INSTRUCCIONES` lo indica: `"ℹ️ Se excluyeron N equipo(s) con resguardo activo..."`.
+
+**Columnas del Excel y su comportamiento:**
+
+| Color celda | Significado |
+|---|---|
+| Gris | Bloqueada — protegida por contraseña vacía; el importer la ignora aunque se modifique |
+| Naranja suave | `No. Serie` — identificador único, nunca se modifica |
+| Blanca | Editable — puede modificarse; los cambios se importarán |
+
+| Columna | Campo DB | Editable | Desplegable |
+|---|---|---|---|
+| A — No. Inventario | `num_inventario` | Sí | No |
+| B — Nombre Equipo | `nombre_equipo` | Sí | No |
+| C — Tipo | `tipo` | No | — |
+| D — No. Serie | `cpu_serie` | No (identificador) | — |
+| E — Área | `area` | Sí | Catálogo `cat_rangos_ips` |
+| F — Responsable | `nombre_usuario` / `user_id` | Sí | Usuarios activos del sistema |
+| G — Estado | derivado | No | — |
+| H-I — Marca / Modelo CPU | `cpu_marca`, `cpu_modelo` | Sí | No |
+| J-Q — Periféricos | series de teclado, mouse, monitor, no-break, cargador | Sí | No |
+| R-U — Docking | marca, modelo, serie + candado | Sí | No |
+| V — Candado | `candado` | Sí | No |
+| W — MAC | `mac` | Sí | No (validación de formato) |
+| X — IP | `ipv4` / `ip_id` | Sí | IPs no bloqueadas por resguardo |
+| Y — Observaciones | `observaciones` | Sí | No |
+
+**Regla de celdas vacías:** Una celda editable vacía **conserva el valor actual** en BD — no lo borra.
+
+**Paso 2 — Edición y carga**
+
+El administrador edita el Excel en Excel, LibreOffice o Google Sheets. Los desplegables de `Área`, `Responsable` e `IP` limitan los valores válidos directamente en la celda. Al terminar, regresa al modal y carga el archivo usando el botón **"Seleccionar archivo Excel"** → **"Validar archivo"**.
+
+**Paso 3 — Previsualización (dry-run)**
+
+El sistema procesa el archivo sin tocar la base de datos. El modal muestra tres contadores y el detalle por fila:
+
+| Indicador | Significado |
+|---|---|
+| ✅ Actualizables | Filas con cambios válidos que se aplicarán |
+| ➖ Sin cambios | Filas en que todos los valores coinciden con los de la BD |
+| ❌ Errores | Filas rechazadas — el motivo se muestra por fila |
+
+El botón **"Aplicar (N) cambios"** solo se habilita si hay al menos 1 fila actualizable.
+
+**Paso 4 — Aplicación**
+
+El administrador hace clic en **"Aplicar"**. El sistema aplica solo las filas marcadas como `ok` y registra un evento `Actualización Masiva` en `movimientos_equipos` por cada equipo modificado. La `notas` del evento contiene el diff campo por campo (`"Monitor S/N: (vacío) → MON-123 | Área: Dir. Finanzas → DIRECCIÓN DE FINANZAS"`).
+
+---
+
+#### Reglas de validación (por orden de prioridad)
+
+| Regla | Resultado si falla |
+|---|---|
+| `No. Serie` debe existir en `inventario_equipos` | ❌ Error: "Serie no encontrada en el sistema." |
+| Equipo tiene `pdf_resguardo IS NOT NULL` o `user_id IS NOT NULL` | ❌ Error: "Este equipo tiene resguardo activo. Para modificar sus datos, introduce un nuevo PDF de resguardo desde el módulo Kardex." |
+| `Área` nueva no existe en `cat_rangos_ips` (comparación `mb_strtolower`, en PHP para evitar limitaciones de `LOWER()` en SQLite con acentos) | ❌ Error por fila |
+| `MAC` no cumple el patrón `XX:XX:XX:XX:XX:XX` | ❌ Error por fila |
+| `IP` no está registrada en `inventario_ips_completo` | ❌ Error por fila |
+| `IP` está asignada a un equipo con resguardo activo | ❌ Error por fila |
+| `IP` está asignada a otro equipo sin resguardo (distinto al que se está importando) | ❌ Error por fila |
+| El valor de un campo es igual al valor actual en BD | No genera cambio — se omite silenciosamente |
+| `Responsable` no coincide con ningún usuario activo (comparación `mb_strtolower` en PHP) | Se guarda como texto en `nombre_usuario` sin asignar `user_id`; no bloquea la fila |
+
+**Por qué los errores de `Área` antes causaban falsos negativos:** SQLite solo baja letras ASCII con `LOWER()`. Caracteres como `É`, `Ó`, `Ú` no se convierten, así que `LOWER('DIRECCIÓN')` devuelve `'DIRECCIÓN'` en SQLite. La validación ahora se hace en PHP con `mb_strtolower()` en ambos lados.
+
+---
+
+#### Manejo especial de Responsable e IP
+
+**Responsable:**
+- El importer intenta coincidencia exacta (`mb_strtolower`) entre el valor del Excel y `TRIM(name || ' ' || apellido_paterno)` de todos los usuarios activos, cargados en memoria.
+- Si hay coincidencia → actualiza `user_id` + `nombre_usuario`.
+- Si no hay coincidencia → actualiza solo `nombre_usuario` (campo de texto legacy). No se bloquea la fila. El diff indica `"Responsable (texto): ..."`.
+- Razón: los equipos sin resguardo suelen tener `nombre_usuario` en formato legacy APELLIDO NOMBRE (todo mayúsculas), que es diferente al formato `name apellido_paterno` del sistema. Bloquear por esto haría la importación inútil.
+
+**IP:**
+- Si cambia → libera la IP anterior (actualiza `inventario_ips_completo.estatus = 'Libre'`) antes de llamar a `IpAssigner::resolveId()` con la nueva.
+- Si la IP nueva no estaba registrada en `inventario_ips_completo` → error (no se crean IPs nuevas por importación).
+- El dropdown del Excel solo muestra IPs que no estén asignadas a equipos con resguardo. IPs asignadas a equipos sin resguardo sí aparecen (pueden reasignarse).
+
+---
+
+#### Evento Kardex generado
+
+```
+tipo_evento:   'Actualización Masiva'
+tipo_activo:   'equipo'
+activo_id:     id del equipo
+origen:        'Importación Excel'
+destino:       'Importación Excel'
+estado_equipo: null
+notas:         "Monitor S/N: (vacío) → MON-123 | Área: Dir. Finanzas → DIRECCIÓN DE FINANZAS"
+registrado_by: Auth::id()  (admin que ejecutó el import)
+```
+
+---
+
+#### Sesión temporal del archivo
+
+El archivo se guarda en `storage/app/temp_imports/` durante la fase dry-run. Al aplicar, el sistema usa ese archivo (identificado por la sesión PHP del admin, TTL 30 min). Si la sesión expira, la respuesta del backend es `422 "Sesión de importación expirada"` y el modal pide subir el archivo de nuevo.
+
+---
+
+#### Restricciones de diseño (no negociables)
+
+1. **Solo actualización** — no se crean ni eliminan filas en `inventario_equipos`.
+2. **Equipos con resguardo son intocables** — la única forma de modificarlos es subir un nuevo PDF desde Kardex (CU-01).
+3. **Dos fases obligatorias** — siempre dry-run antes de aplicar. No hay modo "aplicar directo".
+4. **La verdad absoluta son los resguardos PDF** — cualquier dato del equipo que tenga resguardo prevalece sobre el Excel.
+
+---
+
+#### Archivos clave
+
+- `app/Imports/EquiposImporter.php` — lógica de dry-run y aplicación; manejo especial de Responsable e IP
+- `app/Exports/EquiposExporter.php@downloadFormato` — genera el XLSX con 3 hojas, protección, desplegables y filtros
+- `Modules/Kardex/app/Http/Controllers/KardexController.php@validarImport` — recibe el archivo, ejecuta dry-run, guarda temp en sesión
+- `Modules/Kardex/app/Http/Controllers/KardexController.php@aplicarImport` — aplica los cambios usando el temp de sesión
+- `Modules/Kardex/routes/web.php` → `POST /kardex/importar/validar` / `POST /kardex/importar/aplicar`
+- `resources/views/components/tabla-encabezado.blade.php` — modal de importación (5 fases: inicio / validando / preview / aplicando / listo); `descargarFormato()` pasa filtros activos
+
+---
+
 ## Herramientas de desarrollo
 
 ### `php artisan kardex:seed-entradas`

@@ -162,6 +162,9 @@ Route::middleware(['auth', 'admin'])->prefix('kardex')->name('kardex.')->group(f
         );
     })->name('usuarios.buscar');
 
+    Route::post('/importar/validar',    [KardexController::class, 'validarImport'])->name('importar.validar');
+    Route::post('/importar/aplicar',    [KardexController::class, 'aplicarImport'])->name('importar.aplicar');
+
     Route::get('/resguardo/subir',      [KardexController::class, 'subirResguardo'])->name('resguardo.subir');
     Route::post('/resguardo/extraer',   [KardexController::class, 'extraerResguardo'])->name('resguardo.extraer');
     Route::get('/resguardo/preview',    [KardexController::class, 'mostrarPreview'])->name('resguardo.preview');

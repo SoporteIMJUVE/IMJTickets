@@ -51,7 +51,10 @@
 
         {{-- Tabla Equipos --}}
         <div class="bg-canvas border border-border rounded-xl overflow-hidden shadow-sm">
-            <x-tabla-encabezado titulo="Inventario de Equipos" tab="equipos" exportUrl="{{ route('kardex.exportar', 'equipos') }}">
+            <x-tabla-encabezado titulo="Inventario de Equipos" tab="equipos"
+                exportUrl="{{ route('kardex.exportar', 'equipos') }}"
+                importValidarUrl="{{ route('kardex.importar.validar') }}"
+                importAplicarUrl="{{ route('kardex.importar.aplicar') }}">
                 <x-slot:filtros>
                     <div>
                         <label class="block text-[10px] font-bold uppercase tracking-wider text-muted mb-1">Tipo</label>
