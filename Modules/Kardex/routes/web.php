@@ -142,7 +142,7 @@ Route::middleware(['auth', 'admin'])->prefix('kardex')->name('kardex.')->group(f
         return response()->json(
             \DB::table('users')
                 ->leftJoin('departamentos', 'users.id_departamento', '=', 'departamentos.id_departamento')
-                ->where('users.activo', 1)
+                ->where('users.activo', true)
                 ->where(function ($query) use ($q) {
                     $query->where('users.name',             'like', "%{$q}%")
                           ->orWhere('users.apellido_paterno','like', "%{$q}%")

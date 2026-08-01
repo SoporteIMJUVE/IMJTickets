@@ -589,4 +589,210 @@ php artisan kardex:seed-entradas --rollback
 
 **No usar en producción:** El rollback elimina todos los eventos con `notas LIKE '[seed-pruebas]%'`; en producción podría haber colisión si alguien escribe esa cadena manualmente en notas reales.
 
+---
+
+## CU-10 — Gestión de Licencias Microsoft 365
+
+### Contexto
+
+IMJUVE paga licencias de Microsoft 365 para sus empleados. Estas licencias son activos de TI igual que los equipos o impresoras, y deben administrarse en el inventario. A diferencia de un equipo (1 equipo → 1 responsable), una licencia puede tener múltiples titulares y puede estar instalada en varios equipos según el tipo.
+
+La gestión vive en el módulo Kardex, tab **Licencias**.
+
+---
+
+### Modelo de datos
+
+#### Tabla `licencias`
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `id` | PK | |
+| `correo` | string(150), unique | Dirección de correo de la cuenta M365 (ej. `jgarcia@imjuve.gob.mx`) |
+| `tipo` | string(50) | Tipo de licencia: `E1`, `E3`, `Exchange Plan 1`, `Microsoft 365 Business Standard`, etc. |
+| `max_usuarios` | integer | Cuántos empleados pueden ser titulares de esta cuenta al mismo tiempo |
+| `max_equipos` | integer | Cuántos equipos del inventario pueden tener la licencia instalada (0 = solo acceso web) |
+| `area` | text, nullable | Área o departamento dueño de la licencia |
+| `estado` | string(30) | `Activa`, `Inactiva`, `Suspendida` |
+| `caducidad` | date, nullable | Fecha de vencimiento del contrato/licencia |
+| `observaciones` | text, nullable | Notas adicionales |
+
+#### Tabla `licencia_users` (pivot)
+
+Relaciona una licencia con los empleados que la usan como titulares.
+
+| Columna | Descripción |
+|---|---|
+| `licencia_id` | FK → `licencias` |
+| `user_id` | FK → `users` |
+| Unique: `(licencia_id, user_id)` | Un empleado no puede estar duplicado en la misma licencia |
+
+El sistema valida que `COUNT(*) WHERE licencia_id = X ≤ licencias.max_usuarios` antes de agregar.
+
+#### Tabla `licencia_equipos` (pivot)
+
+Relaciona una licencia con los equipos del inventario donde está instalada.
+
+| Columna | Descripción |
+|---|---|
+| `licencia_id` | FK → `licencias` |
+| `equipo_id` | FK → `inventario_equipos` |
+| Unique: `(licencia_id, equipo_id)` | Un equipo no puede estar duplicado en la misma licencia |
+
+El sistema valida que `COUNT(*) WHERE licencia_id = X ≤ licencias.max_equipos` antes de vincular. Si `max_equipos = 0`, el botón "Vincular equipo" está deshabilitado.
+
+---
+
+### Cupos por defecto según tipo
+
+El formulario de nueva licencia auto-rellena los cupos cuando el admin selecciona el tipo. Pueden ser editados manualmente si el contrato es diferente.
+
+| Tipo | `max_usuarios` por defecto | `max_equipos` por defecto | Razón |
+|---|---|---|---|
+| E1 | 1 | 0 | Solo acceso web, no permite instalación de aplicaciones de escritorio |
+| E3 | 1 | 5 | Permite Office en hasta 5 PC/Mac |
+| Exchange Plan 1 | 1 | 0 | Solo servicio de correo, sin apps de Office |
+| Microsoft 365 Business Basic | 1 | 0 | Solo web, sin Office de escritorio |
+| Microsoft 365 Business Standard | 1 | 5 | Incluye Office instalable en 5 equipos |
+| Otro | 1 | 0 | El admin define manualmente |
+
+> **Nota:** Microsoft define los cupos por usuario (cada usuario puede instalar en N dispositivos). En este sistema los cupos están definidos **por cuenta/correo**, no por usuario, porque IMJUVE puede tener cuentas compartidas entre empleados.
+
+---
+
+### Flujo principal: crear una licencia
+
+1. Admin navega a Kardex → tab **Licencias**
+2. Hace click en **Nueva licencia**
+3. En el modal rellena:
+   - **Correo M365** (único en el sistema)
+   - **Tipo** → los cupos se auto-rellenan
+   - **Estado** (Activa por defecto)
+   - **Caducidad** (opcional, pero recomendado para alertas)
+   - Ajusta cupos si el contrato difiere del estándar
+4. Guarda → la licencia aparece en la tabla
+5. Al hacer click en la fila se abre el panel lateral para gestionar titulares y equipos
+
+---
+
+### Flujo: asignar un titular
+
+Un **titular** es el empleado que usa esa cuenta de correo.
+
+1. En el panel lateral de la licencia, sección **Titulares** → click en **Agregar**
+2. Se muestra un `prompt` para buscar por nombre o email del empleado
+3. Si hay coincidencias, el admin selecciona el número del empleado deseado
+4. El sistema verifica `n_titulares < max_usuarios` antes de insertar en `licencia_users`
+5. Si el cupo está lleno → error `"Cupo de titulares alcanzado (N)."`
+6. El badge de la tabla se actualiza: `N/max_usuarios` con color verde/amarillo/rojo
+
+Para quitar un titular: botón `person_remove` junto al nombre en el panel → confirmación → delete en `licencia_users`.
+
+---
+
+### Flujo: vincular un equipo
+
+Aplica solo cuando `max_equipos > 0` (el tipo de licencia permite instalación en PC).
+
+1. En el panel lateral, sección **Equipos instalados** → click en **Vincular**
+2. Se pide el **No. de Serie** del equipo
+3. El sistema resuelve la serie a `id` vía `/kardex/resguardo/verificar-serie`
+4. Verifica `n_equipos < max_equipos` antes de insertar en `licencia_equipos`
+5. Si el cupo está lleno → error `"Cupo de equipos alcanzado (N)."`
+6. Si `max_equipos = 0` → el botón muestra "Solo web" y está deshabilitado
+
+Para desvincular: botón `link_off` junto al equipo → confirmación → delete en `licencia_equipos`.
+
+---
+
+### Caducidad — semáforo de color
+
+| Color | Condición |
+|---|---|
+| 🟢 Verde | Fecha futura con más de 30 días restantes |
+| 🟡 Amarillo | Vence en 30 días o menos |
+| 🔴 Rojo | Ya venció o sin fecha registrada |
+
+El color aparece tanto en la tabla principal como en el panel lateral.
+
+---
+
+### Integración con el directorio de empleados
+
+El export de CRM (directorio de empleados en Excel) incluye una columna **Licencia** que muestra el tipo y correo de cada licencia asociada al empleado:
+
+- Sin licencias → `—`
+- Una licencia → `E3 (jgarcia@imjuve.gob.mx)`
+- Múltiples → `E3 (cuenta1@…) | Exchange Plan 1 (cuenta2@…)`
+
+Esto es útil para auditorías y para saber qué tipo de acceso tiene cada empleado antes de darle soporte.
+
+---
+
+### Reglas de negocio
+
+1. El `correo` de una licencia es único en todo el sistema — no puede haber dos licencias con el mismo correo.
+2. Un empleado puede ser titular de múltiples licencias (ej. su correo personal E3 + una cuenta de departamento Exchange).
+3. Un equipo puede estar vinculado a múltiples licencias (ej. tiene E3 y también un antivirus con licencia separada si se agrega ese tipo).
+4. Los cupos son independientes: el cupo de titulares y el de equipos no se suman — se validan por separado.
+5. Las licencias no están vinculadas al ciclo de vida de los equipos (Kardex de movimientos). Si un equipo vinculado se da de baja, la vinculación en `licencia_equipos` persiste hasta que el admin la retire manualmente.
+6. Las licencias **no generan eventos en `movimientos_equipos`** — no son activos físicos con transferencias de custodia.
+
+---
+
+### Archivos clave
+
+| Archivo | Rol |
+|---|---|
+| `Modules/Kardex/database/migrations/2026_07_31_000001_create_licencias_table.php` | Tabla principal |
+| `Modules/Kardex/database/migrations/2026_07_31_000002_create_licencia_users_table.php` | Pivot titulares |
+| `Modules/Kardex/database/migrations/2026_07_31_000003_create_licencia_equipos_table.php` | Pivot equipos |
+| `Modules/Kardex/app/Http/Controllers/KardexController.php` | Métodos: `licenciasJson`, `licenciaDetalle`, `storeLicencia`, `updateLicencia`, `asignarLicenciaUsuario`, `desasignarLicenciaUsuario`, `asignarLicenciaEquipo`, `desasignarLicenciaEquipo` |
+| `Modules/Kardex/routes/web.php` | 8 rutas bajo `/kardex/licencias` |
+| `Modules/Kardex/resources/views/index.blade.php` | Tab Licencias, panel lateral, modal crear/editar, JS de carga y gestión |
+| `app/Exports/EmpleadosExporter.php` | Columna Licencia en el export del directorio CRM |
+
+---
+
+## CU-11 — Kanban: ocultar tickets cerrados antiguos
+
+### Contexto
+
+La vista Kanban del módulo Tickets muestra tres columnas: ABIERTO, ATENDIENDO y CERRADO. Con el tiempo la columna CERRADO acumula tickets que ya no requieren atención, haciendo difícil distinguir los recientemente cerrados (que aún pueden necesitar seguimiento) de los archivados.
+
+**Regla:** Tickets en estado CERRADO (`estado = 2`) cerrados hace más de 24 horas **no se muestran en el Kanban**. Siguen visibles en la vista Lista.
+
+---
+
+### Implementación
+
+En `Modules/Tickets/resources/views/index.blade.php`, al renderizar la columna CERRADO del Kanban, se filtra `$colTickets` en PHP:
+
+```php
+$umbral        = \Carbon\Carbon::now()->subDay();
+$kanbanTickets = $colTickets->filter(fn($t) =>
+    $t->cerrado_at && \Carbon\Carbon::parse($t->cerrado_at)->gt($umbral)
+);
+$nOcultos = $colTickets->count() - $kanbanTickets->count();
+```
+
+- `$colTickets` proviene de `$porEstado[2]` — no se modifica, la vista Lista sigue usándolo íntegro.
+- Solo se muestran tickets con `cerrado_at` registrado **y** dentro de las últimas 24 horas.
+- Tickets con `cerrado_at = NULL` también se ocultan (datos migrados sin fecha de cierre).
+
+### Campo `cerrado_at`
+
+Se establece automáticamente en `TicketsController` cuando el estado cambia a `2`:
+
+```php
+if ($estado === 2) $extra = ['cerrado_at' => now(), 'cerrado_by' => Auth::user()->email];
+DB::table('tickets')->where('id', $id)->update(array_merge(['estado' => $estado], $extra));
+```
+
+### Badge y contador
+
+- El badge numérico de la columna CERRADO muestra `$kanbanTickets->count()` (solo los visibles).
+- Si `$nOcultos > 0`, aparece junto al badge un texto `"+N oculto(s)"` en cursiva.
+- La vista Lista no cambia: muestra todos los tickets cerrados sin filtro de fecha.
+
 **Archivo:** `app/Console/Commands/SeedEntradasCommand.php`

@@ -330,7 +330,7 @@ class KardexController extends Controller
             $apellido = $partes[1] ?? '';
             $candidatos = DB::table('users')
                 ->leftJoin('departamentos', 'users.id_departamento', '=', 'departamentos.id_departamento')
-                ->where('users.activo', 1)
+                ->where('users.activo', true)
                 ->where(function ($q) use ($nombre, $apellido) {
                     $q->where('users.name', 'like', "%{$nombre}%")
                       ->orWhere('users.apellido_paterno', 'like', "%{$apellido}%")

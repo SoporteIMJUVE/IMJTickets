@@ -1073,7 +1073,7 @@ async function abrirPanelEquipo(id) {
                     <select id="select-usuario-${eq.id}"
                             class="text-sm border border-border rounded px-3 py-1.5 bg-canvas outline-none focus:ring-2 focus:ring-brand flex-1">
                         <option value="">— Sin usuario —</option>
-                        @foreach(\DB::table('users')->where('activo', 1)->orderBy('name')->select('id', 'name', 'apellido_paterno')->get() as $u)
+                        @foreach(\DB::table('users')->where('activo', true)->orderBy('name')->select('id', 'name', 'apellido_paterno')->get() as $u)
                         <option value="{{ $u->id }}" ${eq.usuario_actual_id == {{ $u->id }} ? 'selected' : ''}>
                             {{ trim($u->name . ' ' . $u->apellido_paterno) }}
                         </option>

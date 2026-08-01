@@ -8,6 +8,7 @@ use App\Support\KardexMovimiento;
 use App\Support\NewAccountProvisioner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class CRMController extends Controller
@@ -144,6 +145,8 @@ class CRMController extends Controller
             ]);
         }
 
+        self::provisionarLicenciaE1($idEmpleado, $correo);
+
         if ($request->expectsJson()) {
             return response()->json(['ok' => true, 'id' => $idEmpleado]);
         }
@@ -209,6 +212,10 @@ class CRMController extends Controller
         }
 
         DB::table('users')->where('id', $id)->update($datosUsuario);
+
+        if (!empty($validated['correo'])) {
+            self::provisionarLicenciaE1((int) $id, $validated['correo']);
+        }
 
         foreach ($validated['equipos'] ?? [] as $equipo) {
             if (empty($equipo['tipo'])) continue;
@@ -491,5 +498,30 @@ class CRMController extends Controller
         }
 
         return redirect()->route('crm.index');
+    }
+
+    private static function provisionarLicenciaE1(int $userId, string $email): void
+    {
+        if (!str_ends_with(strtolower($email), '@imjuventud.gob.mx')) return;
+        if (!Schema::hasTable('licencias'))                            return;
+
+        $licId = DB::table('licencias')->where('correo', $email)->value('id');
+
+        if (!$licId) {
+            $licId = DB::table('licencias')->insertGetId([
+                'correo'       => $email,
+                'tipo'         => 'E1',
+                'max_usuarios' => 1,
+                'max_equipos'  => 0,
+                'estado'       => 'Activa',
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ]);
+        }
+
+        DB::table('licencia_users')->updateOrInsert(
+            ['licencia_id' => $licId, 'user_id' => $userId],
+            ['created_at'  => now()]
+        );
     }
 }

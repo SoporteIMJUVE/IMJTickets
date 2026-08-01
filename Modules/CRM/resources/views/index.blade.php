@@ -307,17 +307,8 @@
         </div>
     </div>
 
-    {{-- Footer Actions --}}
-    <div class="p-6 border-t border-border bg-surface grid grid-cols-2 gap-3">
-        <button onclick="openEditModal()" class="w-full py-3 bg-wash text-brand font-bold rounded-lg hover:bg-surface-high transition-colors flex items-center justify-center gap-2 text-sm">
-            <span class="material-symbols-outlined text-sm">edit</span>
-            Editar
-        </button>
-        <button class="w-full py-3 bg-brand text-white font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 text-sm">
-            <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
-            Resguardo
-        </button>
-    </div>
+    {{-- Footer Actions — rendered by openUserPanel() según activo --}}
+    <div class="p-6 border-t border-border bg-surface" id="panel-footer"></div>
 </div>
 
 {{-- Backdrop --}}
@@ -428,6 +419,28 @@ async function openUserPanel(row) {
     // Volver al tab Recursos por defecto; resetear mini-tab historial a Tickets
     switchHistorialTab('tickets');
     switchPanelTab('recursos', document.querySelector('#user-panel .flex.border-b button'));
+
+    // Footer: solo Reactivar si está de baja; botones normales si está activo
+    const footer = document.getElementById('panel-footer');
+    if (activo) {
+        footer.className = 'p-6 border-t border-border bg-surface grid grid-cols-2 gap-3';
+        footer.innerHTML = `
+            <button onclick="openEditModal()" class="w-full py-3 bg-wash text-brand font-bold rounded-lg hover:bg-surface-high transition-colors flex items-center justify-center gap-2 text-sm">
+                <span class="material-symbols-outlined text-sm">edit</span>
+                Editar
+            </button>
+            <button class="w-full py-3 bg-brand text-white font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 text-sm">
+                <span class="material-symbols-outlined text-sm">picture_as_pdf</span>
+                Resguardo
+            </button>`;
+    } else {
+        footer.className = 'p-6 border-t border-border bg-surface';
+        footer.innerHTML = `
+            <button onclick="reactivarDesdePanel()" class="w-full py-3 bg-status-active text-white font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 text-sm">
+                <span class="material-symbols-outlined text-sm">person_check</span>
+                Reactivar Usuario
+            </button>`;
+    }
 
     document.getElementById('user-panel').classList.remove('closed');
     document.getElementById('panel-backdrop').classList.remove('hidden');
@@ -611,6 +624,21 @@ function closeUserPanel() {
     document.getElementById('panel-backdrop').classList.add('hidden');
 }
 
+async function reactivarDesdePanel() {
+    if (!currentEmpleado.id) return;
+    if (!confirm('¿Reactivar a ' + currentEmpleado.nombre + '?')) return;
+    const r = await fetch(`/crm/empleados/${currentEmpleado.id}/reactivar`, {
+        method: 'PATCH',
+        headers: {
+            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json',
+        },
+    });
+    if ((await r.json()).ok) { closeUserPanel(); window.location.reload(); }
+    else alert('No se pudo reactivar. Intenta de nuevo.');
+}
+
 // ─── Modal IP libres ─────────────────────────────────────────────────────────
 
 let _ipModalIdx = null;
@@ -763,12 +791,12 @@ function openEditModal() {
     document.getElementById('section-baja')?.classList.remove('hidden');
     document.getElementById('section-extras-tel').classList.add('hidden');
 
-    // Poblar equipos existentes en el formulario
+    // Poblar equipos existentes — solo lectura (editar datos requiere un resguardo)
     const container = document.getElementById('equipos-container');
     container.innerHTML = '';
     equipoIdx = 0;
     currentEquipos.forEach(eq => {
-        container.appendChild(crearEquipoExistente(equipoIdx++, eq));
+        container.appendChild(crearEquipoReadOnly(equipoIdx++, eq));
     });
     const sectionEq = document.getElementById('section-extras-eq');
     sectionEq.classList.remove('hidden');
@@ -1031,14 +1059,14 @@ function modoEquipoNuevo(btn) {
     const idx  = item.dataset.idx;
     item.innerHTML = `
         ${_closeBtnHtml}
-        <div class="mb-3 flex gap-2 items-start bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-lg p-3">
-            <span class="material-symbols-outlined text-amber-600 dark:text-amber-400 text-sm mt-0.5 shrink-0">warning</span>
-            <p class="text-[11px] text-amber-800 dark:text-amber-300 leading-snug">
+        <div class="mb-3 flex gap-2 items-start rounded-lg p-3" style="background:#ea580c;border:1px solid #c2410c">
+            <span class="material-symbols-outlined text-white text-sm mt-0.5 shrink-0">warning</span>
+            <p class="text-[11px] text-white leading-snug">
                 <strong>Equipo personal.</strong> Al registrar un activo sin resguardo se entiende que es
                 <strong>propiedad del empleado y no del IMJUVE</strong>. El IMJUVE no se hace responsable
                 de ningún daño, pérdida o mantenimiento de este equipo. Este activo quedará excluido del
                 switcheo de responsables. Se recomienda registrar primero al empleado e ingresar el
-                <a href="{{ route('kardex.index') }}" class="font-bold underline">resguardo en Inventario</a>.
+                <a href="{{ route('kardex.index') }}" class="font-bold underline text-white">resguardo en Inventario</a>.
             </p>
         </div>
         <div class="mb-3">
@@ -1268,6 +1296,177 @@ document.getElementById('form-nuevo-usuario')?.addEventListener('submit', async 
     const row = document.querySelector(`tr[data-id="${id}"]`);
     if (row) { row.scrollIntoView({ block: 'center' }); openUserPanel(row); }
 })();
+
+// ─── Equipos en modo solo lectura (dentro del modal Editar) ──────────────────
+
+function buildCamposReadOnly(eq) {
+    const f = (label, val) => val
+        ? `<div>
+               <p class="text-[10px] text-muted font-bold uppercase">${label}</p>
+               <p class="text-xs font-mono text-ink break-all">${escHtml(String(val))}</p>
+           </div>`
+        : '';
+    const marca = [eq.cpu_marca, eq.cpu_modelo].filter(Boolean).join(' ');
+    return `<div class="grid grid-cols-2 gap-3 mb-3">
+        ${f('Nombre',         eq.nombre_equipo)}
+        ${f('Marca / Modelo', marca || null)}
+        ${f('No. Serie',      eq.cpu_serie)}
+        ${f('IPv4',           eq.ipv4)}
+        ${f('MAC',            eq.mac)}
+        ${f('No. Inventario', eq.num_inventario)}
+        ${f('Serie Cargador', eq.cargador_serie)}
+        ${f('Serie Docking',  eq.docking_serie)}
+        ${f('Serie Monitor',  eq.monitor_serie)}
+        ${f('Serie Teclado',  eq.teclado_serie)}
+        ${f('Serie Mouse',    eq.mouse_serie)}
+    </div>`;
+}
+
+function crearEquipoReadOnly(idx, eq) {
+    const esPersonal = parseInt(eq.es_personal) === 1;
+    const tipoColor = {
+        'Laptop':           'var(--color-status-free)',
+        'PC Avanzada':      'var(--color-status-active)',
+        'PC Especializada': 'var(--color-status-low)',
+        'Telefono':         'var(--color-gold)',
+    };
+    const color = tipoColor[eq.tipo] ?? 'var(--color-brand)';
+
+    const tipoBadge = `<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+        style="background:${color}1a;color:${color}">${escHtml(eq.tipo)}</span>`;
+
+    const personalBanner = esPersonal ? `
+        <div class="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 p-3">
+            <span class="material-symbols-outlined text-amber-500 text-sm mt-0.5 shrink-0">warning</span>
+            <p class="text-[11px] text-amber-800 dark:text-amber-300 leading-snug">
+                <strong>Equipo personal.</strong> Es propiedad del empleado, no del IMJUVE.
+                No tiene resguardo institucional ni puede ser reasignado.
+            </p>
+        </div>` : '';
+
+    const acciones = esPersonal
+        ? `<button type="button" onclick="darDeBajaEquipo(${eq.id})"
+                class="w-full mt-1 py-2 border border-status-critical text-status-critical font-bold rounded-lg
+                       hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-[11px]
+                       flex items-center justify-center gap-1.5">
+                <span class="material-symbols-outlined text-sm">delete_forever</span>
+                Dar de baja este equipo
+           </button>`
+        : `<div class="grid grid-cols-3 gap-2 mt-1">
+                <button type="button" onclick="desvincularEquipo(${eq.id})"
+                    class="py-2 border border-border text-muted font-bold rounded-lg hover:bg-wash transition-colors
+                           text-[10px] flex flex-col items-center gap-0.5 leading-tight">
+                    <span class="material-symbols-outlined text-base">link_off</span>
+                    Desvincular
+                </button>
+                <button type="button" onclick="cambiarEstadoEquipoInline(${eq.id})"
+                    class="py-2 border border-border text-muted font-bold rounded-lg hover:bg-wash transition-colors
+                           text-[10px] flex flex-col items-center gap-0.5 leading-tight">
+                    <span class="material-symbols-outlined text-base">swap_horiz</span>
+                    Cambiar estado
+                </button>
+                <button type="button" onclick="vincularEquipo(${eq.id})"
+                    class="py-2 border border-brand text-brand font-bold rounded-lg hover:bg-brand/5 transition-colors
+                           text-[10px] flex flex-col items-center gap-0.5 leading-tight">
+                    <span class="material-symbols-outlined text-base">person_search</span>
+                    Otro usuario
+                </button>
+           </div>
+           <div id="estado-inline-${eq.id}" class="hidden mt-2"></div>`;
+
+    const div = document.createElement('div');
+    div.className = 'border rounded-xl p-4 bg-surface '
+        + (esPersonal ? 'border-amber-300' : 'border-status-active/40');
+    div.dataset.idx = idx;
+    div.innerHTML = `
+        <div class="flex items-center gap-2 mb-3">
+            ${tipoBadge}
+            ${esPersonal
+                ? `<span style="background:#92400E15;color:#b45309;font-size:9px;font-weight:700;
+                               padding:1px 7px;border-radius:999px;letter-spacing:.05em">PERSONAL</span>`
+                : `<span style="background:#16653415;color:var(--color-status-active);font-size:9px;font-weight:700;
+                               padding:1px 7px;border-radius:999px;letter-spacing:.05em">CON RESGUARDO</span>`
+            }
+            <span class="ml-auto text-[10px] text-muted italic">Solo lectura</span>
+        </div>
+        ${personalBanner}
+        ${buildCamposReadOnly(eq)}
+        ${acciones}`;
+    return div;
+}
+
+async function desvincularEquipo(eqId) {
+    if (!confirm('¿Desvincular este equipo del empleado? Quedará sin responsable asignado en el inventario.')) return;
+    const r = await fetch(`/crm/equipo/${eqId}/desvincular`, {
+        method: 'PATCH',
+        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+    });
+    if ((await r.json()).ok) { closeUsuarioModal(); window.location.reload(); }
+    else alert('No se pudo desvincular. Intenta de nuevo.');
+}
+
+function cambiarEstadoEquipoInline(eqId) {
+    const container = document.getElementById(`estado-inline-${eqId}`);
+    if (!container.classList.contains('hidden')) { container.classList.add('hidden'); return; }
+    container.innerHTML = `
+        <div class="flex gap-2">
+            <select id="sel-estado-${eqId}"
+                class="flex-1 border border-border rounded-lg px-3 py-2 text-sm bg-canvas focus:outline-none focus:border-brand">
+                <option value="mantenimiento">Mantenimiento</option>
+                <option value="baja">Baja</option>
+            </select>
+            <button type="button" onclick="aplicarEstadoEquipo(${eqId})"
+                class="px-4 py-2 bg-brand text-white text-sm font-bold rounded-lg hover:opacity-90">
+                Aplicar
+            </button>
+        </div>`;
+    container.classList.remove('hidden');
+}
+
+async function aplicarEstadoEquipo(eqId) {
+    const estado = document.getElementById(`sel-estado-${eqId}`).value;
+    const r = await fetch(`/kardex/equipo/${eqId}/estado`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                   'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+        body: JSON.stringify({ estado }),
+    });
+    if ((await r.json()).ok) { closeUsuarioModal(); window.location.reload(); }
+    else alert('No se pudo cambiar el estado. Intenta de nuevo.');
+}
+
+async function vincularEquipo(eqId) {
+    const q = prompt('Buscar empleado (nombre o correo):');
+    if (!q || q.trim().length < 2) return;
+    const res = await fetch(`/kardex/usuarios/buscar?q=${encodeURIComponent(q)}`).then(r => r.json());
+    if (!res.length) { alert('No se encontraron empleados con ese criterio.'); return; }
+    const lista = res.map((u, i) =>
+        `${i + 1}. ${u.nombre} ${u.apellido_paterno} (${u.correo})`
+    ).join('\n');
+    const idx = parseInt(prompt(`Selecciona el número del nuevo responsable:\n\n${lista}`));
+    if (isNaN(idx) || idx < 1 || idx > res.length) { alert('Selección inválida.'); return; }
+    const user = res[idx - 1];
+    const r = await fetch(`/crm/equipo/${eqId}/vincular`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                   'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+        body: JSON.stringify({ user_id: user.id_empleado }),
+    });
+    if ((await r.json()).ok) { closeUsuarioModal(); window.location.reload(); }
+    else alert('No se pudo reasignar el equipo. Intenta de nuevo.');
+}
+
+async function darDeBajaEquipo(eqId) {
+    if (!confirm('¿Dar de baja este equipo personal? Quedará marcado como "baja" en el inventario.')) return;
+    const r = await fetch(`/kardex/equipo/${eqId}/estado`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                   'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+        body: JSON.stringify({ estado: 'baja' }),
+    });
+    if ((await r.json()).ok) { closeUsuarioModal(); window.location.reload(); }
+    else alert('No se pudo dar de baja el equipo. Intenta de nuevo.');
+}
 </script>
 
 {{-- ═══════════════════════════════════════════════════════════════════════ --}}
