@@ -4,6 +4,7 @@ namespace Modules\Network\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Support\IpAssigner;
+use App\Support\KardexMovimiento;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -195,14 +196,45 @@ class NetworkController extends Controller
             return response()->json(['errors' => ['general' => ['Esta IP no está ocupada.']]], 422);
         }
 
+        $ipRow = DB::table('inventario_ips_completo')->where('id', $id)->first();
+        $ipStr = $ipRow->ip ?? '—';
+
         if ($ocupante->tabla === 'inventario_equipos') {
+            $eq = DB::table('inventario_equipos')->where('id', $ocupante->id)->first();
+            $serie = $eq->cpu_serie ?? '—';
+
             DB::table('inventario_equipos')->where('id', $ocupante->id)->update([
                 'estado'     => $validated['estado'],
                 'updated_at' => now(),
             ]);
             IpAssigner::liberarEquipo($ocupante->id);
+
+            KardexMovimiento::registrar(
+                tipo_activo:   'equipo',
+                activo_id:     (int) $ocupante->id,
+                tipo_evento:   'Liberación IP',
+                origen:        $serie,
+                destino:       'Sin equipo',
+                estado_equipo: 'Libre',
+                notas:         "IP: {$ipStr}",
+            );
+
+            $tipoEvento   = $validated['estado'] === 'baja' ? 'Baja' : 'Mantenimiento';
+            $estadoEquipo = $validated['estado'] === 'baja' ? 'Baja' : 'Mantenimiento';
+            KardexMovimiento::registrar(
+                tipo_activo:   'equipo',
+                activo_id:     (int) $ocupante->id,
+                tipo_evento:   $tipoEvento,
+                origen:        $eq->area ?? 'Sin área',
+                destino:       $tipoEvento === 'Baja' ? 'Proveedor' : null,
+                user_from_id:  $eq->user_id ?? null,
+                estado_equipo: $estadoEquipo,
+                notas:         "Operación ejecutada desde panel Network.",
+            );
         } else {
-            // impresoras no tiene columna de estado — solo se desliga la IP.
+            $imp = DB::table('impresoras')->where('id_impresora', $ocupante->id)->first();
+            $serie = $imp->serie ?? '—';
+
             DB::table('impresoras')->where('id_impresora', $ocupante->id)->update([
                 'ip_id'      => null,
                 'ip_address' => null,
@@ -212,6 +244,16 @@ class NetworkController extends Controller
                 'estatus'    => 'Libre',
                 'updated_at' => now(),
             ]);
+
+            KardexMovimiento::registrar(
+                tipo_activo:   'impresora',
+                activo_id:     (int) $ocupante->id,
+                tipo_evento:   'Liberación IP',
+                origen:        $serie,
+                destino:       'Sin equipo',
+                estado_equipo: 'Libre',
+                notas:         "IP: {$ipStr}",
+            );
         }
 
         return response()->json(['ok' => true]);
@@ -225,16 +267,28 @@ class NetworkController extends Controller
 
         $ipRow = DB::table('inventario_ips_completo')->where('id', $id)->first();
         abort_if(!$ipRow, 404);
+        $ipStr = $ipRow->ip;
 
         $ocupante = IpAssigner::findOccupant($id);
         if ($ocupante && $ocupante->tabla === 'inventario_equipos' && (int) $ocupante->id === (int) $validated['equipo_id']) {
             return response()->json(['errors' => ['equipo_id' => ['Ese ya es el equipo actual.']]], 422);
         }
 
+        // Serie del equipo origen (el que pierde la IP)
+        $serieOrigen = 'Sin equipo';
+        $activo_origen_id   = null;
+        $activo_origen_tipo = 'equipo';
         if ($ocupante) {
-            $tablaVieja = $ocupante->tabla;
-            $pkVieja    = $tablaVieja === 'inventario_equipos' ? 'id' : 'id_impresora';
+            $tablaVieja   = $ocupante->tabla;
+            $pkVieja      = $tablaVieja === 'inventario_equipos' ? 'id' : 'id_impresora';
             $campoIpVieja = $tablaVieja === 'inventario_equipos' ? 'ipv4' : 'ip_address';
+            $filaVieja    = DB::table($tablaVieja)->where($pkVieja, $ocupante->id)->first();
+            $serieOrigen  = $tablaVieja === 'inventario_equipos'
+                ? ($filaVieja->cpu_serie ?? '—')
+                : ($filaVieja->serie ?? '—');
+            $activo_origen_id   = (int) $ocupante->id;
+            $activo_origen_tipo = $tablaVieja === 'inventario_equipos' ? 'equipo' : 'impresora';
+
             DB::table($tablaVieja)->where($pkVieja, $ocupante->id)->update([
                 'ip_id'        => null,
                 $campoIpVieja  => null,
@@ -242,10 +296,12 @@ class NetworkController extends Controller
             ]);
         }
 
-        // El equipo destino podría ya tener otra IP asignada — esa IP vieja
-        // se queda huérfana si no la liberamos también.
+        // Serie del equipo destino (el que recibe la IP)
         $equipoDestino = DB::table('inventario_equipos')->where('id', $validated['equipo_id'])->first();
-        if ($equipoDestino->ip_id && (int) $equipoDestino->ip_id !== $id) {
+        $serieDestino  = $equipoDestino->cpu_serie ?? '—';
+        $teniaIp       = $equipoDestino->ip_id && (int) $equipoDestino->ip_id !== $id;
+
+        if ($teniaIp) {
             DB::table('inventario_ips_completo')->where('id', $equipoDestino->ip_id)->update([
                 'estatus'    => 'Libre',
                 'updated_at' => now(),
@@ -254,7 +310,7 @@ class NetworkController extends Controller
 
         DB::table('inventario_equipos')->where('id', $validated['equipo_id'])->update([
             'ip_id'      => $id,
-            'ipv4'       => $ipRow->ip,
+            'ipv4'       => $ipStr,
             'updated_at' => now(),
         ]);
 
@@ -262,6 +318,30 @@ class NetworkController extends Controller
             'estatus'    => 'Ocupada',
             'updated_at' => now(),
         ]);
+
+        // Evento: el equipo origen pierde la IP
+        if ($activo_origen_id) {
+            KardexMovimiento::registrar(
+                tipo_activo:   $activo_origen_tipo,
+                activo_id:     $activo_origen_id,
+                tipo_evento:   'Liberación IP',
+                origen:        $serieOrigen,
+                destino:       $serieDestino,
+                estado_equipo: 'Libre',
+                notas:         "IP: {$ipStr} — liberada por switcheo",
+            );
+        }
+
+        // Evento: el equipo destino recibe la IP
+        KardexMovimiento::registrar(
+            tipo_activo:   'equipo',
+            activo_id:     (int) $validated['equipo_id'],
+            tipo_evento:   $teniaIp ? 'Cambio IP' : 'Asignación IP',
+            origen:        $serieOrigen,
+            destino:       $serieDestino,
+            estado_equipo: 'Ocupada',
+            notas:         "IP: {$ipStr}",
+        );
 
         return response()->json(['ok' => true]);
     }

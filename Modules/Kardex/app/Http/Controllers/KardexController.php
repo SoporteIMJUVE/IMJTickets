@@ -97,6 +97,7 @@ class KardexController extends Controller
                 'inventario_equipos.estado as estado_actual',
                 'inventario_equipos.ipv4',
                 'inventario_equipos.cpu_serie',
+                'inventario_equipos.area',
                 DB::raw("NULLIF(TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'')), '') as responsable_nombre")
             )
             ->where('inventario_equipos.id', $id)
@@ -123,30 +124,39 @@ class KardexController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        DB::table('inventario_equipos')->where('id', $id)->update([
-            'estado'     => $estado,
-            'updated_at' => now(),
-        ]);
+        if ($estado === 'baja') {
+            DB::table('inventario_equipos')->where('id', $id)->update([
+                'estado'            => 'baja',
+                'user_id'           => null,
+                'usuario_actual_id' => null,
+                'nombre_usuario'    => null,
+                'updated_at'        => now(),
+            ]);
 
-        $tipoEvento    = match($estado) {
-            'mantenimiento' => 'Mantenimiento',
-            'baja'          => 'Baja',
-            default         => 'Almacén',
-        };
-        $estadoEquipo  = match($estado) {
-            'mantenimiento' => 'Mantenimiento',
-            'baja'          => 'Baja',
-            default         => $equipo->user_id ? 'Asignado' : 'Almacén',
-        };
+            KardexMovimiento::registrar(
+                tipo_activo:   'equipo',
+                activo_id:     (int) $id,
+                tipo_evento:   'Baja',
+                origen:        $equipo->area ?? 'Sin área',
+                destino:       'Proveedor',
+                user_from_id:  $equipo->user_id,
+                estado_equipo: 'Baja',
+            );
+        } else {
+            DB::table('inventario_equipos')->where('id', $id)->update([
+                'estado'     => $estado,
+                'updated_at' => now(),
+            ]);
 
-        KardexMovimiento::registrar(
-            tipo_activo:   'equipo',
-            activo_id:     (int) $id,
-            tipo_evento:   $tipoEvento,
-            origen:        $equipo->responsable_nombre ?? 'Sin responsable',
-            user_from_id:  $equipo->user_id,
-            estado_equipo: $estadoEquipo,
-        );
+            KardexMovimiento::registrar(
+                tipo_activo:   'equipo',
+                activo_id:     (int) $id,
+                tipo_evento:   'Mantenimiento',
+                origen:        $equipo->responsable_nombre ?? 'Sin responsable',
+                user_from_id:  $equipo->user_id,
+                estado_equipo: 'Mantenimiento',
+            );
+        }
 
         if (in_array($estado, ['mantenimiento', 'baja'], true)) {
             if ($equipo->ipv4) {
@@ -320,7 +330,7 @@ class KardexController extends Controller
             $apellido = $partes[1] ?? '';
             $candidatos = DB::table('users')
                 ->leftJoin('departamentos', 'users.id_departamento', '=', 'departamentos.id_departamento')
-                ->where('users.activo', 1)
+                ->where('users.activo', true)
                 ->where(function ($q) use ($nombre, $apellido) {
                     $q->where('users.name', 'like', "%{$nombre}%")
                       ->orWhere('users.apellido_paterno', 'like', "%{$apellido}%")
@@ -529,10 +539,33 @@ class KardexController extends Controller
                 $ipId    = IpAssigner::resolveId($ipNueva);
                 $ocupante = IpAssigner::findOccupant($ipId);
 
-                if ($ocupante && $ocupante->id !== $existente->id && (int) $ocupante->user_id !== $userId) {
-                    return redirect()->route('kardex.resguardo.preview')->withInput()->withErrors([
-                        'ipv4' => "La IP {$ipNueva} ya está asignada a otro dispositivo.",
+                if ($ocupante && (int) $ocupante->id !== (int) $existente->id) {
+                    // La IP está en un dispositivo distinto al que se está guardando.
+                    if ($ocupante->tabla === 'inventario_equipos' && (int) $ocupante->user_id !== $userId) {
+                        // Diferente equipo, diferente propietario → bloquear
+                        return redirect()->route('kardex.resguardo.preview')->withInput()->withErrors([
+                            'ipv4' => "La IP {$ipNueva} ya está asignada a otro equipo (distinto propietario). Libérala primero desde el panel Network.",
+                        ]);
+                    }
+                    // Mismo propietario (u ocupante es impresora) → switcheo implícito:
+                    // se desvincula la IP del dispositivo anterior sin pasar por 'Libre',
+                    // porque inmediatamente se reasigna abajo.
+                    $pkAnterior      = $ocupante->tabla === 'inventario_equipos' ? 'id' : 'id_impresora';
+                    $campoIpAnterior = $ocupante->tabla === 'inventario_equipos' ? 'ipv4' : 'ip_address';
+                    DB::table($ocupante->tabla)->where($pkAnterior, $ocupante->id)->update([
+                        'ip_id'          => null,
+                        $campoIpAnterior => null,
+                        'updated_at'     => now(),
                     ]);
+                    KardexMovimiento::registrar(
+                        tipo_activo:   $ocupante->tabla === 'inventario_equipos' ? 'equipo' : 'impresora',
+                        activo_id:     (int) $ocupante->id,
+                        tipo_evento:   'Liberación IP',
+                        origen:        $existente->cpu_serie,
+                        destino:       $existente->cpu_serie,
+                        estado_equipo: 'Libre',
+                        notas:         "IP: {$ipNueva} — liberada por reasignación de resguardo",
+                    );
                 }
 
                 // Registrar evento según si ya tenía IP o no
@@ -577,6 +610,7 @@ class KardexController extends Controller
                     destino:       $nombreEmpleado,
                     user_from_id:  $existente->user_id,
                     user_to_id:    $userId,
+                    ticket_ref:    $request->ticket_ref ?: null,
                     estado_equipo: 'Asignado',
                     notas:         'Cambio de responsable por nuevo resguardo PDF.',
                 );
@@ -680,6 +714,7 @@ class KardexController extends Controller
             origen:        'Subdirección de Sistemas',
             destino:       $nombreEmpleado,
             user_to_id:    $userId,
+            ticket_ref:    $request->ticket_ref ?: null,
             estado_equipo: 'Asignado',
             notas:         $notaAsignacion,
         );
@@ -841,5 +876,219 @@ class KardexController extends Controller
         }
 
         return response()->json(['ip' => null, 'mensaje' => 'Rango sin IPs disponibles']);
+    }
+
+    // ─── Importación masiva de equipos (solo equipos sin resguardo) ───────────
+
+    public function validarImport(Request $request)
+    {
+        $request->validate([
+            'archivo' => 'required|file|mimes:xlsx,xls|max:10240',
+        ]);
+
+        $path     = $request->file('archivo')->store('temp_imports', 'local');
+        $fullPath = Storage::disk('local')->path($path);
+
+        try {
+            $importer  = new \App\Imports\EquiposImporter();
+            $resultado = $importer->process($fullPath, dryRun: true);
+
+            session(['import_temp_path' => $path, 'import_temp_ts' => now()->timestamp]);
+
+            return response()->json($resultado);
+        } catch (\Throwable $e) {
+            Storage::disk('local')->delete($path);
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function aplicarImport(Request $request)
+    {
+        $path = session('import_temp_path');
+        $ts   = (int) session('import_temp_ts', 0);
+
+        if (!$path || (now()->timestamp - $ts) > 1800) {
+            return response()->json(['error' => 'Sesión de importación expirada (30 min). Vuelve a subir el archivo.'], 422);
+        }
+
+        $fullPath = Storage::disk('local')->path($path);
+
+        if (!file_exists($fullPath)) {
+            return response()->json(['error' => 'El archivo temporal ya no existe. Vuelve a subir.'], 422);
+        }
+
+        try {
+            $importer  = new \App\Imports\EquiposImporter();
+            $resultado = $importer->process($fullPath, dryRun: false);
+
+            Storage::disk('local')->delete($path);
+            session()->forget(['import_temp_path', 'import_temp_ts']);
+
+            return response()->json($resultado);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    // ─── Licencias ─────────────────────────────────────────────────────────────
+
+    public function licenciasJson()
+    {
+        $licencias = DB::table('licencias')->orderBy('correo')->get();
+
+        $nUsuarios = DB::table('licencia_users')
+            ->selectRaw('licencia_id, COUNT(*) as total')
+            ->groupBy('licencia_id')
+            ->pluck('total', 'licencia_id');
+
+        $nEquipos = DB::table('licencia_equipos')
+            ->selectRaw('licencia_id, COUNT(*) as total')
+            ->groupBy('licencia_id')
+            ->pluck('total', 'licencia_id');
+
+        return response()->json($licencias->map(function ($lic) use ($nUsuarios, $nEquipos) {
+            $lic->n_usuarios = (int) ($nUsuarios[$lic->id] ?? 0);
+            $lic->n_equipos  = (int) ($nEquipos[$lic->id] ?? 0);
+            return $lic;
+        }));
+    }
+
+    public function licenciaDetalle($id)
+    {
+        $lic = DB::table('licencias')->where('id', $id)->first();
+        abort_if(!$lic, 404);
+
+        $titulares = DB::table('licencia_users')
+            ->join('users', 'licencia_users.user_id', '=', 'users.id')
+            ->where('licencia_users.licencia_id', $id)
+            ->select(
+                'users.id',
+                DB::raw("TRIM(COALESCE(users.name,'') || ' ' || COALESCE(users.apellido_paterno,'')) as nombre"),
+                'users.email',
+                'users.puesto',
+            )
+            ->get();
+
+        $equipos = DB::table('licencia_equipos')
+            ->join('inventario_equipos', 'licencia_equipos.equipo_id', '=', 'inventario_equipos.id')
+            ->where('licencia_equipos.licencia_id', $id)
+            ->select(
+                'inventario_equipos.id',
+                'inventario_equipos.tipo',
+                'inventario_equipos.cpu_serie',
+                'inventario_equipos.cpu_marca',
+                'inventario_equipos.cpu_modelo',
+                'inventario_equipos.area',
+            )
+            ->get();
+
+        $lic->titulares = $titulares;
+        $lic->equipos   = $equipos;
+
+        return response()->json($lic);
+    }
+
+    public function storeLicencia(Request $request)
+    {
+        $defaults = match ($request->input('tipo')) {
+            'E3'             => ['max_usuarios' => 1, 'max_equipos' => 5],
+            'E1'             => ['max_usuarios' => 1, 'max_equipos' => 0],
+            'Exchange Plan 1'=> ['max_usuarios' => 1, 'max_equipos' => 0],
+            default          => ['max_usuarios' => 1, 'max_equipos' => 0],
+        };
+
+        $data = $request->validate([
+            'correo'        => 'required|email|unique:licencias,correo|max:150',
+            'tipo'          => 'required|string|max:50',
+            'max_usuarios'  => 'required|integer|min:1',
+            'max_equipos'   => 'required|integer|min:0',
+            'area'          => 'nullable|string',
+            'estado'        => 'required|string|in:Activa,Inactiva,Suspendida',
+            'caducidad'     => 'nullable|date',
+            'observaciones' => 'nullable|string',
+        ]);
+
+        $id = DB::table('licencias')->insertGetId(array_merge($data, [
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]));
+
+        return response()->json(['ok' => true, 'id' => $id]);
+    }
+
+    public function updateLicencia(Request $request, $id)
+    {
+        abort_if(!DB::table('licencias')->where('id', $id)->exists(), 404);
+
+        $data = $request->validate([
+            'correo'        => "required|email|max:150|unique:licencias,correo,{$id}",
+            'tipo'          => 'required|string|max:50',
+            'max_usuarios'  => 'required|integer|min:1',
+            'max_equipos'   => 'required|integer|min:0',
+            'area'          => 'nullable|string',
+            'estado'        => 'required|string|in:Activa,Inactiva,Suspendida',
+            'caducidad'     => 'nullable|date',
+            'observaciones' => 'nullable|string',
+        ]);
+
+        DB::table('licencias')->where('id', $id)->update(array_merge($data, ['updated_at' => now()]));
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function asignarLicenciaUsuario(Request $request, $id)
+    {
+        $lic = DB::table('licencias')->where('id', $id)->first();
+        abort_if(!$lic, 404);
+
+        $userId = $request->validate(['user_id' => 'required|exists:users,id'])['user_id'];
+
+        $nActual = DB::table('licencia_users')->where('licencia_id', $id)->count();
+        if ($nActual >= $lic->max_usuarios) {
+            return response()->json(['error' => "Cupo de titulares alcanzado ({$lic->max_usuarios})."], 422);
+        }
+
+        DB::table('licencia_users')->updateOrInsert(
+            ['licencia_id' => $id, 'user_id' => $userId],
+            ['created_at'  => now()]
+        );
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function desasignarLicenciaUsuario($id, $userId)
+    {
+        DB::table('licencia_users')->where('licencia_id', $id)->where('user_id', $userId)->delete();
+        return response()->json(['ok' => true]);
+    }
+
+    public function asignarLicenciaEquipo(Request $request, $id)
+    {
+        $lic = DB::table('licencias')->where('id', $id)->first();
+        abort_if(!$lic, 404);
+
+        if ($lic->max_equipos <= 0) {
+            return response()->json(['error' => 'Esta licencia no permite instalación en equipos (solo acceso web).'], 422);
+        }
+
+        $equipoId = $request->validate(['equipo_id' => 'required|exists:inventario_equipos,id'])['equipo_id'];
+
+        $nActual = DB::table('licencia_equipos')->where('licencia_id', $id)->count();
+        if ($nActual >= $lic->max_equipos) {
+            return response()->json(['error' => "Cupo de equipos alcanzado ({$lic->max_equipos})."], 422);
+        }
+
+        DB::table('licencia_equipos')->updateOrInsert(
+            ['licencia_id' => $id, 'equipo_id' => $equipoId],
+            ['created_at'  => now()]
+        );
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function desasignarLicenciaEquipo($id, $equipoId)
+    {
+        DB::table('licencia_equipos')->where('licencia_id', $id)->where('equipo_id', $equipoId)->delete();
+        return response()->json(['ok' => true]);
     }
 }

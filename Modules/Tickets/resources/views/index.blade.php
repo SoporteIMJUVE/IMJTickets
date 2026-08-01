@@ -218,7 +218,19 @@
         @endphp
         <div class="grid grid-cols-3 gap-6">
             @foreach($columns as $col)
-            @php $colTickets = $porEstado[$col['estado']]; @endphp
+            @php
+                $colTickets = $porEstado[$col['estado']];
+                if ($col['estado'] === 2) {
+                    $umbral         = \Carbon\Carbon::now()->subDay();
+                    $kanbanTickets  = $colTickets->filter(fn($t) =>
+                        $t->cerrado_at && \Carbon\Carbon::parse($t->cerrado_at)->gt($umbral)
+                    );
+                    $nOcultos = $colTickets->count() - $kanbanTickets->count();
+                } else {
+                    $kanbanTickets = $colTickets;
+                    $nOcultos      = 0;
+                }
+            @endphp
             <div>
                 {{-- Cabecera de columna --}}
                 <div class="flex items-center justify-between pb-3 mb-4 border-b-2 {{ $col['border'] }}">
@@ -227,12 +239,12 @@
                         {{ $col['label'] }}
                     </h3>
                     <div class="flex items-center gap-2">
-                        @if($col['estado'] === 2)
-                        <span id="cerrados-ocultos" class="hidden text-[10px] text-muted italic"></span>
+                        @if($col['estado'] === 2 && $nOcultos > 0)
+                        <span class="text-[10px] text-muted italic">+{{ $nOcultos }} oculto{{ $nOcultos !== 1 ? 's' : '' }}</span>
                         @endif
                         <span id="badge-estado-{{ $col['estado'] }}" class="text-xs font-bold text-white px-2 py-0.5 rounded-full"
                               style="background:{{ $col['color'] }}">
-                            {{ $colTickets->count() }}
+                            {{ $kanbanTickets->count() }}
                         </span>
                     </div>
                 </div>
@@ -241,7 +253,7 @@
                 @php $bgCerrado = $col['estado'] === 2 ? 'bg-wash/60 rounded-lg p-2' : ''; @endphp
                 <div class="kanban-col-body space-y-3 min-h-[200px] {{ $bgCerrado }}"
                      data-estado="{{ $col['estado'] }}">
-                    @forelse($colTickets as $t)
+                    @forelse($kanbanTickets as $t)
                     @php
                         $folio = '#TK-' . \Carbon\Carbon::parse($t->created_at)->format('Y') . '-' . str_pad($t->id, 4, '0', STR_PAD_LEFT);
                         $td = ['id'=>$t->id,'folio'=>$folio,'nombre'=>$t->nombre,'correo'=>$t->correo,'area'=>$t->area,'tipo'=>$t->tipo,'descripcion'=>$t->descripcion,'estado'=>$t->estado,'atendido_by'=>$t->atendido_by,'created_at'=>$t->created_at,'atendido_at'=>$t->atendido_at,'cerrado_at'=>$t->cerrado_at,'ip'=>$t->ip??null,'mac'=>$t->mac??null];

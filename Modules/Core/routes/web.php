@@ -191,7 +191,6 @@ Route::middleware(['auth', 'admin'])->group(function () {
                 ->orWhereRaw("LOWER(COALESCE(docking_marca,'')) LIKE LOWER(?)",   [$like])
                 ->orWhereRaw("LOWER(COALESCE(docking_serie,'')) LIKE LOWER(?)",   [$like])
                 ->orWhereRaw("LOWER(COALESCE(ipv4,'')) LIKE LOWER(?)",            [$like])
-                ->orWhereRaw("LOWER(COALESCE(ipv4_actual,'')) LIKE LOWER(?)",     [$like])
                 ->orWhereRaw("LOWER(COALESCE(mac,'')) LIKE LOWER(?)",             [$like]);
             $totalEq = \DB::table('inventario_equipos')->where($condEq)->count();
             if ($totalEq > 0) {

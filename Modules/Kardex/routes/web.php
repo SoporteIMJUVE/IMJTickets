@@ -142,7 +142,7 @@ Route::middleware(['auth', 'admin'])->prefix('kardex')->name('kardex.')->group(f
         return response()->json(
             \DB::table('users')
                 ->leftJoin('departamentos', 'users.id_departamento', '=', 'departamentos.id_departamento')
-                ->where('users.activo', 1)
+                ->where('users.activo', true)
                 ->where(function ($query) use ($q) {
                     $query->where('users.name',             'like', "%{$q}%")
                           ->orWhere('users.apellido_paterno','like', "%{$q}%")
@@ -162,11 +162,60 @@ Route::middleware(['auth', 'admin'])->prefix('kardex')->name('kardex.')->group(f
         );
     })->name('usuarios.buscar');
 
+    Route::post('/importar/validar',    [KardexController::class, 'validarImport'])->name('importar.validar');
+    Route::post('/importar/aplicar',    [KardexController::class, 'aplicarImport'])->name('importar.aplicar');
+
+    // ── Licencias ────────────────────────────────────────────────────────────
+    Route::get('/licencias/json',                                     [KardexController::class, 'licenciasJson'])->name('licencias.json');
+    Route::get('/licencias/{id}/detalle',                             [KardexController::class, 'licenciaDetalle'])->name('licencias.detalle');
+    Route::post('/licencias',                                         [KardexController::class, 'storeLicencia'])->name('licencias.store');
+    Route::put('/licencias/{id}',                                     [KardexController::class, 'updateLicencia'])->name('licencias.update');
+    Route::post('/licencias/{id}/usuario',                            [KardexController::class, 'asignarLicenciaUsuario'])->name('licencias.asignar-usuario');
+    Route::delete('/licencias/{id}/usuario/{userId}',                 [KardexController::class, 'desasignarLicenciaUsuario'])->name('licencias.desasignar-usuario');
+    Route::post('/licencias/{id}/equipo',                             [KardexController::class, 'asignarLicenciaEquipo'])->name('licencias.asignar-equipo');
+    Route::delete('/licencias/{id}/equipo/{equipoId}',                [KardexController::class, 'desasignarLicenciaEquipo'])->name('licencias.desasignar-equipo');
+
     Route::get('/resguardo/subir',      [KardexController::class, 'subirResguardo'])->name('resguardo.subir');
     Route::post('/resguardo/extraer',   [KardexController::class, 'extraerResguardo'])->name('resguardo.extraer');
     Route::get('/resguardo/preview',    [KardexController::class, 'mostrarPreview'])->name('resguardo.preview');
     Route::post('/resguardo/guardar',   [KardexController::class, 'guardarResguardo'])->name('resguardo.guardar');
     Route::get('/resguardo/ip',         [KardexController::class, 'sugerirIp'])->name('resguardo.ip');
+
+    // JSON: busca un ticket por folio para vincular al resguardo.
+    // Solo acepta tickets de tipo "Solicitud de Equipo".
+    Route::get('/resguardo/ticket-buscar', function (\Illuminate\Http\Request $request) {
+        $input = strtoupper(trim($request->input('folio', '')));
+        if (!preg_match('/TK-(\d{4})-(\d+)/', $input, $m)) {
+            return response()->json(['error' => 'Formato inválido. Ejemplo: TK-2026-0008'], 422);
+        }
+        $year = (int) $m[1];
+        $id   = (int) $m[2];
+
+        $t = \DB::table('tickets')
+            ->where('id', $id)
+            ->where('tipo', 'Solicitud de Equipo')
+            ->first();
+
+        if (!$t || \Carbon\Carbon::parse($t->created_at)->year !== $year) {
+            return response()->json(['error' => 'No se encontró un ticket "Solicitud de Equipo" con ese folio.'], 404);
+        }
+
+        $folio  = '#TK-' . \Carbon\Carbon::parse($t->created_at)->format('Y') . '-' . str_pad($t->id, 4, '0', STR_PAD_LEFT);
+        $estado = match ((int) $t->estado) { 0 => 'Cerrado', 1 => 'Abierto', 2 => 'Atendiendo', default => 'Desconocido' };
+
+        return response()->json([
+            'folio'        => $folio,
+            'nombre'       => $t->nombre,
+            'correo'       => $t->correo,
+            'area'         => $t->area,
+            'tipo'         => $t->tipo,
+            'descripcion'  => $t->descripcion,
+            'estado_label' => $estado,
+            'hace'         => \Carbon\Carbon::parse($t->created_at)->diffForHumans(),
+            'ip'           => $t->ip  ?? null,
+            'mac'          => $t->mac ?? null,
+        ]);
+    })->name('resguardo.ticket-buscar');
 
     // JSON: verifica si una serie ya existe — permite que el formulario de preview
     // actualice el banner de operación cuando el admin corrige el número de serie.

@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class EmpleadosExporter extends BaseExporter
 {
@@ -10,7 +11,7 @@ class EmpleadosExporter extends BaseExporter
     {
         return [
             'Nombre', 'Correo', 'Departamento / Área',
-            'Equipos Asignados', 'No. de Inventario(s)', 'Estado', 'Licencia',
+            'Equipos Asignados', 'No. de Serie', 'Estado', 'Licencia',
         ];
     }
 
@@ -49,15 +50,34 @@ class EmpleadosExporter extends BaseExporter
 
         $equiposPorEmpleado = DB::table('inventario_equipos')
             ->whereNotNull('user_id')
-            ->select('user_id', 'num_inventario', 'tipo')
+            ->select('user_id', 'cpu_serie', 'tipo')
             ->get()
             ->groupBy('user_id');
+
+        $licenciasPorUsuario = Schema::hasTable('licencia_users')
+            ? DB::table('licencia_users')
+                ->join('licencias', 'licencia_users.licencia_id', '=', 'licencias.id')
+                ->select('licencia_users.user_id', 'licencias.tipo', 'licencias.correo')
+                ->get()
+                ->groupBy(fn($r) => (string) $r->user_id)
+            : collect();
 
         $rows = [];
         foreach ($empleados as $emp) {
             $equipos  = $equiposPorEmpleado->get($emp->id_empleado, collect());
             $tipos    = $equipos->pluck('tipo')->filter()->implode(', ') ?: '—';
-            $numInvs  = $equipos->pluck('num_inventario')->filter()->implode(', ') ?: '—';
+            $numInvs  = $equipos->isNotEmpty()
+                ? $equipos->map(fn($e) => $e->cpu_serie ?: 'Personal')->implode(', ')
+                : '—';
+
+            $lics = $licenciasPorUsuario->get((string) $emp->id_empleado, collect());
+            if ($lics->isNotEmpty()) {
+                $licTexto = $lics->map(fn($l) => "{$l->tipo} ({$l->correo})")->implode(' | ');
+            } elseif (str_ends_with(strtolower((string) ($emp->correo ?? '')), '@imjuventud.gob.mx')) {
+                $licTexto = 'E1 (' . $emp->correo . ')';
+            } else {
+                $licTexto = '—';
+            }
 
             $rows[] = [
                 trim($emp->nombre_completo),
@@ -66,7 +86,7 @@ class EmpleadosExporter extends BaseExporter
                 $tipos,
                 $numInvs,
                 $emp->activo ? 'Activo' : 'Baja',
-                '', // Licencia — campo pendiente
+                $licTexto,
             ];
         }
 

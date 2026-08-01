@@ -259,9 +259,11 @@
         {{-- Historial Reciente --}}
         <section>
             <h4 class="text-[11px] font-bold uppercase tracking-wider text-muted mb-4 pb-2 border-b border-border">Historial Reciente</h4>
-            <div class="text-center text-muted py-6">
-                <span class="material-symbols-outlined text-3xl block mb-2">history</span>
-                <p class="text-sm">Sin historial disponible</p>
+            <div id="panel-historial">
+                <div class="text-center text-muted py-6">
+                    <span class="material-symbols-outlined text-3xl block mb-2 animate-pulse">history</span>
+                    <p class="text-sm">Cargando…</p>
+                </div>
             </div>
         </section>
     </div>
@@ -428,6 +430,65 @@ async function abrirPanelIp(id) {
 
     const btnLiberar = document.getElementById('btn-liberar-ip');
     btnLiberar.disabled = data.estatus !== 'Ocupada';
+
+    // Cargar historial Kardex del dispositivo que ocupa esta IP
+    cargarHistorialIp(data.ocupante);
+}
+
+const _KARDEX_BASE = '{{ url('/kardex') }}';
+
+const _EVENTO_ESTILOS = {
+    'Entrada':       { dot: 'bg-green-500',  txt: 'text-green-700'  },
+    'Asignación':    { dot: 'bg-green-500',  txt: 'text-green-700'  },
+    'Asignación IP': { dot: 'bg-blue-500',   txt: 'text-blue-700'   },
+    'Reasignación':  { dot: 'bg-amber-500',  txt: 'text-amber-700'  },
+    'Cambio IP':     { dot: 'bg-amber-500',  txt: 'text-amber-700'  },
+    'Liberación IP': { dot: 'bg-slate-400',  txt: 'text-slate-600'  },
+    'Almacén':       { dot: 'bg-slate-400',  txt: 'text-slate-600'  },
+    'Mantenimiento': { dot: 'bg-orange-500', txt: 'text-orange-700' },
+    'Baja':          { dot: 'bg-red-500',    txt: 'text-red-700'    },
+    'Reingreso':     { dot: 'bg-teal-500',   txt: 'text-teal-700'   },
+};
+
+async function cargarHistorialIp(ocupante) {
+    const contenedor = document.getElementById('panel-historial');
+    if (!ocupante) {
+        contenedor.innerHTML = `<p class="text-xs text-muted italic text-center py-4">IP sin dispositivo asignado — sin historial.</p>`;
+        return;
+    }
+    const tipo = ocupante.tabla === 'inventario_equipos' ? 'equipo' : 'impresora';
+    const url  = `${_KARDEX_BASE}/${tipo}/${ocupante.id}/historial`;
+    let movs;
+    try {
+        const r = await fetch(url);
+        movs = r.ok ? await r.json() : [];
+    } catch { movs = []; }
+
+    if (!movs.length) {
+        contenedor.innerHTML = `<p class="text-xs text-muted italic text-center py-4">Sin movimientos registrados para este dispositivo.</p>`;
+        return;
+    }
+
+    // Solo los 10 más recientes en el panel lateral
+    const recientes = movs.slice(0, 10);
+    contenedor.innerHTML = `<div class="relative pl-4 border-l-2 border-border space-y-4">
+        ${recientes.map(m => {
+            const estilo  = _EVENTO_ESTILOS[m.tipo_evento] ?? { dot: 'bg-muted', txt: 'text-muted' };
+            const fecha   = m.created_at ? new Date(m.created_at).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' }) : '—';
+            const deOrigen = m.origen ? `<span class="opacity-70">${m.origen}</span>` : '';
+            const aDest    = m.destino ? ` → <span class="opacity-70">${m.destino}</span>` : '';
+            const notas    = m.notas   ? `<p class="text-[10px] text-muted mt-0.5">${m.notas}</p>` : '';
+            const por      = m.registrado_email ? `<p class="text-[10px] text-muted mt-0.5">por ${m.registrado_email}</p>` : '';
+            return `<div class="relative">
+                <span class="absolute -left-5 top-1 w-2.5 h-2.5 rounded-full ${estilo.dot} ring-2 ring-canvas"></span>
+                <p class="text-[10px] text-muted leading-none mb-0.5">${fecha}</p>
+                <p class="text-xs font-bold ${estilo.txt}">${m.tipo_evento}</p>
+                ${(m.origen || m.destino) ? `<p class="text-[11px] text-on-surface">${deOrigen}${aDest}</p>` : ''}
+                ${notas}${por}
+            </div>`;
+        }).join('')}
+    </div>
+    ${movs.length > 10 ? `<p class="text-[10px] text-muted text-center mt-3">+${movs.length - 10} movimientos más — ver en Kardex.</p>` : ''}`;
 }
 
 function closeIpPanel() {

@@ -40,16 +40,22 @@ class TicketsController extends Controller
         $hace7 = now()->subDays(7)->toDateTimeString();
 
         // Promedio de resolución (tickets cerrados en los últimos 7 días)
+        // Cálculo en PHP para compatibilidad SQLite y PostgreSQL.
         $cerrados7 = DB::table('tickets')
             ->whereNotNull('cerrado_at')
             ->where('cerrado_at', '>=', $hace7)
-            ->selectRaw("AVG((julianday(cerrado_at) - julianday(created_at)) * 24) as avg_horas")
-            ->value('avg_horas');
-        $promedioResolucion = $cerrados7
-            ? ($cerrados7 < 1
-                ? round($cerrados7 * 60) . ' min'
-                : round($cerrados7, 1) . ' h')
-            : 'Sin datos';
+            ->select('cerrado_at', 'created_at')
+            ->get();
+        $promedioResolucion = 'Sin datos';
+        if ($cerrados7->isNotEmpty()) {
+            $avgHoras = $cerrados7->avg(fn($t) =>
+                \Carbon\Carbon::parse($t->cerrado_at)
+                    ->diffInMinutes(\Carbon\Carbon::parse($t->created_at)) / 60
+            );
+            $promedioResolucion = $avgHoras < 1
+                ? round($avgHoras * 60) . ' min'
+                : round($avgHoras, 1) . ' h';
+        }
 
         // Área con más tickets en los últimos 7 días
         $areaTop = DB::table('tickets')

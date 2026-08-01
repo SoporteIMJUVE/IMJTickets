@@ -105,10 +105,17 @@ Route::middleware(['auth', 'admin'])->prefix('crm')->name('crm.')->group(functio
             ) as ipv4"),
         ];
 
+        $esPersonalExpr = \DB::raw("CASE WHEN EXISTS (
+            SELECT 1 FROM movimientos_equipos m
+            WHERE m.activo_id = inventario_equipos.id
+              AND m.tipo_activo = 'equipo'
+              AND m.tipo_evento = 'Entrada'
+        ) THEN 0 ELSE 1 END as es_personal");
+
         // 1. Ligados por FK (vinculación formal)
         $porFk = \DB::table('inventario_equipos')
             ->where('inventario_equipos.user_id', $id)
-            ->select($selectBase)
+            ->select(array_merge($selectBase, [$esPersonalExpr]))
             ->orderBy('tipo')->orderBy('consecutivo')
             ->get()
             ->map(fn($e) => array_merge((array)$e, ['match' => 'fk']));
@@ -122,7 +129,7 @@ Route::middleware(['auth', 'admin'])->prefix('crm')->name('crm.')->group(functio
                 ->whereNull('inventario_equipos.user_id')
                 ->where('inventario_equipos.nombre_usuario', 'like', "%{$nombre}%")
                 ->where('inventario_equipos.nombre_usuario', 'like', "%{$apellido}%")
-                ->select($selectBase)
+                ->select(array_merge($selectBase, [$esPersonalExpr]))
                 ->orderBy('tipo')->orderBy('consecutivo')
                 ->get()
                 ->map(fn($e) => array_merge((array)$e, ['match' => 'nombre']));
@@ -130,6 +137,22 @@ Route::middleware(['auth', 'admin'])->prefix('crm')->name('crm.')->group(functio
 
         return response()->json($porFk->concat($porNombre)->values());
     })->name('empleado.equipos');
+
+    // PATCH: desvincular equipo de su responsable actual (user_id → null)
+    Route::patch('/equipo/{id}/desvincular', function ($id) {
+        \DB::table('inventario_equipos')->where('id', $id)->update(['user_id' => null]);
+        return response()->json(['ok' => true]);
+    })->name('equipo.desvincular');
+
+    // PATCH: reasignar equipo a otro usuario
+    Route::patch('/equipo/{id}/vincular', function ($id) {
+        $userId = request()->input('user_id');
+        if (!\DB::table('users')->where('id', $userId)->exists()) {
+            return response()->json(['ok' => false, 'message' => 'Usuario no encontrado'], 404);
+        }
+        \DB::table('inventario_equipos')->where('id', $id)->update(['user_id' => $userId]);
+        return response()->json(['ok' => true]);
+    })->name('equipo.vincular');
 
     // JSON: IPs libres filtradas por area (para mini-modal de asignación en edición de equipo)
     Route::get('/ips-libres', function (\Illuminate\Http\Request $request) {
